@@ -10,6 +10,11 @@ const rollCallGuardSource = readFileSync(
   "utf8",
 );
 
+const rollCallClientSource = readFileSync(
+  new URL("./attendance-client.tsx", import.meta.url),
+  "utf8",
+);
+
 describe("Roll Call dialog layout", () => {
   test("uses the full viewport for the focused roll-call workflow", () => {
     expect(rollCallDialogSource).toContain("h-[100dvh]");
@@ -34,6 +39,20 @@ describe("Roll Call dialog layout", () => {
     expect(rollCallDialogSource).toContain("<BadgeIcon title={badge} /> {badge}");
     expect(rollCallDialogSource).toContain("Perfect Attendance");
     expect(rollCallDialogSource).toContain("Reliable Learner");
+  });
+
+  test("reads the current student\u0027s private semester note without changing dated marks", () => {
+    expect(rollCallClientSource).toContain('semesterNotes={semesterNotesQuery.isSuccess ? semesterNotes : []}');
+    expect(rollCallClientSource).toContain('semesterNotesState={semesterNotesQuery.isError ? "error"');
+    expect(rollCallGuardSource).toContain('<ActiveRollCallDialog {...props} />');
+    expect(rollCallDialogSource).toContain("item.studentId === currentStudentId");
+    expect(rollCallDialogSource).toContain("semesterNotesState === \"ready\"");
+    expect(rollCallDialogSource).toContain('data-testid="roll-call-semester-note"');
+    expect(rollCallDialogSource).toContain('aria-label="Semester note"');
+    expect(rollCallDialogSource).toContain("whitespace-pre-wrap break-words");
+    expect(rollCallDialogSource).toContain("Private semester notes are unavailable.");
+    expect(rollCallDialogSource).toContain("read-only during roll call");
+    expect(rollCallDialogSource).not.toContain("offeringsApi.semesterNotes(");
   });
 
   test("does not allow a zero-mark roll call to save", () => {

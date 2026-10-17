@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Award, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileCheck2, HelpCircle, LogOut, Save, SkipForward, Star, Trophy, UserRound, XCircle } from "lucide-react";
-import type { AttendanceRecordView, AttendanceStatus, OfferingView } from "@dse-pms/shared-types";
+import { Award, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileCheck2, HelpCircle, LogOut, Pin, Save, SkipForward, Star, Trophy, UserRound, XCircle } from "lucide-react";
+import type { AttendanceRecordView, AttendanceStatus, OfferingView, StudentSemesterNoteView } from "@dse-pms/shared-types";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@dse-pms/ui";
 import { getAttendanceCounts, getNextIndex, getPreviousIndex, getSkipFeedback, getUnmarkedStudentIds, hasAttendanceObservation } from "./roll-call-state";
 
@@ -12,6 +12,8 @@ interface RollCallDialogProps {
   date: string;
   week: number | null;
   records: AttendanceRecordView[];
+  semesterNotes: StudentSemesterNoteView[];
+  semesterNotesState: "loading" | "ready" | "error";
   saving: boolean;
   saveError?: string | null;
   onUpdateRecord: (studentId: string, patch: Partial<Pick<AttendanceRecordView, "status" | "permissionPending" | "permissionPendingSince" | "note">>) => void;
@@ -47,7 +49,7 @@ function BadgeIcon({ title }: { title: string }) {
   return <Award className="h-3.5 w-3.5" />;
 }
 
-export function RollCallDialog({ open, offering, date, week, records, saving, saveError, onUpdateRecord, onRequestClose, onSaveAndClose }: RollCallDialogProps) {
+export function RollCallDialog({ open, offering, date, week, records, semesterNotes, semesterNotesState, saving, saveError, onUpdateRecord, onRequestClose, onSaveAndClose }: RollCallDialogProps) {
   const [index, setIndex] = useState(0);
   const [reviewStudentIds, setReviewStudentIds] = useState<string[] | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -66,6 +68,10 @@ export function RollCallDialog({ open, offering, date, week, records, saving, sa
   const sequence = useMemo(() => reviewStudentIds ?? records.map((record) => record.studentId), [records, reviewStudentIds]);
   const currentStudentId = sequence[index] ?? null;
   const current = currentStudentId ? records.find((record) => record.studentId === currentStudentId) ?? null : null;
+  // Derive on every student transition: never hold the prior student\u0027s private note in local state.
+  const currentSemesterNote = semesterNotesState === "ready" && currentStudentId
+    ? semesterNotes.find((item) => item.studentId === currentStudentId && item.note.trim())?.note ?? null
+    : null;
   const courseTitle = offering?.course?.title ?? offering?.course?.code ?? "Course";
   const weekLabel = week ? `Week ${week}` : "Week not scheduled";
   const markedCount = counts.Total - counts.Unmarked;
@@ -148,6 +154,8 @@ export function RollCallDialog({ open, offering, date, week, records, saving, sa
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Student {sequence.length === 0 ? 0 : index + 1} of {sequence.length}</p>
                   {current.studentKhmerName ? <h3 lang="km" className="mt-3 max-w-[min(1100px,94vw)] break-words text-6xl font-semibold leading-[1.05] tracking-tight text-foreground md:text-7xl xl:text-8xl 2xl:text-9xl">{current.studentKhmerName}</h3> : null}
                   <h3 className={`${current.studentKhmerName ? "mt-1 text-5xl md:text-6xl xl:text-7xl 2xl:text-8xl" : "mt-3 text-6xl md:text-7xl xl:text-8xl 2xl:text-9xl"} max-w-[min(1100px,94vw)] break-words font-semibold leading-[1.05] tracking-tight text-foreground`}>{current.studentName}</h3>
+                  {currentSemesterNote ? <div className="mt-4 w-full max-w-2xl lg:hidden"><RollCallSemesterNote note={currentSemesterNote} /></div> : null}
+                  {semesterNotesState === "error" ? <p role="status" className="mt-3 text-xs text-muted-foreground lg:hidden">Private semester notes are unavailable. Attendance marking still works.</p> : null}
                   <div className="mt-5 w-full max-w-2xl rounded-xl border border-border bg-muted/25 px-5 py-3 text-left">
                     {history && historyRate !== null ? <div className="grid items-center gap-3 sm:grid-cols-[auto_1fr_auto]"><div><p className="text-xs text-muted-foreground">Attendance this course</p><p className="text-2xl font-semibold tabular-nums text-foreground">{historyRate}%</p></div><div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-status-live transition-[width]" style={{ width: `${historyProgress}%` }} /></div><p className="text-right text-sm font-semibold tabular-nums text-foreground">{history.attendedSessions} / {history.markedSessions}<span className="block text-[11px] font-normal text-muted-foreground">sessions attended</span></p></div>
                       : <p className="text-center text-sm text-muted-foreground">No finalized attendance history yet</p>}
@@ -174,6 +182,8 @@ export function RollCallDialog({ open, offering, date, week, records, saving, sa
               <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground"><span>Total Students</span><span className="font-semibold tabular-nums text-foreground">{counts.Total}</span></div>
               {counts.Unmarked > 0 ? <button type="button" onClick={reviewUnmarked} className="mt-4 w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Review Unmarked ({counts.Unmarked})</button> : <div className="mt-4 rounded-md border border-status-live/25 bg-status-live-bg px-3 py-2 text-xs font-medium text-status-live">Everyone has a status.</div>}
               {current ? <div className="mt-4 rounded-lg border border-border bg-background p-3"><p className="text-xs font-semibold text-foreground">Student Info</p><div className="mt-2 flex items-center justify-between gap-3 text-xs"><span className="text-muted-foreground">ID</span><span className="truncate font-medium text-foreground">{current.studentNumber ?? "—"}</span></div></div> : null}
+              {currentSemesterNote ? <div className="mt-3 hidden lg:block"><RollCallSemesterNote note={currentSemesterNote} /></div> : null}
+              {semesterNotesState === "error" ? <p role="status" className="mt-3 hidden text-xs text-muted-foreground lg:block">Private semester notes are unavailable. Attendance marking still works.</p> : null}
               {saveError ? <div role="alert" className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm text-destructive">Attendance was not saved. {saveError} Your marks are still here; correct the problem and try again.</div> : null}
               <button type="button" onClick={() => void onSaveAndClose()} disabled={saving || records.length === 0 || !canSaveAttendance} className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"><Save className="h-4 w-4" />{saving ? "Saving…" : "Save Attendance"}</button>
               <p className="mt-2 text-center text-[10px] leading-4 text-muted-foreground">{canSaveAttendance ? "Permission Pending remains unresolved until an authorized lecturer changes it." : "Mark at least one student before saving. Unmarked is not a saved attendance status."}</p>
@@ -183,6 +193,14 @@ export function RollCallDialog({ open, offering, date, week, records, saving, sa
       </DialogContent>
     </Dialog>
   );
+}
+
+function RollCallSemesterNote({ note }: { note: string }) {
+  return <section aria-label="Semester note" data-testid="roll-call-semester-note" className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-left">
+    <h4 className="flex items-center gap-1.5 text-xs font-semibold text-foreground"><Pin className="h-3.5 w-3.5 text-primary" aria-hidden="true" /> Semester note</h4>
+    <p className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-5 text-foreground">{note}</p>
+    <p className="mt-2 text-[11px] text-muted-foreground">Private lecturer note · read-only during roll call</p>
+  </section>;
 }
 
 function SummaryRow({ label, value, dotClass }: { label: string; value: number; dotClass: string }) {

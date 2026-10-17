@@ -681,7 +681,7 @@ export function AttendanceClient() {
           }}
         />
       ) : null}
-      <RollCallDialog open={rollCallOpen} offering={selectedOffering} date={date} week={teachingWeek} records={records} saving={saving} saveError={mutationError} onUpdateRecord={updateRecord} onRequestClose={requestRollCallClose} onSaveAndClose={saveRollCallAndClose} />
+      <RollCallDialog open={rollCallOpen} offering={selectedOffering} date={date} week={teachingWeek} records={records} semesterNotes={semesterNotesQuery.isSuccess ? semesterNotes : []} semesterNotesState={semesterNotesQuery.isError ? "error" : semesterNotesQuery.isSuccess ? "ready" : "loading"} saving={saving} saveError={mutationError} onUpdateRecord={updateRecord} onRequestClose={requestRollCallClose} onSaveAndClose={saveRollCallAndClose} />
       <StudentRecheckDialog open={Boolean(recheckRecord)} initialMode={recheckMode} offeringId={offeringId} date={date} record={recheckRecord} hasPrevious={recheckMode === "standard" && recheckIndex > 0} hasNext={recheckMode === "standard" && recheckIndex >= 0 && recheckIndex < records.length - 1} onPrevious={() => moveRecheck(-1)} onNext={() => moveRecheck(1)} onClose={() => { setRecheckStudentId(null); setRecheckMode("standard"); }} onSaved={handleRecheckSaved} />
     </>
   );
