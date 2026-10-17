@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { AttendanceRecordView, OfferingView } from "@dse-pms/shared-types";
+import type { AttendanceRecordView, OfferingView, StudentSemesterNoteView } from "@dse-pms/shared-types";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@dse-pms/ui";
 import { RollCallDialog as ActiveRollCallDialog } from "./roll-call-dialog-base";
 
@@ -11,6 +11,8 @@ interface RollCallDialogProps {
   date: string;
   week: number | null;
   records: AttendanceRecordView[];
+  semesterNotes: StudentSemesterNoteView[];
+  semesterNotesState: "loading" | "ready" | "error";
   saving: boolean;
   saveError: string | null;
   onUpdateRecord: (
