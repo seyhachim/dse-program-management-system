@@ -11,6 +11,8 @@ import type {
   OfferingView,
   RecheckAttendanceInput,
   SaveAttendanceInput,
+  SaveStudentSemesterNoteInput,
+  StudentSemesterNoteView,
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
 import { ApiError, api } from "./api";
@@ -114,6 +116,15 @@ export const offeringsApi = {
   ): Promise<AttendanceSessionView> {
     return api.post<AttendanceSessionView>(
       `/api/offerings/${id}/attendance/${encodeURIComponent(date)}/recheck`,
+      input,
+    );
+  },
+  semesterNotes(id: string): Promise<StudentSemesterNoteView[]> {
+    return api.get<StudentSemesterNoteView[]>(`/api/offerings/${id}/attendance/semester-notes`);
+  },
+  saveSemesterNote(id: string, studentId: string, input: SaveStudentSemesterNoteInput): Promise<StudentSemesterNoteView> {
+    return api.put<StudentSemesterNoteView>(
+      `/api/offerings/${id}/attendance/semester-notes/${encodeURIComponent(studentId)}`,
       input,
     );
   },
