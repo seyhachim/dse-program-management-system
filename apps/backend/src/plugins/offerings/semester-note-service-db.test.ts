@@ -46,7 +46,7 @@ describeDb("private semester note persistence and audit", () => {
     expect(await semesterNoteService.list(offering.id)).toEqual([second]);
 
     // A stale lecturer session cannot overwrite another lecturer's newer note.
-    expect(semesterNoteService.save(offering.id, student.id, {
+    await expect(semesterNoteService.save(offering.id, student.id, {
       note: "stale overwrite", expectedVersion: 1,
     }, actor.id)).rejects.toBeInstanceOf(SemesterNoteConflictError);
 
@@ -72,16 +72,16 @@ describeDb("private semester note persistence and audit", () => {
       { version: 3, before: "Discussed new approach", after: "", actor: actor.id },
     ]);
 
-    expect(prisma.offeringStudentSemesterNoteRevision.delete({
+    await expect(prisma.offeringStudentSemesterNoteRevision.delete({
       where: { id: stored.revisions[0]!.id },
     })).rejects.toThrow();
 
-    expect(semesterNoteService.save(offering.id, crypto.randomUUID(), {
+    await expect(semesterNoteService.save(offering.id, crypto.randomUUID(), {
       note: "Not a roster member", expectedVersion: 0,
     }, actor.id)).rejects.toBeInstanceOf(SemesterNoteNotFoundError);
 
     await prisma.offering.update({ where: { id: offering.id }, data: { status: "Completed" } });
-    expect(semesterNoteService.save(offering.id, student.id, {
+    await expect(semesterNoteService.save(offering.id, student.id, {
       note: "Cannot edit historical note", expectedVersion: 3,
     }, actor.id)).rejects.toBeInstanceOf(SemesterNoteReadOnlyError);
     expect((await semesterNoteService.list(offering.id))[0]?.version).toBe(3);
