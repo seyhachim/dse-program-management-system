@@ -3,6 +3,7 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { CalendarDays, ExternalLink, ShieldCheck } from "lucide-react";
 import type { PublishedAcademicCalendarProjection } from "@dse-pms/shared-types";
+import { parsePublicAcademicYear, parsePublicStudyYear, publicAcademicCalendarEndpoint } from "./public-academic-calendar-query";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -24,25 +25,19 @@ function semesterLabel(value: "First" | "Second"): string {
   return value === "First" ? "Semester 1" : "Semester 2";
 }
 
-function studyYearFromSegment(value: string): number | null {
-  const match = /^year-([1-4])$/i.exec(value) ?? /^([1-4])$/.exec(value);
-  return match ? Number(match[1]) : null;
-}
-
 export default function PublicAcademicCalendarPage({ params }: PublicAcademicCalendarPageProps) {
   const routeParams = use(params);
   const programmeId = decodeURIComponent(routeParams.programmeId);
-  const academicYear = decodeURIComponent(routeParams.academicYear).replace(/-/g, "–");
-  const studyYear = studyYearFromSegment(routeParams.studyYear);
+  const academicYear = parsePublicAcademicYear(routeParams.academicYear);
+  const studyYear = parsePublicStudyYear(routeParams.studyYear);
   const [data, setData] = useState<PublishedAcademicCalendarProjection | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const endpoint = useMemo(() => {
-    if (!studyYear) return null;
-    const query = new URLSearchParams({ studyYear: String(studyYear), academicYear });
-    return `${API_URL}/api/programme/public/programmes/${encodeURIComponent(programmeId)}/academic-calendar?${query.toString()}`;
-  }, [programmeId, academicYear, studyYear]);
+  const endpoint = useMemo(
+    () => publicAcademicCalendarEndpoint(API_URL, programmeId, academicYear, studyYear),
+    [programmeId, academicYear, studyYear],
+  );
 
   useEffect(() => {
     if (!endpoint) {
