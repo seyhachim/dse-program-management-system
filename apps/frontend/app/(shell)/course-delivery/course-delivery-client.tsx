@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
@@ -352,6 +353,12 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
               <StatusBadge tone="neutral" label={`${finalizedCount} finalized`} icon={false} />
               <StatusBadge tone="warning" label={`${missingCount} missing`} icon={false} />
             </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Before publishing, verify every student's mark here, then{" "}
+              <Link className="font-medium text-primary underline underline-offset-2" href="/assessments-results">
+                review weighted totals and CLO evidence
+              </Link>.
+            </p>
             {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
             {publishedCount > 0 && !allPublished ? <p className="mt-3 text-sm text-warning">Legacy partially published results detected. Existing published rows stay locked; complete the remaining drafts, then publish the rest.</p> : null}
           </>
