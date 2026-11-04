@@ -23,6 +23,7 @@ import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { courseDeliveryApi, toDateTimeLocal } from "@/lib/course-delivery";
+import { hasScoreReleaseNotice, scoreReleaseNotice } from "@/lib/score-release-notice";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 import { GroupAssessmentPanel } from "./group-assessment-panel";
@@ -255,6 +256,8 @@ function DeadlineRow({ offeringId, assessment, onChanged }: { offeringId: string
 function ResultsPanel({ offering, onChanged }: PanelProps) {
   const [assessmentId, setAssessmentId] = useState(offering.assessments[0]?.id ?? "");
   const [publishing, setPublishing] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [notifying, setNotifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { setAssessmentId(offering.assessments[0]?.id ?? ""); }, [offering.offeringId]);
   const assessment = offering.assessments.find((item) => item.id === assessmentId) ?? offering.assessments[0];
@@ -262,7 +265,12 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
   const draftCount = assessment?.results.filter((row) => row.score !== null && !row.publishedAt).length ?? 0;
   const missingCount = assessment?.results.filter((row) => row.score === null).length ?? 0;
   const allPublished = Boolean(assessment?.results.length) && publishedCount === assessment?.results.length;
+  const finalizedCount = assessment?.results.filter((row) => row.finalizedAt).length ?? 0;
+  const allFinalized = allPublished && finalizedCount === assessment?.results.length;
   const readyToPublish = Boolean(assessment?.results.length) && missingCount === 0 && !allPublished;
+  const readyToFinalize = allPublished && finalizedCount === 0;
+  const notice = assessment ? scoreReleaseNotice(offering.code, offering.sectionCode, assessment.name) : null;
+  const alreadyNotified = Boolean(notice && hasScoreReleaseNotice(offering.announcements, notice.title));
 
   const publishAssessment = async () => {
     if (!assessment || !readyToPublish) return;
@@ -282,6 +290,33 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
     } finally { setPublishing(false); }
   };
 
+  const finalizeAssessment = async () => {
+    if (!assessment || assessment.mode !== "individual" || !readyToFinalize) return;
+    if (!window.confirm(`Finalize ${assessment.name} for all ${assessment.results.length} students? These become official locked results and subsequent corrections require an audit reason.`)) return;
+    setFinalizing(true); setError(null);
+    try {
+      await courseDeliveryApi.finalizeAssessmentResults({
+        offeringId: offering.offeringId,
+        assessmentItemId: assessment.id,
+      });
+      await onChanged(`${assessment.name} results finalized for the full section.`);
+    } catch (reason) {
+      setError(messageFrom(reason, "Could not finalize assessment results"));
+    } finally { setFinalizing(false); }
+  };
+
+  const notifyStudents = async () => {
+    if (!assessment || !notice || !allPublished || alreadyNotified) return;
+    if (!window.confirm(`Notify the ${assessment.results.length} students in ${offering.code} section ${offering.sectionCode} that ${assessment.name} results are available? This publishes a generic course announcement (and sends it to linked Telegram recipients). No individual marks will be included.`)) return;
+    setNotifying(true); setError(null);
+    try {
+      await courseDeliveryApi.publishAnnouncement({ offeringId: offering.offeringId, ...notice });
+      await onChanged(`Students notified about ${assessment.name} results without sharing individual marks.`);
+    } catch (reason) {
+      setError(messageFrom(reason, "Could not notify students"));
+    } finally { setNotifying(false); }
+  };
+
   return (
     <div className="space-y-4">
       <Panel title="Assessment markbook" description="Save marks as private drafts first. Publication is a separate class-level action after every student row is complete.">
@@ -293,9 +328,19 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
               </select>
             </label>
             {assessment?.mode === "individual" ? (
-              <Button type="button" onClick={publishAssessment} disabled={publishing || !readyToPublish}>
-                <CheckCircle2 />{publishing ? "Publishing…" : allPublished ? "Published & locked" : "Publish assessment"}
-              </Button>
+              !allPublished ? (
+                <Button type="button" onClick={publishAssessment} disabled={publishing || !readyToPublish}>
+                  <CheckCircle2 />{publishing ? "Publishing…" : "Publish assessment"}
+                </Button>
+              ) : allFinalized ? (
+                <StatusBadge tone="success" label="Official results finalized" icon={false} />
+              ) : finalizedCount > 0 ? (
+                <StatusBadge tone="warning" label="Partially finalized — review required" icon={false} />
+              ) : (
+                <Button type="button" variant="outline" onClick={finalizeAssessment} disabled={finalizing}>
+                  <LockKeyhole />{finalizing ? "Finalizing…" : "Finalize official results"}
+                </Button>
+              )
             ) : null}
           </div>
         ) : <Muted>Add active assessments to the course specification first.</Muted>}
@@ -304,6 +349,7 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
             <div className="mt-4 flex flex-wrap gap-2">
               <StatusBadge tone="neutral" label={`${draftCount} draft`} icon={false} />
               <StatusBadge tone="success" label={`${publishedCount} published`} icon={false} />
+              <StatusBadge tone="neutral" label={`${finalizedCount} finalized`} icon={false} />
               <StatusBadge tone="warning" label={`${missingCount} missing`} icon={false} />
             </div>
             {missingCount > 0 ? <p className="mt-3 text-sm text-muted-foreground">Complete all {missingCount} missing student mark{missingCount === 1 ? "" : "s"} before publishing this assessment.</p> : null}
@@ -311,6 +357,21 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
           </>
         ) : assessment ? (
           <p className="mt-3 text-sm text-muted-foreground">This assessment uses {assessment.mode === "group" ? "Group" : "Group + Individual"} scoring. Configure membership and source evidence in the group workspace below.</p>
+        ) : null}
+        {assessment && allPublished ? (
+          <div className="mt-4 flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold">Notify students</p>
+              <p className="text-xs text-muted-foreground">Separate from publication. Only a generic course notice is shared; no student marks or feedback.</p>
+            </div>
+            {alreadyNotified ? (
+              <StatusBadge tone="success" label="Students notified" icon={false} />
+            ) : (
+              <Button type="button" variant="outline" onClick={notifyStudents} disabled={notifying}>
+                <Send />{notifying ? "Notifying…" : "Notify students"}
+              </Button>
+            )}
+          </div>
         ) : null}
         {error ? <InlineError>{error}</InlineError> : null}
       </Panel>
@@ -353,8 +414,10 @@ function ResultRow({ assessment, row, onChanged }: { assessment: CourseDeliveryA
         <div className="min-w-52 flex-1">
           <div className="flex items-center gap-2">
             <p className="font-semibold">{row.studentName}</p>
-            {locked ? (
-              <StatusBadge tone="success" label="Published · locked" icon={false} />
+            {row.finalizedAt ? (
+              <StatusBadge tone="success" label="Finalized" icon={false} />
+            ) : locked ? (
+              <StatusBadge tone="success" label="Published · provisional" icon={false} />
             ) : row.score !== null ? (
               <StatusBadge tone="neutral" label="Draft" icon={false} />
             ) : null}
