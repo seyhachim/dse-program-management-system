@@ -39,6 +39,11 @@ export const CreateOpportunityInput = z.object({
 }).strict();
 export type CreateOpportunityInput = z.infer<typeof CreateOpportunityInput>;
 
+/** Reviewer must document what official result/evidence was checked. */
+export const ReviewOpportunityExperienceInput = z.object({
+  reason: z.string().trim().max(1000).default(""),
+}).strict();
+
 export const SubmitOpportunityExperienceInput = z.object({
   evidenceId: z.string().uuid(),
   outcome: OpportunityOutcome,
