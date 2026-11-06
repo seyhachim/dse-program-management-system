@@ -493,6 +493,13 @@ export const opportunitiesManifest: PluginManifest = {
       roles: ["student", "lecturer", "program_coordinator", "program_secretary", "admin"],
       group: "Community",
     },
+    {
+      label: "Manage Opportunities",
+      path: "/opportunities/manage",
+      icon: "clipboard-check",
+      roles: ["admin", "program_coordinator"],
+      group: "Community",
+    },
   ],
 };
 
