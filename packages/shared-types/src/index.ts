@@ -51,6 +51,7 @@ export * from "./portal-weekly-notes.ts";
 export * from "./course-achievements.ts";
 export * from "./student-schedule.ts";
 export * from "./student-portfolio.ts";
+export * from "./opportunities.ts";
 export * from "./student-portfolio-verification.ts";
 export * from "./result-corrections.ts";
 export * from "./telegram.ts";
