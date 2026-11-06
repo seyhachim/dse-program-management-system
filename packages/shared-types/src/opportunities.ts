@@ -73,6 +73,15 @@ export interface OpportunityDetailView extends OpportunityView {
   experiences: OpportunityExperienceView[];
 }
 
+/** Student-only consent record; no peer evidence or private verification details. */
+export interface OwnOpportunityExperienceView {
+  id: string;
+  evidenceId: string;
+  outcome: OpportunityOutcome;
+  status: "Pending" | "Approved" | "Hidden";
+  consentedAt: string;
+}
+
 export interface OpportunityExperienceReviewView {
   id: string;
   opportunityId: string;
