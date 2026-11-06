@@ -8,6 +8,8 @@ type PublicCalendarHubPageProps = {
 export default async function PublicCalendarHubPage({ params }: PublicCalendarHubPageProps) {
   const { programmeId, academicYear } = await params;
   const programmeName = programmeId.toLowerCase() === "dse" ? "DSE Programme" : `${programmeId.toUpperCase()} Programme`;
+  // Display only: keep the original academicYear label in all calendar URLs.
+  const displayAcademicYear = academicYear.replace(/^(\d{4})-(\d{4})$/, "$1–$2");
 
   return (
     <main className="min-h-screen bg-muted/20 px-4 py-8 sm:px-6 lg:px-8">
@@ -20,9 +22,9 @@ export default async function PublicCalendarHubPage({ params }: PublicCalendarHu
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{programmeName}</p>
               <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Academic Calendar</h1>
-              <p className="mt-2 text-sm text-muted-foreground sm:text-base">Academic Year {academicYear}</p>
+              <p className="mt-2 text-sm text-muted-foreground sm:text-base">{displayAcademicYear}</p>
               <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                Choose your study year to view its official academic calendar. Each year opens in a new tab.
+                Select your year to view the calendar.
               </p>
             </div>
           </div>
@@ -36,26 +38,20 @@ export default async function PublicCalendarHubPage({ params }: PublicCalendarHu
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Open Year ${studyYear} academic calendar in a new tab`}
-              className="group rounded-2xl border border-border bg-card p-6 shadow-sm transition-colors hover:border-primary/50 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary/50 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="flex items-center justify-between gap-4">
                 <h2 className="text-xl font-semibold">Year {studyYear}</h2>
                 <ExternalLink className="h-5 w-5 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">
-                View the published calendar and important academic dates for Year {studyYear}.
-              </p>
-              <p className="mt-4 text-sm font-medium text-primary">Open calendar in new tab</p>
+              <p className="mt-3 text-sm font-medium text-primary">View calendar</p>
             </a>
           ))}
         </section>
 
-        <footer className="rounded-2xl border border-border bg-card p-5 text-sm leading-6 text-muted-foreground">
-          <p className="flex items-start gap-2">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-            Each linked page displays only the official published calendar. If a study year has not been issued yet,
-            its page will say so. No student records are shown.
-          </p>
+        <footer className="flex items-center gap-2 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <p>Only published academic calendars are shown.</p>
         </footer>
       </div>
     </main>
