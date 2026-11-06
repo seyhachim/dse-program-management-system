@@ -65,6 +65,17 @@ dbDescribe("opportunity publication, authorization and consent database boundary
       expect(pending.map((item) => item.id)).toContain(submission.id);
       await opportunitiesService.reviewExperience(actor, submission.id, "approve");
       expect((await opportunitiesService.detail(student, created.id)).experiences).toHaveLength(1);
+      expect((await opportunitiesService.myExperiences(student, created.id))[0]?.status).toBe("Approved");
+      await expect(opportunitiesService.withdrawExperience(actor, created.id, submission.id)).rejects.toHaveProperty("status", 404);
+      expect((await opportunitiesService.withdrawExperience(student, created.id, submission.id)).status).toBe("Hidden");
+      expect((await opportunitiesService.detail(student, created.id)).experiences).toHaveLength(0);
+      await expect(opportunitiesService.withdrawExperience(student, created.id, submission.id)).rejects.toHaveProperty("status", 409);
+      const reconfirmed = await opportunitiesService.submitExperience(student, created.id, {
+        evidenceId: evidence.id, outcome: "Winner", consent: true,
+      });
+      expect(reconfirmed.status).toBe("Pending");
+      await opportunitiesService.reviewExperience(actor, submission.id, "approve");
+      expect((await opportunitiesService.detail(student, created.id)).experiences).toHaveLength(1);
       await prisma.studentPortfolioProfile.update({ where: { id: profile.id }, data: { isPublic: false } });
       expect((await opportunitiesService.detail(student, created.id)).experiences).toHaveLength(0);
       await prisma.studentPortfolioProfile.update({ where: { id: profile.id }, data: { isPublic: true } });
@@ -79,7 +90,7 @@ dbDescribe("opportunity publication, authorization and consent database boundary
       expect(await opportunitiesService.list(student, programmeId)).toHaveLength(0);
       await expect(opportunitiesService.detail(student, created.id)).rejects.toHaveProperty("status", 404);
       const actions = await prisma.opportunityAuditEvent.findMany({ where: { opportunityId: created.id } });
-      expect(actions.map((item) => item.action)).toEqual(expect.arrayContaining(["Created", "Published", "ExperienceConsented", "ExperienceApproved", "ExperienceHidden", "Archived"]));
+      expect(actions.map((item) => item.action)).toEqual(expect.arrayContaining(["Created", "Published", "ExperienceConsented", "ExperienceApproved", "ExperienceWithdrawn", "ExperienceResubmitted", "ExperienceHidden", "Archived"]));
       const expired = await opportunitiesService.create(actor, { ...input, deadline: "2026-11-05" });
       await expect(opportunitiesService.publish(actor, expired.id, new Date("2026-11-06T10:00:00.000Z"))).rejects.toHaveProperty("status", 409);
     } finally {
