@@ -504,7 +504,6 @@ export const opportunitiesManifest: PluginManifest = {
 };
 
 export const pluginManifests: PluginManifest[] = [
-  opportunitiesManifest,
   studentPortalManifest,
   dashboardManifest,
   studentsManifest,
@@ -518,6 +517,7 @@ export const pluginManifests: PluginManifest[] = [
   methodsManifest,
   rubricsManifest,
   authManifest,
+  opportunitiesManifest,
 ];
 
 /**
