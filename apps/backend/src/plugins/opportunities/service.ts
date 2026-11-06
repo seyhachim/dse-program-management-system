@@ -272,7 +272,11 @@ export const opportunitiesService = {
     }));
   },
 
-  async reviewExperience(actor: AuthUser, id: string, action: "approve" | "hide") {
+  async reviewExperience(actor: AuthUser, id: string, action: "approve" | "hide", reason = "") {
+    if (reason.length > 1000) throw new OpportunityError(400, "Review note is too long");
+    if (action === "approve" && reason.trim().length < 12) {
+      throw new OpportunityError(400, "Record an official result URL or staff verification evidence before approving");
+    }
     const item = await prisma.opportunityExperience.findUnique({
       where: { id }, include: { opportunity: true },
     });
@@ -295,7 +299,8 @@ export const opportunitiesService = {
         data: { status: target, reviewedById: actor.id, reviewedAt: new Date() },
       });
       if (!changed.count) throw new OpportunityError(409, "Experience was reviewed by another staff member");
-      await audit(tx, item.opportunityId, actor.id, "Experience" + target, item.evidenceId);
+      await audit(tx, item.opportunityId, actor.id, "Experience" + target,
+        JSON.stringify({ evidenceId: item.evidenceId, reviewerEvidence: reason.trim() }));
       return { id, status: target };
     });
   },
