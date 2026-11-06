@@ -98,7 +98,7 @@ export async function main(env = process.env): Promise<void> {
         FROM pg_database WHERE datname = current_database()
       `;
       if (rows.length !== 1) throw new Error("Cannot verify staging database identity");
-      return rows[0];
+      return rows[0]!;
     });
     // No database identifiers or credentials are printed.
     console.log("Staging database identity verified (read-only).");
