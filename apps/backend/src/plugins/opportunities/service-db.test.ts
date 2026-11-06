@@ -63,7 +63,8 @@ dbDescribe("opportunity publication, authorization and consent database boundary
       expect((await opportunitiesService.detail(student, created.id)).experiences).toHaveLength(0);
       const pending = await opportunitiesService.reviewList(actor, programmeId);
       expect(pending.map((item) => item.id)).toContain(submission.id);
-      await opportunitiesService.reviewExperience(actor, submission.id, "approve");
+      await expect(opportunitiesService.reviewExperience(actor, submission.id, "approve")).rejects.toHaveProperty("status", 400);
+      await opportunitiesService.reviewExperience(actor, submission.id, "approve", "Verified against organizer results archive");
       expect((await opportunitiesService.detail(student, created.id)).experiences).toHaveLength(1);
       expect((await opportunitiesService.myExperiences(student, created.id))[0]?.status).toBe("Approved");
       await expect(opportunitiesService.withdrawExperience(actor, created.id, submission.id)).rejects.toHaveProperty("status", 404);
@@ -74,7 +75,7 @@ dbDescribe("opportunity publication, authorization and consent database boundary
         evidenceId: evidence.id, outcome: "Winner", consent: true,
       });
       expect(reconfirmed.status).toBe("Pending");
-      await opportunitiesService.reviewExperience(actor, submission.id, "approve");
+      await opportunitiesService.reviewExperience(actor, submission.id, "approve", "Verified against organizer results archive");
       expect((await opportunitiesService.detail(student, created.id)).experiences).toHaveLength(1);
       await prisma.studentPortfolioProfile.update({ where: { id: profile.id }, data: { isPublic: false } });
       expect((await opportunitiesService.detail(student, created.id)).experiences).toHaveLength(0);
