@@ -21,6 +21,6 @@ export const opportunitiesApi = {
   submitExperience: (id: string, input: SubmitOpportunityExperienceInput) =>
     api.post<{ id: string; status: string }>(base + "/" + encodeURIComponent(id) + "/experiences", input),
   pendingExperiences: () => api.get<OpportunityExperienceReviewView[]>(base + "/manage/experiences"),
-  reviewExperience: (id: string, action: "approve" | "hide") =>
-    api.post<{ id: string; status: string }>(base + "/manage/experiences/" + encodeURIComponent(id) + "/" + action, {}),
+  reviewExperience: (id: string, action: "approve" | "hide", reason = "") =>
+    api.post<{ id: string; status: string }>(base + "/manage/experiences/" + encodeURIComponent(id) + "/" + action, { reason }),
 };
