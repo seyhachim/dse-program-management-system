@@ -69,6 +69,12 @@ export function createOpportunitiesRouter(): Router {
   router.get("/:id", route(async (req, res) => {
     res.json(await opportunitiesService.detail(req.user!, parsedId(req.params.id)));
   }));
+  router.get("/:id/my-experiences", route(async (req, res) => {
+    res.json(await opportunitiesService.myExperiences(req.user!, parsedId(req.params.id)));
+  }));
+  router.post("/:id/experiences/:experienceId/withdraw", route(async (req, res) => {
+    res.json(await opportunitiesService.withdrawExperience(req.user!, parsedId(req.params.id), parsedId(req.params.experienceId)));
+  }));
   router.post("/:id/experiences", route(async (req, res) => {
     const input = SubmitOpportunityExperienceInput.safeParse(req.body);
     if (!input.success) throw new OpportunityError(400, "Consent, outcome and evidence ID are required");
