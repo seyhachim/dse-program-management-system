@@ -19,6 +19,7 @@ export function ManageOpportunitiesClient() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(initialForm);
   const [busy, setBusy] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const staff = me?.roles.some((r) => r === "admin" || r === "program_coordinator");
@@ -128,9 +129,25 @@ export function ManageOpportunitiesClient() {
                 <p className="text-xs text-muted-foreground">{item.status} · Consented {new Date(item.consentedAt).toLocaleDateString()}</p>
                 {item.publicStudent ? <Link href={"/portfolio/" + encodeURIComponent(item.publicStudent.publicPortfolioSlug)} className="text-sm text-primary underline">{item.publicStudent.studentName}: {item.publicStudent.evidenceTitle}</Link> : <p className="text-sm text-destructive">Public verified portfolio evidence unavailable; approval blocked.</p>}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {item.status === "Pending" && item.publicStudent ? <button type="button" disabled={busy} onClick={() => void perform(() => opportunitiesApi.reviewExperience(item.id, "approve"), "Student experience approved.")} className="min-h-11 rounded-lg border px-3 text-sm font-medium disabled:opacity-50">Approve</button> : null}
-                <button type="button" disabled={busy} onClick={() => void perform(() => opportunitiesApi.reviewExperience(item.id, "hide"), "Student experience hidden.")} className="min-h-11 rounded-lg border px-3 text-sm disabled:opacity-50">Hide</button>
+              <div className="flex min-w-[240px] flex-1 flex-col gap-2 sm:max-w-sm">
+                {item.status === "Pending" && item.publicStudent ? (
+                  <label className="text-sm font-medium">
+                    Review evidence / official result reference
+                    <textarea
+                      value={reviewNotes[item.id] ?? ""}
+                      onChange={(event) => setReviewNotes((prev) => ({ ...prev, [item.id]: event.target.value }))}
+                      placeholder="Example: organizer's published results page and matching award details"
+                      maxLength={1000}
+                      rows={2}
+                      className={control}
+                    />
+                    <span className="mt-1 block text-xs text-muted-foreground">Required before approval. Saved in the audit trail.</span>
+                  </label>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                {item.status === "Pending" && item.publicStudent ? <button type="button" disabled={busy || (reviewNotes[item.id] ?? "").trim().length < 12} onClick={() => void perform(() => opportunitiesApi.reviewExperience(item.id, "approve", reviewNotes[item.id] ?? ""), "Student experience approved.")} className="min-h-11 rounded-lg border px-3 text-sm font-medium disabled:opacity-50">Approve</button> : null}
+                <button type="button" disabled={busy} onClick={() => void perform(() => opportunitiesApi.reviewExperience(item.id, "hide", reviewNotes[item.id] ?? ""), "Student experience hidden.")} className="min-h-11 rounded-lg border px-3 text-sm disabled:opacity-50">Hide</button>
+                </div>
               </div>
             </article>
           ))}</div>}
