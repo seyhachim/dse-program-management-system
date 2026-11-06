@@ -212,7 +212,7 @@ export const opportunitiesService = {
   async reviewList(actor: AuthUser, programmeId: string): Promise<OpportunityExperienceReviewView[]> {
     requireRole(actor, programmeId, STAFF_ROLES);
     const items = await prisma.opportunityExperience.findMany({
-      where: { opportunity: { programmeId }, status: "Pending" },
+      where: { opportunity: { programmeId }, status: { in: ["Pending", "Approved"] } },
       include: { opportunity: { select: { title: true } } },
       orderBy: { createdAt: "desc" },
       take: MAX_LIST_SIZE,
@@ -223,7 +223,7 @@ export const opportunitiesService = {
         id: item.id, opportunityId: item.opportunityId,
         opportunityTitle: item.opportunity.title, evidenceId: item.evidenceId,
         outcome: item.outcome as OpportunityExperienceReviewView["outcome"],
-        status: "Pending" as const, consentedAt: item.consentedAt.toISOString(),
+        status: item.status as OpportunityExperienceReviewView["status"], consentedAt: item.consentedAt.toISOString(),
         publicStudent: evidence ? {
           id: item.id, outcome: item.outcome as OpportunityExperienceView["outcome"],
           studentName: evidence.studentName, evidenceTitle: evidence.evidenceTitle,
