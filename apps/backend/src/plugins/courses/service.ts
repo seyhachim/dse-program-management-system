@@ -31,6 +31,8 @@ import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 import { assertCourseSpecEditable } from "./spec-lock.ts";
+import { courseSpecSubmissionGaps } from "./course-spec-submit-readiness.ts";
+import { specificationDateForSubmission } from "./automatic-specification-date.ts";
 import { uniqueActiveCurriculumPlacement } from "./course-spec-progress-placement.ts";
 import {
   buildCourseInfoSnapshot,
@@ -460,48 +462,30 @@ export const courseService = {
     if (!spec)
       throw new ReferenceError("Course specification has not been started");
 
-    const savedComplete = (sectionId: SpecSectionId) =>
-      spec.sections.some(
-        (saved) =>
-          saved.sectionKey === sectionId && saved.status === "Complete",
+    if (!["Draft", "ChangesRequested"].includes(spec.reviewStatus)) {
+      throw new ReferenceError(
+        "This course specification is not ready for submission",
       );
-
-    const activeClos = spec.clos.filter((clo) => clo.status === "Active");
-    const readinessGaps: string[] = [];
-
-    if (!savedComplete("courseInfo")) readinessGaps.push("Course Information");
-
-    if (
-      !savedComplete("clos") ||
-      activeClos.length === 0 ||
-      activeClos.some((clo) => clo.mappedPlos.length === 0)
-    ) {
-      readinessGaps.push("Course Learning Outcomes");
     }
 
-    if (
-      activeClos.length === 0 ||
-      activeClos.some((clo) => clo.teachingMethods.length === 0)
-    ) {
-      readinessGaps.push("Teaching & Learning");
-    }
-
-    if (!savedComplete("assessmentPlan")) readinessGaps.push("Assessment");
-    if (!savedComplete("slt")) readinessGaps.push("Weekly Plan");
-    if (!savedComplete("responsibility"))
-      readinessGaps.push("Student Responsibility");
-
+    // Use the same source-derived authoring rules as Overview and Review & Submit.
+    // Persisted Complete/Draft flags cannot hide current Weekly Plan, CLO or
+    // Teaching & Learning gaps; preserved assessment-only weeks are ignored.
+    const readinessGaps = courseSpecSubmissionGaps(spec);
     if (readinessGaps.length > 0) {
       throw new ReferenceError(
         `Complete all required sections before submitting: ${readinessGaps.join(", ")}`,
       );
     }
 
-    if (!["Draft", "ChangesRequested"].includes(spec.reviewStatus)) {
-      throw new ReferenceError(
-        "This course specification is not ready for submission",
-      );
-    }
+    // The first submitted version receives its canonical Cambodia date.
+    // A revision cannot silently acquire a new date on resubmission.
+    const specificationDate = specificationDateForSubmission({
+      reviewStatus:
+        spec.reviewStatus === "ChangesRequested" ? "ChangesRequested" : "Draft",
+      existingDate: spec.specDate,
+      now: new Date(),
+    });
 
     const nextVersion = spec.submissionVersion + 1;
     const nextStatus =
@@ -510,6 +494,7 @@ export const courseService = {
       where: { id: spec.id },
       data: {
         reviewStatus: nextStatus,
+        specDate: specificationDate,
         submissionVersion: nextVersion,
         submittedAt: new Date(),
         submittedById,
@@ -783,6 +768,7 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
 const SPEC_INCLUDE = {
   sections: true,
   courseInfo: true,
+  teachingLearning: true,
   clos: {
     include: { teachingMethods: true, assessmentMethods: true },
     orderBy: { order: "asc" as const },
