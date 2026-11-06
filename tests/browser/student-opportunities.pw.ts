@@ -45,7 +45,7 @@ test("#1284 staff publish → mobile student browse → archive; secretary/stude
     const unauthorizedPublish = await secretaryApi.post("/api/opportunities/manage/" + id + "/publish", { data: {} });
     expect(unauthorizedPublish.status()).toBe(403);
     const unauthorizedCreate = await studentApi.post("/api/opportunities/manage", {
-      data: { programmeId: "dse", title, organizer: "Org", summary: "Any data", eligibility: "Students", type: "hackathon", sourceUrl: "https://example.org" },
+      data: { programmeId: "dse", title, organizer: "Org", summary: "Develop practical solutions for communities", eligibility: "Students", type: "hackathon", sourceUrl: "https://example.org" },
     });
     expect(unauthorizedCreate.status()).toBe(403);
 
