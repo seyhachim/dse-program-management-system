@@ -19,6 +19,7 @@ export function OpportunityDetailClient() {
   const [outcome, setOutcome] = useState<OpportunityOutcome>("Participant");
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isStudent = Boolean(me?.roles.includes("student"));
@@ -33,6 +34,12 @@ export function OpportunityDetailClient() {
     queryFn: studentPortfolioApi.evidence,
     enabled: Boolean(me?.id && isStudent),
   });
+  const myExperiences = useQuery({
+    queryKey: protectedQueryKey({ userId: me?.id ?? "pending" }, "opportunities", id, "my-experiences"),
+    queryFn: () => opportunitiesApi.myExperiences(id),
+    enabled: Boolean(me?.id && id && isStudent),
+    staleTime: 15_000,
+  });
   const eligibleEvidence = (evidence.data ?? []).filter((item) =>
     item.visibility === "public" && (item.origin === "competition" || item.origin === "achievement"));
 
@@ -44,9 +51,21 @@ export function OpportunityDetailClient() {
       await opportunitiesApi.submitExperience(id, { evidenceId, outcome, consent: true });
       setNotice("Submitted for programme staff review. Your information is not shown yet.");
       setConsent(false);
+      await myExperiences.refetch();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not submit your experience");
     } finally { setSubmitting(false); }
+  };
+
+  const withdraw = async (experienceId: string) => {
+    setWithdrawing(true); setError(null); setNotice(null);
+    try {
+      await opportunitiesApi.withdrawExperience(id, experienceId);
+      await Promise.all([myExperiences.refetch(), detail.refetch()]);
+      setNotice("Your consent was withdrawn. This experience is no longer displayed.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not withdraw consent");
+    } finally { setWithdrawing(false); }
   };
 
   const item = detail.data;
@@ -108,13 +127,31 @@ export function OpportunityDetailClient() {
                 </label>
                 <label className="flex items-start gap-3 text-sm leading-6">
                   <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-primary" />
-                  I consent to publicly show my name, selected verified evidence and result on this opportunity after staff review. I can unpublish my portfolio evidence later.
+                  I consent to publicly show my name, selected verified evidence and result on this opportunity after staff review. I can withdraw this consent here at any time, or unpublish my portfolio evidence.
                 </label>
                 {notice ? <p role="status" className="text-sm text-emerald-700">{notice}</p> : null}
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
                 <button type="submit" disabled={submitting || !consent || !evidenceId} className="min-h-11 rounded-lg bg-primary px-4 font-semibold text-primary-foreground disabled:opacity-50">{submitting ? "Submitting…" : "Submit for review"}</button>
                 {!eligibleEvidence.length ? <p className="text-sm text-muted-foreground">No eligible evidence is currently public. Add and verify competition/achievement evidence in <Link href="/portal/portfolio" className="text-primary underline">your portfolio</Link> first.</p> : null}
               </form>
+              {myExperiences.data?.length ? (
+                <div className="mt-6 border-t pt-4">
+                  <h3 className="font-semibold">Your shared experience requests</h3>
+                  <div className="mt-3 space-y-2">
+                    {myExperiences.data.map((own) => (
+                      <div key={own.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3">
+                        <p className="text-sm">{own.outcome} · {own.status === "Hidden" ? "Not shared" : own.status === "Pending" ? "Awaiting review" : "Publicly shared"}</p>
+                        {own.status !== "Hidden" ? (
+                          <button type="button" disabled={withdrawing} onClick={() => void withdraw(own.id)}
+                            className="min-h-11 rounded-lg border px-3 text-sm font-medium disabled:opacity-50">
+                            {withdrawing ? "Updating…" : "Withdraw consent"}
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </section>
           ) : null}
         </>}
