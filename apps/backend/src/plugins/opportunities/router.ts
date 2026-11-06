@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { CreateOpportunityInput, SubmitOpportunityExperienceInput } from "@dse-pms/shared-types";
+import { CreateOpportunityInput, ReviewOpportunityExperienceInput, SubmitOpportunityExperienceInput } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { OpportunityError, opportunitiesService } from "./service.ts";
 
@@ -61,10 +61,14 @@ export function createOpportunitiesRouter(): Router {
     res.json(await opportunitiesService.reviewList(req.user!, programmeId(req)));
   }));
   router.post("/manage/experiences/:id/approve", route(async (req, res) => {
-    res.json(await opportunitiesService.reviewExperience(req.user!, parsedId(req.params.id), "approve"));
+    const body = ReviewOpportunityExperienceInput.safeParse(req.body);
+    if (!body.success) throw new OpportunityError(400, "Invalid review note");
+    res.json(await opportunitiesService.reviewExperience(req.user!, parsedId(req.params.id), "approve", body.data.reason));
   }));
   router.post("/manage/experiences/:id/hide", route(async (req, res) => {
-    res.json(await opportunitiesService.reviewExperience(req.user!, parsedId(req.params.id), "hide"));
+    const body = ReviewOpportunityExperienceInput.safeParse(req.body);
+    if (!body.success) throw new OpportunityError(400, "Invalid review note");
+    res.json(await opportunitiesService.reviewExperience(req.user!, parsedId(req.params.id), "hide", body.data.reason));
   }));
   router.get("/:id", route(async (req, res) => {
     res.json(await opportunitiesService.detail(req.user!, parsedId(req.params.id)));
