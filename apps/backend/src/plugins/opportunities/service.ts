@@ -180,6 +180,45 @@ export const opportunitiesService = {
     }));
   },
 
+  async myExperiences(actor: AuthUser, id: string) {
+    const opportunity = await activeOpportunity(actor, id, new Date());
+    requireRole(actor, opportunity.programmeId, ["student"]);
+    const rows = await prisma.opportunityExperience.findMany({
+      where: { opportunityId: id, consentedById: actor.id },
+      select: { id: true, evidenceId: true, outcome: true, status: true, consentedAt: true },
+      orderBy: { consentedAt: "desc" },
+      take: 25,
+    });
+    return rows.map((row) => ({
+      ...row,
+      outcome: row.outcome as "Winner" | "Finalist" | "Participant",
+      status: row.status as "Pending" | "Approved" | "Hidden",
+      consentedAt: row.consentedAt.toISOString(),
+    }));
+  },
+
+  /** Student opt-out persists even if portfolio evidence is later republished. */
+  async withdrawExperience(actor: AuthUser, opportunityId: string, experienceId: string) {
+    const row = await prisma.opportunityExperience.findFirst({
+      where: { id: experienceId, opportunityId, consentedById: actor.id },
+      include: { opportunity: { select: { programmeId: true } } },
+    });
+    if (!row) throw new OpportunityError(404, "Experience not found");
+    requireRole(actor, row.opportunity.programmeId, ["student"]);
+    if (row.status === "Hidden") throw new OpportunityError(409, "Experience is already hidden");
+    return prisma.$transaction(async (tx) => {
+      const changed = await tx.opportunityExperience.updateMany({
+        where: { id: experienceId, status: row.status, consentedById: actor.id },
+        // Review fields represent the actor/time of the last visibility decision,
+        // which can be a student's voluntary withdrawal or a staff review.
+        data: { status: "Hidden", reviewedById: actor.id, reviewedAt: new Date() },
+      });
+      if (!changed.count) throw new OpportunityError(409, "Experience was modified");
+      await audit(tx, opportunityId, actor.id, "ExperienceWithdrawn", row.evidenceId);
+      return { id: experienceId, status: "Hidden" as const };
+    });
+  },
+
   async submitExperience(actor: AuthUser, id: string, input: SubmitOpportunityExperienceInput) {
     const row = await activeOpportunity(actor, id, new Date());
     requireRole(actor, row.programmeId, ["student"]);
