@@ -6,7 +6,14 @@ import { registry } from "../../core/plugins/registry.ts";
 import { studentPortalPlugin } from "../student-portal/index.ts";
 import { OpportunityError, opportunitiesService } from "./service.ts";
 
-const dbDescribe = process.env.OPPORTUNITIES_DB_TESTS === "1" ? describe : describe.skip;
+// This test adds immutable portfolio verification history. Only run against an
+// explicitly opted-in, disposable test database; never delete/disable audit triggers.
+const dbName = (() => {
+  try { return new URL(process.env.DATABASE_URL ?? "").pathname.slice(1); }
+  catch { return ""; }
+})();
+const disposable = dbName === "dse_ci" || dbName.endsWith("_test") || dbName.endsWith("_integration");
+const dbDescribe = process.env.OPPORTUNITIES_DB_TESTS === "1" && disposable ? describe : describe.skip;
 
 dbDescribe("opportunity publication, authorization and consent database boundary", () => {
   test("draft/publish/expiry/archive and verified opt-in never expose private portfolio evidence", async () => {
@@ -76,15 +83,9 @@ dbDescribe("opportunity publication, authorization and consent database boundary
       const expired = await opportunitiesService.create(actor, { ...input, deadline: "2026-11-05" });
       await expect(opportunitiesService.publish(actor, expired.id, new Date("2026-11-06T10:00:00.000Z"))).rejects.toHaveProperty("status", 409);
     } finally {
-      await prisma.opportunityAuditEvent.deleteMany({ where: { opportunity: { programmeId } } });
-      await prisma.opportunityExperience.deleteMany({ where: { opportunity: { programmeId } } });
-      await prisma.opportunity.deleteMany({ where: { programmeId } });
-      await prisma.studentPortfolioVerificationEvent.deleteMany({ where: { evidenceId: evidence.id } });
-      await prisma.studentPortfolioEvidence.deleteMany({ where: { id: evidence.id } });
-      await prisma.studentPortfolioProfile.delete({ where: { id: profile.id } });
-      await prisma.student.delete({ where: { id: studentRow.id } });
-      await prisma.programme.deleteMany({ where: { id: { in: [programme.id, other.id] } } });
-      await prisma.user.deleteMany({ where: { id: { in: [u1.id, u2.id] } } });
+      // Keep the isolated CI fixtures until PostgreSQL teardown. Verification
+      // events are append-only, so deleting them as test cleanup would violate
+      // the same academic-audit guarantees this feature must preserve.
     }
   });
 });
