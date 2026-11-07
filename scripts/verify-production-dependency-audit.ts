@@ -77,11 +77,23 @@ if (!ui.devDependencies?.shadcn) {
 if (frontend.devDependencies?.postcss !== "8.5.23") {
   structuralErrors.push("apps/frontend build PostCSS must remain pinned to patched 8.5.23");
 }
-if (frontend.dependencies?.next !== "^16.3.3") {
-  structuralErrors.push("apps/frontend Next.js must remain on the patched ^16.3.3 or newer compatible line");
+const requiredRuntimeOverrides: Record<string, string> = {
+  "body-parser": "1.20.9", // CVE-2026-111181: decompression trailing-bytes crash
+  "proxy-addr": "2.0.8", // CVE-2026-90711: mapped IPv6 trust-subnet bypass
+  dompurify: "3.4.17", // GHSA-cg2g-xh64-v4q7: template / DOM bypass
+  sharp: "0.35.5", // CVE-2026-96889: upstream SVG image decoding
+  undici: "7.30.1", // 2026 TLS / DoS fixes for resolved 7.x runtime
+};
+for (const [name, version] of Object.entries(requiredRuntimeOverrides)) {
+  if (root.overrides?.[name] !== version) {
+    structuralErrors.push(`root ${name} override must stay pinned to patched ${version}`);
+  }
 }
-if (frontend.devDependencies?.["eslint-config-next"] !== "16.3.3") {
-  structuralErrors.push("eslint-config-next must stay aligned with the reviewed 16.3.3 line");
+if (frontend.dependencies?.next !== "^16.4.1") {
+  structuralErrors.push("apps/frontend Next.js must remain on the patched ^16.4.1 or newer compatible line");
+}
+if (frontend.devDependencies?.["eslint-config-next"] !== "16.4.1") {
+  structuralErrors.push("eslint-config-next must stay aligned with the reviewed 16.4.1 line");
 }
 
 if (structuralErrors.length > 0) {
