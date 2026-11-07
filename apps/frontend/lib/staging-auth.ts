@@ -1,6 +1,7 @@
 "use client";
 
 import { createAuthClient } from "@neondatabase/auth";
+import { BetterAuthVanillaAdapter } from "@neondatabase/auth/vanilla/adapters";
 
 /**
  * Staging-only first-party session through the Next.js preview rewrite.
@@ -16,14 +17,17 @@ export function getStagingAuth() {
       process.env.NEXT_PUBLIC_STAGING_MODE !== "true") {
     throw new Error("Isolated staging authentication is unavailable");
   }
-  client ??= createAuthClient(`${window.location.origin}/staging-auth`);
+  client ??= createAuthClient(`${window.location.origin}/staging-auth`, {
+    adapter: BetterAuthVanillaAdapter(),
+  });
   return client;
 }
 
 export async function stagingBearerToken(): Promise<string | null> {
-  const { data, error } = await getStagingAuth().token();
-  if (error || !data?.token) return null;
-  return data.token;
+  const { data, error } = await getStagingAuth().getSession();
+  const sessionToken = data?.session?.token;
+  if (error || !sessionToken) return null;
+  return sessionToken;
 }
 
 /** A successful login/logout invalidates role-gated app caches. */
