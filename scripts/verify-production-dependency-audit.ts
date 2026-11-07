@@ -12,14 +12,21 @@ type Advisory = {
 type AuditReport = Record<string, Advisory[]>;
 
 const DEV_ONLY_ADVISORIES: Record<string, Set<number>> = {
-  "@hono/node-server": new Set([1139322]),
-  "brace-expansion": new Set([1130591, 1130734]),
+  "@hono/node-server": new Set([1139322, 1243661]),
+  // @modelcontextprotocol/sdk is reachable only via the devDependency shadcn CLI;
+  // neither the Bun API nor Next.js deployed production entrypoint imports it.
+  "@modelcontextprotocol/sdk": new Set([1241339, 1242628, 1242649, 1242667, 1243488, 1244498]),
+  "brace-expansion": new Set([1130591, 1130734, 1240107, 1240108, 1240111, 1240100, 1240103, 1240104]),
+  deepmerge: new Set([1243505]), // apps/frontend devDependency shadcn -> deepmerge
   // `bun pm why hono` on the refreshed #1010 lockfile resolves this copy only
   // through shadcn -> @modelcontextprotocol/sdk / @hono/node-server. shadcn is
   // explicitly dev-only in both frontend and UI workspaces.
-  hono: new Set([1130733, 1138771, 1138772, 1138773, 1193729, 1193730, 1193731]),
+  hono: new Set([1130733, 1138771, 1138772, 1138773, 1193729, 1193730, 1193731, 1240640, 1242595]),
   // New 2026-09-29 advisories affect the same dev-only copy previously traced through shadcn tooling.
-  "ip-address": new Set([1130722, 1130723, 1130724, 1239948, 1239949]),
+  "ip-address": new Set([1130722, 1130723, 1130724, 1239948, 1239949, 1240097, 1240098, 1242883]),
+  minimatch: new Set([1244623]), // apps/frontend devDependency eslint -> minimatch
+  "postcss-selector-parser": new Set([1243380]), // shadcn CLI (dev only)
+  systeminformation: new Set([1243663, 1243616, 1243617]), // shadcn -> @dotenvx/dotenvx (dev only)
   // `bun pm why js-yaml` resolves this copy only through ESLint/eslint-config-next
   // and shadcn/cosmiconfig, all development tooling; it is not in the deployed
   // Next.js or Bun backend runtime path.
@@ -35,6 +42,13 @@ const DEV_ONLY_ADVISORIES: Record<string, Set<number>> = {
 // or sooner if PostCSS changes its Nano ID usage. Owner: DSE PMS maintainers.
 const CONDITIONAL_RUNTIME_ADVISORIES: Record<string, Set<number>> = {
   nanoid: new Set([1139427]),
+  // GHSA-mrhx-c7xc-m3w5: Zod v3 remains in live contract schemas, while the
+  // vendor fix requires breaking Zod v4.6.6. HTTP JSON input is limited to
+  // Express default 100 KB, so the unbounded multi-MB attacker-controlled array
+  // required for the documented high-memory issue cannot reach the validator
+  // via the normal API. Residual risk: programmatic parsing/very dense JSON.
+  // Owner: DSE PMS maintainers. Review/migrate v4 by 2026-11-21 (#1292 follow-up).
+  zod: new Set([1243066]),
 };
 
 async function readJson<T>(path: string): Promise<T> {
@@ -59,8 +73,8 @@ if (root.overrides?.browserslist !== "^4.28.7") {
     "root browserslist override must stay on the patched ^4.28.7 security line",
   );
 }
-if (root.overrides?.qs !== "6.16.0") {
-  structuralErrors.push("root qs override must remain pinned to patched 6.16.0");
+if (root.overrides?.qs !== "6.16.1") {
+  structuralErrors.push("root qs override must remain pinned to patched 6.16.1");
 }
 if (frontend.dependencies?.shadcn) {
   structuralErrors.push("apps/frontend must not ship shadcn as a production dependency");
@@ -77,11 +91,24 @@ if (!ui.devDependencies?.shadcn) {
 if (frontend.devDependencies?.postcss !== "8.5.23") {
   structuralErrors.push("apps/frontend build PostCSS must remain pinned to patched 8.5.23");
 }
-if (frontend.dependencies?.next !== "^16.3.3") {
-  structuralErrors.push("apps/frontend Next.js must remain on the patched ^16.3.3 or newer compatible line");
+const requiredRuntimeOverrides: Record<string, string> = {
+  "body-parser": "1.20.9", // CVE-2026-111181: decompression trailing-bytes crash
+  "proxy-addr": "2.0.8", // CVE-2026-90711: mapped IPv6 trust-subnet bypass
+  dompurify: "3.4.17", // GHSA-cg2g-xh64-v4q7: template / DOM bypass
+  sharp: "0.35.5", // CVE-2026-96889: upstream SVG image decoding
+  undici: "7.30.1", // 2026 TLS / DoS fixes for resolved 7.x runtime
+  "source-map-js": "1.2.2", // CVE-2026-93749: indexed section offsets
+};
+for (const [name, version] of Object.entries(requiredRuntimeOverrides)) {
+  if (root.overrides?.[name] !== version) {
+    structuralErrors.push(`root ${name} override must stay pinned to patched ${version}`);
+  }
 }
-if (frontend.devDependencies?.["eslint-config-next"] !== "16.3.3") {
-  structuralErrors.push("eslint-config-next must stay aligned with the reviewed 16.3.3 line");
+if (frontend.dependencies?.next !== "^16.4.1") {
+  structuralErrors.push("apps/frontend Next.js must remain on the patched ^16.4.1 or newer compatible line");
+}
+if (frontend.devDependencies?.["eslint-config-next"] !== "16.4.1") {
+  structuralErrors.push("eslint-config-next must stay aligned with the reviewed 16.4.1 line");
 }
 
 if (structuralErrors.length > 0) {
@@ -103,7 +130,9 @@ for (const [packageName, advisories] of Object.entries(report)) {
       classified.push({
         packageName,
         advisory,
-        disposition: "temporarily-accepted: vulnerable API primitive is not used by PostCSS 8.5.23; review by 2026-11-18",
+        disposition: packageName === "zod"
+          ? "temporarily-accepted: v3 compatibility; 100 KB Express JSON limit bounds external input; upgrade assessment by 2026-11-21"
+          : "temporarily-accepted: vulnerable API primitive is not used by PostCSS 8.5.23; review by 2026-11-18",
       });
       continue;
     }
