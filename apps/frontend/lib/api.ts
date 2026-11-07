@@ -8,6 +8,7 @@ import { createInflightGetDeduper } from "./inflight-get";
 import { createInflightLoader } from "./inflight-value";
 import { runConfirmedMutation } from "./mutation-invalidation";
 import { AUTH_MODE, getSupabase } from "./supabase";
+import { stagingBearerToken } from "./staging-auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "";
@@ -16,6 +17,10 @@ const runInflightGet = createInflightGetDeduper();
 const runInflightAuthHeader = createInflightLoader<Record<string, string>>();
 
 async function authHeader(): Promise<Record<string, string>> {
+  if (AUTH_MODE === "neon-staging") {
+    const token = await stagingBearerToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
   if (AUTH_MODE === "supabase") {
     return runInflightAuthHeader(async (): Promise<Record<string, string>> => {
       const { data } = await getSupabase().auth.getSession();
@@ -61,6 +66,10 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
     cache: "no-store",
   });
 
+  if (res.status === 401 && AUTH_MODE === "neon-staging" && !isRetry) {
+    if (typeof window !== "undefined") window.location.replace("/login");
+    throw new ApiError(401, "Staging session expired. Please sign in again.");
+  }
   if (res.status === 401 && AUTH_MODE === "supabase" && !isRetry) {
     const supabase = getSupabase();
     const { data, error } = await supabase.auth.refreshSession();
