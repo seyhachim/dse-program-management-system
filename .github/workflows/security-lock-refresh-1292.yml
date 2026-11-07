@@ -1,0 +1,71 @@
+name: Security 1292 lockfile regeneration (one-shot)
+
+on:
+  push:
+    branches:
+      - security/1292-patch-2026-advisories
+    paths:
+      - .github/workflows/security-lock-refresh-1292.yml
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    if: github.repository == 'seyhachim/dse-program-management-system'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout security branch
+        uses: actions/checkout@v4
+        with:
+          ref: security/1292-patch-2026-advisories
+          persist-credentials: true
+      - name: Setup pinned Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Generate updated lockfile from reviewed manifests
+        run: |
+          bun install --no-progress
+          bunx prisma validate --schema apps/backend/prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+      - name: Assert patched lockfile selections
+        run: |
+          bun -e '
+          const lock = await Bun.file("bun.lock").text();
+          const keys = {
+            next: "16.4.1",
+            sharp: "0.35.5",
+            dompurify: "3.4.17",
+            "proxy-addr": "2.0.8",
+            "body-parser": "1.20.9",
+            undici: "7.30.1"
+          };
+          for (const [name, expected] of Object.entries(keys)) {
+            const re = new RegExp("[\\x22]" + name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&") + "[\\x22]\\s*:\\s*\\[\\s*[\\x22]" + name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&") + "@" + expected.replace(/\\./g, "\\.") + "[\\x22]");
+            if (!re.test(lock)) { throw new Error("Expected patched " + name + "@" + expected + " in lockfile"); }
+            console.log("Verified " + name + "@" + expected);
+          }
+          '
+      - name: Commit generated Bun lockfile only
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- bun.lock
+          if git diff --cached --quiet; then
+            echo "No lockfile changes"
+          else
+            git commit -m "chore(security): regenerate Bun lock with patched dependencies (#1292)"
+            git push origin HEAD:security/1292-patch-2026-advisories
+          fi
+      - name: Check advisory report without relaxing the policy
+        run: |
+          set +e
+          bun audit --production --json > dependency-audit.json
+          audit_status=$?
+          set -e
+          echo "bun audit raw exit: $audit_status"
+          bun scripts/verify-production-dependency-audit.ts dependency-audit.json
