@@ -1,0 +1,31 @@
+name: Integrate security and staging guard into Student Opportunities (one-shot)
+
+on:
+  push:
+    branches:
+      - feat/student-opportunities-manual-mvp-1284
+    paths:
+      - .github/workflows/security-staging-rebase-1285.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.repository == 'seyhachim/dse-program-management-system'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/student-opportunities-manual-mvp-1284
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge reviewed main into feature branch without rewriting history
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+          git push origin HEAD:feat/student-opportunities-manual-mvp-1284
