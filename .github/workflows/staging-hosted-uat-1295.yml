@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   hosted-stage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 22
     env:
       STAGING_AUTH: https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth
