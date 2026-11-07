@@ -20,6 +20,7 @@ import { telegramPlugin } from "../plugins/telegram/index.ts";
 import { communityPlugin } from "../plugins/community/index.ts";
 import { studentHandbookPlugin } from "../plugins/student-handbook/index.ts";
 import { finalProjectPlugin } from "../plugins/final-project/index.ts";
+import { opportunitiesPlugin } from "../plugins/opportunities/index.ts";
 
 /**
  * Builds the Express app: registers plugins, mounts each plugin router at
@@ -48,6 +49,7 @@ export function createApp(): Express {
   registry.register(communityPlugin);
   registry.register(studentHandbookPlugin);
   registry.register(finalProjectPlugin);
+  registry.register(opportunitiesPlugin);
 
   const app = express();
 

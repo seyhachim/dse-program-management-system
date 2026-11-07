@@ -480,6 +480,29 @@ export const authManifest: PluginManifest = {
   permissions: ["accounts:create"],
 };
 
+export const opportunitiesManifest: PluginManifest = {
+  id: "opportunities",
+  name: "Student Opportunities",
+  version: "0.1.0",
+  description: "Manually reviewed opportunities and consent-based DSE student experiences.",
+  routes: [
+    {
+      label: "Opportunities",
+      path: "/opportunities",
+      icon: "graduation-cap",
+      roles: ["student", "lecturer", "program_coordinator", "program_secretary", "admin"],
+      group: "Community",
+    },
+    {
+      label: "Manage Opportunities",
+      path: "/opportunities/manage",
+      icon: "clipboard-check",
+      roles: ["admin", "program_coordinator"],
+      group: "Community",
+    },
+  ],
+};
+
 export const pluginManifests: PluginManifest[] = [
   studentPortalManifest,
   dashboardManifest,
@@ -494,6 +517,7 @@ export const pluginManifests: PluginManifest[] = [
   methodsManifest,
   rubricsManifest,
   authManifest,
+  opportunitiesManifest,
 ];
 
 /**
