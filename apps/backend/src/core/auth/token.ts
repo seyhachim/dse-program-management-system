@@ -105,9 +105,10 @@ function synthesizeProgrammeRoles(roles: Role[]): ProgrammeRoleAssignment[] {
  * - `supabase`: JWTs issued by Supabase Auth, verified in `verifySupabaseToken`.
  * Kept as a flag so local dev and CI run without a live Supabase project.
  */
-export type AuthMode = "dev" | "supabase";
+export type AuthMode = "dev" | "supabase" | "neon-staging";
 
 export function getAuthMode(): AuthMode {
+  if (process.env.AUTH_MODE === "neon-staging") return "neon-staging";
   return process.env.AUTH_MODE === "supabase" ? "supabase" : "dev";
 }
 
