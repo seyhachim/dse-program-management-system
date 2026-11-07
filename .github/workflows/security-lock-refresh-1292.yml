@@ -34,8 +34,9 @@ jobs:
       - name: Assert patched lockfile selections
         run: |
           bun -e '
-          const lock = await Bun.file("bun.lock").text();
-          const keys = {
+          const raw = await Bun.file("bun.lock").text();
+          const lock = JSON.parse(raw.replace(/,\\s*([}\\]])/g, "$1"));
+          const required = {
             next: "16.4.1",
             sharp: "0.35.5",
             dompurify: "3.4.17",
@@ -43,10 +44,18 @@ jobs:
             "body-parser": "1.20.9",
             undici: "7.30.1"
           };
-          for (const [name, expected] of Object.entries(keys)) {
-            const re = new RegExp("[\\x22]" + name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&") + "[\\x22]\\s*:\\s*\\[\\s*[\\x22]" + name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&") + "@" + expected.replace(/\\./g, "\\.") + "[\\x22]");
-            if (!re.test(lock)) { throw new Error("Expected patched " + name + "@" + expected + " in lockfile"); }
-            console.log("Verified " + name + "@" + expected);
+          for (const [name, minimum] of Object.entries(required)) {
+            const spec = lock.packages[name]?.[0];
+            if (!spec) throw new Error("Missing " + name + " in Bun lockfile");
+            const actual = spec.slice(name.length + 1).split("-")[0];
+            const a = actual.split(".").map(Number);
+            const b = minimum.split(".").map(Number);
+            if (a.length !== 3 || b.length !== 3 ||
+                a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]) ||
+                (a[0] === b[0] && a[1] === b[1] && a[2] < b[2])) {
+              throw new Error("Unpatched " + name + ": " + actual + " < " + minimum);
+            }
+            console.log(name + "@" + actual + " (minimum " + minimum + ")");
           }
           '
       - name: Commit generated Bun lockfile only
