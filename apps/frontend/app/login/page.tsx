@@ -82,7 +82,7 @@ function LoginForm() {
         : await getSupabase().auth.signInWithPassword({ email: email.trim(), password });
 
       if (providerError) {
-        setError(friendlyLoginError(providerError.message));
+        setError(friendlyLoginError(providerError.message ?? "Sign-in failed"));
         return;
       }
 
