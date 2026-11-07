@@ -13,8 +13,10 @@ database only**. The direct hostname is
 No Prisma migration, seed, Render deploy, production DB or academic data
 change has been performed. The existing Render preview backend database
 target and isolated authentication remain unverified, so this is **not yet
-a full persistent staging environment**. Feature #1285 and safety PR #1291
-remain draft; security audit gate #1292 is outstanding.
+a full persistent staging environment**. Feature #1285 and safety PR #1291 remain draft. Security patch PR #1293
+merged as `78c338d8b3d596de6fbe1b69fedfb21186565f02`, restoring the
+production dependency audit; the separately tracked Zod v4 migration
+is #1294. Re-run this branch's CI against updated `main` before merge.
 
 ## Provider assessment
 
