@@ -30,5 +30,11 @@ describe("public Academic Calendar year hub", () => {
     expect(page).toContain('aria-label={`Open Year ${studyYear} academic calendar in a new tab`}');
     expect(page).not.toContain("fetch(");
     expect(page).not.toContain("NEXT_PUBLIC_API_URL");
+    expect(page).toContain('Select your year to view the calendar.');
+    expect(page).toContain('>View calendar</p>');
+    expect(page).toContain('Only published academic calendars are shown.');
+    expect(page).toContain('displayAcademicYear = academicYear.replace');
+    expect(page).not.toContain('View the published calendar and important academic dates for Year');
+    expect(page).not.toContain('Open calendar in new tab</p>');
   });
 });

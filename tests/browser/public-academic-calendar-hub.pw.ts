@@ -13,13 +13,17 @@ test.describe("#1282 public Academic Calendar hub", () => {
       expect(response?.status()).toBe(200);
       expect(new URL(page.url()).pathname).toBe(HUB_PATH);
       await expect(page.getByRole("heading", { level: 1, name: "Academic Calendar" })).toBeVisible();
-      await expect(page.getByText("Academic Year 2026-2027")).toBeVisible();
+      await expect(page.getByText("2026–2027", { exact: true })).toBeVisible();
+      await expect(page.getByText("Select your year to view the calendar.")).toBeVisible();
+      await expect(page.getByText("Only published academic calendars are shown.")).toBeVisible();
 
       for (const year of YEARS) {
         const href = `${HUB_PATH}/year-${year}`;
         const link = page.getByRole("link", {
           name: `Open Year ${year} academic calendar in a new tab`,
         });
+        await expect(link.getByRole("heading", { name: `Year ${year}` })).toBeVisible();
+        await expect(link.getByText("View calendar", { exact: true })).toBeVisible();
         await expect(link).toHaveAttribute("href", href);
         await expect(link).toHaveAttribute("target", "_blank");
         await expect(link).toHaveAttribute("rel", "noopener noreferrer");
