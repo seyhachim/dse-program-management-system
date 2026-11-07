@@ -9,10 +9,21 @@ import { BetterAuthVanillaAdapter } from "@neondatabase/auth/vanilla/adapters";
  * stores the session in an HttpOnly cookie; a short-lived JWT authorizes
  * cross-origin requests to the isolated Render backend.
  */
-function createStagingAuthClient(url: string) {
-  return createAuthClient(url, { adapter: BetterAuthVanillaAdapter() });
+type StagingAuthResult = {
+  data?: { user?: { id: string }; session?: { token?: string } } | null;
+  error?: { message?: string } | null;
+};
+type StagingAuthClient = {
+  getSession(): Promise<StagingAuthResult>;
+  signIn: {
+    email(credentials: { email: string; password: string }): Promise<{ error?: { message?: string } | null }>;
+  };
+  signOut(): Promise<unknown>;
+};
+/** Narrow the library's huge SDK union at one reviewed, stage-only integration boundary. */
+function createStagingAuthClient(url: string): StagingAuthClient {
+  return createAuthClient(url, { adapter: BetterAuthVanillaAdapter() }) as unknown as StagingAuthClient;
 }
-type StagingAuthClient = ReturnType<typeof createStagingAuthClient>;
 let client: StagingAuthClient | null = null;
 
 export function getStagingAuth(): StagingAuthClient {
