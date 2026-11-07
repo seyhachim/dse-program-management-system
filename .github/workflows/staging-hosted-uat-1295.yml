@@ -1,0 +1,114 @@
+name: Isolated staging hosted real-login UAT (one-shot)
+on:
+  push:
+    branches:
+      - test/1295-hosted-uat
+    paths:
+      - .github/workflows/staging-hosted-uat-1295.yml
+permissions:
+  contents: read
+jobs:
+  hosted-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    env:
+      STAGING_AUTH: https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth
+      STAGING_PREVIEW: https://dse-p91wom5qc-seyhachims-projects.vercel.app
+      STAGING_API: https://dse-pms-staging-isolated-free.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Verify isolated live services before generating identities
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 12 --retry-all-errors --retry-delay 5 --max-time 90 "$STAGING_API/health" > /tmp/staging-health.json
+          grep -q '"ok":true' /tmp/staging-health.json
+          status=$(curl -LsS -o /dev/null -w '%{http_code}' --max-time 40 "$STAGING_PREVIEW/login")
+          test "$status" = "200"
+          echo "PASS: isolated staging API and preview are reachable"
+      - name: Create four disposable Neon Auth test identities, with passwords masked
+        shell: bash
+        run: |
+          set -euo pipefail
+          for role in COORD STUDENT SECRETARY OUTSIDER; do
+            email="staging1295-${role,,}-${GITHUB_RUN_ID}@example.com"
+            password="$(openssl rand -hex 22)"
+            echo "::add-mask::$password"
+            echo "STAGE_${role}_EMAIL=$email" >> "$GITHUB_ENV"
+            echo "STAGE_${role}_PASS=$password" >> "$GITHUB_ENV"
+            name="STAGING TEST ${role}"
+            payload=$(mktemp)
+            jq -n --arg name "$name" --arg email "$email" --arg password "$password" \
+              '{name:$name,email:$email,password:$password}' > "$payload"
+            jar="/tmp/neon-stage-${role}.cookies"
+            status=$(curl --silent --show-error --retry 3 --retry-delay 3 \
+              --max-time 60 --cookie-jar "$jar" --cookie "$jar" \
+              -o "/tmp/neon-stage-${role}.response" -w '%{http_code}' \
+              -X POST "$STAGING_AUTH/sign-up/email" \
+              -H "Origin: $STAGING_PREVIEW" -H 'Content-Type: application/json' \
+              --data-binary "@$payload")
+            rm -f "$payload"
+            if [[ "$status" != "200" && "$status" != "201" ]]; then
+              echo "FAIL: Neon Auth test signup for ${role}; HTTP ${status}"
+              jq -r '.message // .error.message // .error // "No public error details"' "/tmp/neon-stage-${role}.response" 2>/dev/null | head -c 250 || true
+              exit 1
+            fi
+            echo "STAGING_IDENTITY_CREATED: $email"
+          done
+          echo "STAGING_AUTH_TEST_USERS_READY: id ${GITHUB_RUN_ID}; all are example.com synthetic, no real students"
+      - name: Check staged PMS role provisioning, then enforce full hosted browser UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=0
+          for n in $(seq 1 66); do
+            ok=1
+            for role in COORD STUDENT SECRETARY; do
+              jar="/tmp/neon-stage-${role}.cookies"
+              curl --silent --show-error -b "$jar" -c "$jar" \
+                -H "Origin: $STAGING_PREVIEW" --max-time 30 \
+                "$STAGING_AUTH/get-session" -o "/tmp/neon-stage-${role}.session" || true
+              jwt=$(jq -r '.session.token // .data.session.token // empty' "/tmp/neon-stage-${role}.session" 2>/dev/null || true)
+              if [[ "$jwt" != *.*.* ]]; then
+                curl --silent --show-error -b "$jar" -c "$jar" -H "Origin: $STAGING_PREVIEW" \
+                  "$STAGING_AUTH/token" -o "/tmp/neon-stage-${role}.jwt" || true
+                jwt=$(jq -r '.token // .data.token // empty' "/tmp/neon-stage-${role}.jwt" 2>/dev/null || true)
+              fi
+              if [[ "$jwt" != *.*.* ]]; then
+                ok=0
+                break
+              fi
+              code=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+                --max-time 30 -H "Authorization: Bearer $jwt" "$STAGING_API/api/auth/me")
+              if [[ "$code" != "200" ]]; then
+                ok=0
+                break
+              fi
+            done
+            if [[ "$ok" == "1" ]]; then
+              ready=1
+              break
+            fi
+            if (( n % 6 == 0 )); then echo "Waiting for explicitly provisioned PMS test roles; attempt $n / 66"; fi
+            sleep 10
+          done
+          if [[ "$ready" != "1" ]]; then
+            echo "FAIL: staging real JWT/role provisioning not completed. Protected UAT not run."
+            exit 1
+          fi
+          echo "PASS: all 3 staging roles validated through actual hosted JWT /api/auth/me"
+      - name: Run hosted Chromium desktop and mobile scenarios
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          cd tests/browser
+          bun install --frozen-lockfile
+          bunx playwright install --with-deps chromium
+          bunx playwright test --config hosted-staging.config.ts
+      - name: Report test-only credential cleanup reminder
+        if: always()
+        run: |
+          echo "UAT runs use synthetic example.com identities in staging Neon Auth only."
+          echo "No passwords, JWTs, cookie jars or Playwright traces are uploaded as artifacts."
