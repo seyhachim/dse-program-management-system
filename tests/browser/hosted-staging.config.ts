@@ -12,7 +12,7 @@ export default defineConfig({
   use: {
     baseURL: "https://dse-p91wom5qc-seyhachims-projects.vercel.app",
     screenshot: "only-on-failure",
-    trace: "retain-on-failure",
+    trace: "off", // Browser traces can capture test passwords; never upload them.
     video: "off",
   },
   outputDir: "staging-test-results",
