@@ -15,7 +15,7 @@ function createStagingAuthClient(url: string) {
 type StagingAuthClient = ReturnType<typeof createStagingAuthClient>;
 let client: StagingAuthClient | null = null;
 
-export function getStagingAuth() {
+export function getStagingAuth(): StagingAuthClient {
   if (typeof window === "undefined" ||
       process.env.NEXT_PUBLIC_AUTH_MODE !== "neon-staging" ||
       process.env.NEXT_PUBLIC_STAGING_MODE !== "true") {
