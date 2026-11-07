@@ -1,8 +1,20 @@
 # DSE PMS — No-additional-cost persistent staging
 
-**Status 2026-11-06: NOT PROVISIONED.** This is the release-gate runbook for
-#1290 and feature #1284 / draft PR #1285. No database, Render environment,
-or authenticated staging session is proven safe yet.
+**Status 2026-11-07: ISOLATED NEON DATABASE PROVISIONED AND MARKED; DEPLOYED STAGING NOT VERIFIED.**
+Neon organization `org-winter-truth-95707920` is confirmed Free
+(subscription `free_v3`, documented $0/month). Independent project
+`dse-pms-staging` (`wandering-heart-46069342`) is in Singapore
+(`aws-ap-southeast-1`); default branch `br-misty-bar-a19mu0bw`,
+database `neondb` is empty (zero user tables), and Neon Auth is disabled.
+The read-only query verified `current_database() = neondb` and the marker
+`DSE-PMS-STAGING:20261107-neon-verified-01` after marking that **new Neon
+database only**. The direct hostname is
+`ep-purple-scene-a1py5uzt.ap-southeast-1.aws.neon.tech` (not a secret).
+No Prisma migration, seed, Render deploy, production DB or academic data
+change has been performed. The existing Render preview backend database
+target and isolated authentication remain unverified, so this is **not yet
+a full persistent staging environment**. Feature #1285 and safety PR #1291
+remain draft; security audit gate #1292 is outstanding.
 
 ## Provider assessment
 
@@ -12,7 +24,7 @@ or authenticated staging session is proven safe yet.
 | Render Free web | My Workspace has a native production candidate, an older PR #1144 native backend and a legacy Docker service; automated preview deployment is OFF. | Reuse the older native backend only after its current database and environment are audited. Never touch legacy Docker or production backend. |
 | Render Free Postgres | No existing DB; new Free databases expire in 30 days and lack backups. | Not persistent; do not provision for this use. |
 | DigitalOcean | Existing $4/month, 512 MB Ubuntu droplet with unverified original workload. | Do not modify. |
-| Neon Free PostgreSQL | $0 tier offers durable 1 GB/project storage subject to compute and network quotas, with idle compute that scales to zero. | Preferred independent DB, pending account connection, exact $0 quote, and verification. |
+| Neon Free PostgreSQL | Verified organisation Free, project in Singapore, independent fresh empty DB and staging identity marker; 1 GB/project storage cap, 100 CU-hours/project and 5 GB transfer per project on Free. | Database provisioned and marked; migration/Render/auth smoke remain pending. |
 | GitHub Actions | Separate disposable PostgreSQL test databases and Playwright suite already in CI. | Keep running until persistent staging is established. |
 
 Official billing references:
