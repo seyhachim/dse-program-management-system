@@ -9,7 +9,11 @@ import { BetterAuthVanillaAdapter } from "@neondatabase/auth/vanilla/adapters";
  * stores the session in an HttpOnly cookie; a short-lived JWT authorizes
  * cross-origin requests to the isolated Render backend.
  */
-let client: ReturnType<typeof createAuthClient> | null = null;
+function createStagingAuthClient(url: string) {
+  return createAuthClient(url, { adapter: BetterAuthVanillaAdapter() });
+}
+type StagingAuthClient = ReturnType<typeof createStagingAuthClient>;
+let client: StagingAuthClient | null = null;
 
 export function getStagingAuth() {
   if (typeof window === "undefined" ||
@@ -17,16 +21,15 @@ export function getStagingAuth() {
       process.env.NEXT_PUBLIC_STAGING_MODE !== "true") {
     throw new Error("Isolated staging authentication is unavailable");
   }
-  client ??= createAuthClient(`${window.location.origin}/staging-auth`, {
-    adapter: BetterAuthVanillaAdapter(),
-  });
+  client ??= createStagingAuthClient(`${window.location.origin}/staging-auth`);
   return client;
 }
 
 export async function stagingBearerToken(): Promise<string | null> {
   const { data, error } = await getStagingAuth().getSession();
-  const sessionToken = data?.session?.token;
-  if (error || !sessionToken) return null;
+  const session = data?.session;
+  const sessionToken = session && "token" in session ? session.token : undefined;
+  if (error || typeof sessionToken !== "string" || !sessionToken) return null;
   return sessionToken;
 }
 
