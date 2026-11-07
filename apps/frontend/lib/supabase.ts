@@ -6,12 +6,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * production builds are validated separately in next.config.mjs and must use
  * `supabase`. Explicit invalid values still fail instead of silently falling back.
  */
-function resolveFrontendAuthMode(): "dev" | "supabase" {
+function resolveFrontendAuthMode(): "dev" | "supabase" | "neon-staging" {
   const mode = process.env.NEXT_PUBLIC_AUTH_MODE;
   if (!mode && process.env.NODE_ENV !== "production") return "dev";
-  if (mode !== "dev" && mode !== "supabase") {
+  if (mode !== "dev" && mode !== "supabase" && mode !== "neon-staging") {
     throw new Error(
-      "NEXT_PUBLIC_AUTH_MODE must be explicitly set to either 'dev' or 'supabase'",
+      "NEXT_PUBLIC_AUTH_MODE must be explicitly set to 'dev', 'supabase' or 'neon-staging'",
     );
   }
   return mode;
