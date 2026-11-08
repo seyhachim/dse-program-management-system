@@ -124,6 +124,13 @@ const qaNavigationManifest: PluginManifest = {
       roles: ["admin", "program_coordinator", "qa_reviewer"],
       group: "Quality Assurance",
     },
+    {
+      label: "AUF Demo (Fictional)",
+      path: "/qa-demo",
+      icon: "presentation",
+      roles: ["admin", "program_coordinator", "qa_reviewer"],
+      group: "Quality Assurance",
+    },
   ],
 };
 
