@@ -19,6 +19,8 @@ const labelKm = new Map<string, string>([
   ["💼 Careers", "💼 អាជីព"],
   ["💰 Fees & Scholarships", "💰 ថ្លៃសិក្សា និងអាហារូបករណ៍"],
   ["❓ Ask DSE", "❓ សួរ DSE"],
+  ["❓ Ask a Question", "❓ សួរសំណួរអំពី DSE"],
+  ["Ask about DSE", "សួរអំពី DSE"],
   ["☰ More", "☰ ផ្សេងៗ"],
   ["1 · What is DSE?", "1 · DSE ជាអ្វី?"],
   ["2 · What will I study?", "2 · ខ្ញុំនឹងសិក្សាអ្វី?"],
