@@ -161,6 +161,9 @@ const EXPECTED_PUBLIC_TABLES = [
   "CopDiscussion",
   "CopComment",
   "CopAction",
+  "Opportunity",
+  "OpportunityExperience",
+  "OpportunityAuditEvent",
 ] as const;
 
 const EXPECTED_ATTENDANCE_TABLES = [

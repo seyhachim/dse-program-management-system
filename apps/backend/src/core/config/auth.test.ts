@@ -81,3 +81,49 @@ describe("resolveAuthConfig", () => {
     });
   });
 });
+
+const neonStaging = {
+  NODE_ENV: "production",
+  AUTH_MODE: "neon-staging",
+  DSE_STAGING_ENVIRONMENT: "true",
+  DSE_STAGING_DB_HOST: "ep-purple-scene-a1py5uzt.ap-southeast-1.aws.neon.tech",
+  DSE_STAGING_DB_NAME: "neondb",
+  DSE_STAGING_DB_MARKER: "DSE-PMS-STAGING:20261107-neon-verified-01",
+  DATABASE_URL: "postgresql://test:synthetic@ep-purple-scene-a1py5uzt.ap-southeast-1.aws.neon.tech/neondb?sslmode=require",
+  NEON_AUTH_BASE_URL: "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth",
+  CORS_ORIGIN: "https://staging-preview.example.com",
+};
+
+describe("staging-only Neon auth — production Supabase is unaffected", () => {
+  test("accepts the exact isolated Neon DB/issuer and never requires Supabase keys", () => {
+    expect(resolveAuthConfig(env(neonStaging))).toEqual({
+      mode: "neon-staging",
+      neonAuthBaseUrl: neonStaging.NEON_AUTH_BASE_URL,
+    });
+  });
+
+  test("rejects any missing staging safety gate", () => {
+    for (const key of [
+      "DSE_STAGING_ENVIRONMENT", "DSE_STAGING_DB_HOST",
+      "DSE_STAGING_DB_NAME", "DSE_STAGING_DB_MARKER",
+      "DATABASE_URL", "NEON_AUTH_BASE_URL", "CORS_ORIGIN",
+    ]) {
+      expect(() => resolveAuthConfig(env({ ...neonStaging, [key]: undefined }))).toThrow();
+    }
+  });
+
+  test("rejects production Supabase database and credentials", () => {
+    const variants = [
+      { DSE_STAGING_ENVIRONMENT: "false" },
+      { DSE_STAGING_DB_MARKER: "DSE-PMS-STAGING:attacker-marker" },
+      { DATABASE_URL: "postgresql://test:test@db.production.supabase.co/postgres?sslmode=require" },
+      { NEON_AUTH_BASE_URL: "https://attacker.invalid/auth" },
+      { CORS_ORIGIN: "*" },
+      { SUPABASE_SERVICE_ROLE_KEY: "test-service-key" },
+      { SUPABASE_URL: "https://production.supabase.co" },
+    ];
+    for (const override of variants) {
+      expect(() => resolveAuthConfig(env({ ...neonStaging, ...override }))).toThrow();
+    }
+  });
+});

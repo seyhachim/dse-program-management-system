@@ -58,7 +58,7 @@ test("Lecturer gets the focused workspace routes in the intended sidebar cluster
   const groups = navGroupsForRole(pluginManifests, ["lecturer"])
     .filter((group) => group.label !== "footer")
     .map((group) => group.label);
-  expect(groups).toEqual(["Teaching", "Academic", "Curriculum", "Delivery", "Personal"]);
+  expect(groups).toEqual(["Teaching", "Academic", "Curriculum", "Delivery", "Personal", "Community"]);
 
   const coursesRoute = lecturerRoutes.find((r) => r.path === "/courses");
   expect(coursesRoute?.label).toBe("Course Specifications");

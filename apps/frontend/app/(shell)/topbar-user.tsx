@@ -18,6 +18,7 @@ import {
 import { useMe } from "@/lib/auth";
 import { clearProtectedQueryCache } from "@/lib/query-client";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
+import { getStagingAuth, notifyStagingAuthChange } from "@/lib/staging-auth";
 import { MOBILE_SHELL_LAYOUT } from "./mobile-shell-layout";
 
 /** First letter of each of the first two words in `name` (e.g. "Grace Hopper" → "GH"). */
@@ -49,7 +50,11 @@ export function TopbarUser() {
     // The auth-state listener repeats this eviction on logout/user switch as a
     // second safety boundary.
     clearProtectedQueryCache(queryClient);
-    await getSupabase().auth.signOut();
+    if (AUTH_MODE === "supabase") await getSupabase().auth.signOut();
+    else if (AUTH_MODE === "neon-staging") {
+      await getStagingAuth().signOut();
+      notifyStagingAuthChange();
+    }
     router.replace("/login");
   };
 
@@ -100,7 +105,7 @@ export function TopbarUser() {
             <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-        {AUTH_MODE === "supabase" ? (
+        {AUTH_MODE !== "dev" ? (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={signOut}>

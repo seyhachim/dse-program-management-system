@@ -2,7 +2,7 @@ import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 export const DEV_TOKEN_STORAGE_KEY = "dse-pms-dev-token";
 
-export type BrowserRole = "admin" | "coordinator" | "lecturer" | "readOnly";
+export type BrowserRole = "admin" | "coordinator" | "lecturer" | "readOnly" | "student";
 
 function tokenFor(role: BrowserRole): string {
   const name =
@@ -12,7 +12,9 @@ function tokenFor(role: BrowserRole): string {
         ? "BROWSER_SMOKE_COORDINATOR_TOKEN"
         : role === "lecturer"
           ? "BROWSER_SMOKE_LECTURER_TOKEN"
-          : "BROWSER_SMOKE_READONLY_TOKEN";
+          : role === "student"
+            ? "BROWSER_SMOKE_STUDENT_TOKEN"
+            : "BROWSER_SMOKE_READONLY_TOKEN";
   const token = process.env[name]?.trim();
   if (!token) throw new Error(`${name} is required for authenticated browser smoke`);
   return token;
