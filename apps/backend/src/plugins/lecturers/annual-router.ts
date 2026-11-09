@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { LinkAnnualEvidenceInput, ReviewAnnualTeachingInput, SubmitAnnualActivityInput } from "@dse-pms/shared-types";
+import { LinkAnnualEvidenceInput, ReviewAnnualTeachingInput, SubmitAnnualActivityInput, ReviewAnnualStaffInput, UpdateAnnualReportingWindowInput } from "@dse-pms/shared-types";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 import { hasGlobalRole, hasRoleInProgramme } from "../../core/auth/token.ts";
 import { lecturerAnnualService, AnnualNotFoundError, AnnualValidationError } from "./annual-service.ts";
@@ -53,11 +53,33 @@ export function createLecturerAnnualRouter():Router {
       res.status(204).end();
     }catch(error){replyError(res,error);}
   });
+  router.delete("/:yearId/me/evidence/:itemId",requireAnnualSelf,async(req,res)=>{
+    try{
+      await lecturerAnnualService.unlinkOwnEvidence(req.params.yearId!,req.user!.id,req.params.itemId!);
+      res.status(204).end();
+    }catch(error){replyError(res,error);}
+  });
   router.post("/:yearId/me/submit",requireAnnualSelf,async(req,res)=>{
     const parsed=SubmitAnnualActivityInput.safeParse(req.body);
     if(!parsed.success){res.status(400).json({error:"Invalid submission",details:parsed.error.flatten()});return;}
     try{
       await lecturerAnnualService.submitOwn(req.params.yearId!,req.user!.id,parsed.data.note);
+      res.status(204).end();
+    }catch(error){replyError(res,error);}
+  });
+  router.put("/:yearId/reporting-window",requireCoordinator,async(req,res)=>{
+    const parsed=UpdateAnnualReportingWindowInput.safeParse(req.body);
+    if(!parsed.success){res.status(400).json({error:"Invalid reporting window",details:parsed.error.flatten()});return;}
+    try{
+      await lecturerAnnualService.configureReportingWindow(req.params.yearId!,req.user!.id,parsed.data);
+      res.status(204).end();
+    }catch(error){replyError(res,error);}
+  });
+  router.post("/:yearId/review-staff",requireCoordinator,async(req,res)=>{
+    const parsed=ReviewAnnualStaffInput.safeParse(req.body);
+    if(!parsed.success){res.status(400).json({error:"Invalid staff review",details:parsed.error.flatten()});return;}
+    try{
+      await lecturerAnnualService.reviewAnnualStaff(req.params.yearId!,req.user!.id,parsed.data);
       res.status(204).end();
     }catch(error){replyError(res,error);}
   });
