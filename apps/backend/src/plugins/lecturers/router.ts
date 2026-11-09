@@ -19,6 +19,7 @@ import {
   PortfolioValidationError,
 } from "./portfolio-service.ts";
 import { lecturerService, NotFoundError } from "./service.ts";
+import { createLecturerAnnualRouter } from "./annual-router.ts";
 
 /** Lecturers router — profile CRUD plus self-owned professional portfolio. */
 export function createLecturerRouter(): Router {
@@ -112,6 +113,10 @@ export function createLecturerRouter(): Router {
   });
 
   router.post("/:id/portfolio-items/:itemId/review", requirePortfolioReviewer, async (req, res) => {
+    if (req.user!.id === req.params.id) {
+      res.status(403).json({ error: "Reviewing your own professional evidence is not permitted" });
+      return;
+    }
     const parsed = ReviewLecturerPortfolioItemInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -128,6 +133,8 @@ export function createLecturerRouter(): Router {
       res.status(errStatus(err)).json({ error: errMessage(err) ?? "Could not review portfolio item" });
     }
   });
+
+  router.use("/annual", createLecturerAnnualRouter());
 
   router.get("/:id", requirePermission("lecturers:read"), async (req, res) => {
     const lecturer = await lecturerService.getById(req.params.id!);
