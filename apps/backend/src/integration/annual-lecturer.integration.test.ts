@@ -16,12 +16,14 @@ type StaffRow = {
   lecturerId: string; classification: string; submissionStatus: string;
   teaching: Array<{ offeringId: string; confirmed: boolean; reviewId: string | null }>;
   evidence: Array<{ id: string; verificationStatus: string }>;
+  employmentType: string | null;
 };
 type Report = {
   academicYear: { id: string; label: string };
   statistics: {
     activeTeaching: number; otherContributors: number; unreported: number;
     distinctPublications: number; verifiedCpdActivities: number;
+    staffSnapshotsMissing: number;
   };
   staff: StaffRow[];
   releaseVersion: number | null;
@@ -83,6 +85,15 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
     expect((await request("/api/lecturers/annual/years", lt)).status).toBe(200);
 
     const before = (await request(`/api/lecturers/annual/${yearId}/summary`, rt)).body as Report;
+    expect((await request(`/api/lecturers/annual/${yearId}/release`, rt, "POST", {})).status).toBe(400);
+    expect((await request(`/api/lecturers/annual/${yearId}/reporting-window`, lt, "PUT", {
+      startDate:"2097-09-01",endDate:"2098-08-31",
+      evidenceUrl:"https://example.invalid/academic-calendar",reason:"Official synthetic calendar",
+    })).status).toBe(403);
+    expect((await request(`/api/lecturers/annual/${yearId}/reporting-window`, rt, "PUT", {
+      startDate:"2097-09-01",endDate:"2098-08-31",
+      evidenceUrl:"https://example.invalid/academic-calendar",reason:"Official synthetic calendar",
+    })).status).toBe(204);
     expect(before.statistics.activeTeaching).toBe(0);
     expect(before.staff.find(s => s.lecturerId === lecturer.id)?.submissionStatus).toBe("unreported");
 
@@ -91,6 +102,20 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
       evidenceUrl: "https://example.invalid/teaching" };
     expect((await request(`/api/lecturers/annual/${yearId}/review-teaching`, lt, "POST", teach)).status).toBe(403);
     expect((await request(`/api/lecturers/annual/${yearId}/review-teaching`, rt, "POST", teach)).status).toBe(204);
+
+    const oldPublication = await request("/api/lecturers/me/portfolio-items", ct, "POST", {
+      kind:"publication",title:"Older synthetic publication",identifier:"10.1234/old-"+suffix,
+      startDate:"2096-04-10",url:"https://example.invalid/old",
+    });
+    expect(oldPublication.status).toBe(201);
+    expect((await request(`/api/lecturers/annual/${yearId}/me/evidence`, ct, "POST",
+      {itemId:(oldPublication.body as {id:string}).id})).status).toBe(400);
+    const undated = await request("/api/lecturers/me/portfolio-items", ct, "POST", {
+      kind:"professional_development",title:"Undated activity",url:"https://example.invalid/no-date",
+    });
+    expect(undated.status).toBe(201);
+    expect((await request(`/api/lecturers/annual/${yearId}/me/evidence`, ct, "POST",
+      {itemId:(undated.body as {id:string}).id})).status).toBe(400);
 
     const pub = await request("/api/lecturers/me/portfolio-items", ct, "POST", {
       kind: "publication", title: "Joint synthetic paper", organization: "DSE",
@@ -136,6 +161,25 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
 
     const next = (await request(`/api/lecturers/annual/${nextYearId}/summary`, rt)).body as Report;
     expect(next.statistics.activeTeaching).toBe(0);
+
+    expect(report.statistics.staffSnapshotsMissing).toBe(2);
+    expect((await request(`/api/lecturers/annual/${yearId}/release`, rt, "POST", {})).status).toBe(400);
+
+    expect((await request(`/api/lecturers/annual/${yearId}/review-staff`, lt, "POST", {
+      lecturerId:lecturer.id,employmentType:"part_time",
+      qualification:"Master",evidenceUrl:"https://example.invalid/staff-roster",
+      reason:"Attempted self review",
+    })).status).toBe(403);
+    for (const id of [lecturer.id,contributor.id]) {
+      expect((await request(`/api/lecturers/annual/${yearId}/review-staff`, rt, "POST", {
+        lecturerId:id,employmentType:"part_time",
+        qualification:"Master",evidenceUrl:"https://example.invalid/staff-roster",
+        reason:"Verified the synthetic annual staff roster",
+      })).status).toBe(204);
+    }
+    const reviewed = (await request(`/api/lecturers/annual/${yearId}/summary`, rt)).body as Report;
+    expect(reviewed.statistics.staffSnapshotsMissing).toBe(0);
+    expect(reviewed.staff.find(s=>s.lecturerId===lecturer.id)?.employmentType).toBe("part_time");
 
     const release = await request(`/api/lecturers/annual/${yearId}/release`, rt, "POST", {});
     expect(release.status).toBe(201);

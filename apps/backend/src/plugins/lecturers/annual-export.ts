@@ -5,11 +5,12 @@ const xml=(v:unknown)=>String(v??"").replace(/&/g,"&amp;")
 
 export function annualReportRows(report:AnnualSummary):string[][] {
   return [
-    ["Academic year","Lecturer ID","Lecturer","Employment type","Qualification",
+    ["Academic year","Window start","Window end","Lecturer ID","Lecturer","Employment type","Qualification",
       "Annual classification","Submission","Confirmed sections","Verified activities",
-      "Teaching source IDs","Evidence item IDs","Verification event IDs"],
+      "Teaching source IDs","Evidence item IDs","Verification event IDs","Staff snapshot status","Annual staff review event ID","Evidence attribution"],
     ...report.staff.map(person=>[
-      report.academicYear.label,person.lecturerId,person.name,
+      report.academicYear.label,report.reportingWindow?.startDate??"Not configured",
+      report.reportingWindow?.endDate??"Not configured",person.lecturerId,person.name,
       person.employmentType??"Not recorded",person.qualification??"Not recorded",
       person.classification,person.submissionStatus,
       String(person.teaching.filter(t=>t.confirmed).length),
@@ -17,9 +18,12 @@ export function annualReportRows(report:AnnualSummary):string[][] {
       person.teaching.filter(t=>t.confirmed)
         .flatMap(t=>[t.offeringId,t.reviewId,...t.deliveredSessionIds]
           .filter((id):id is string=>Boolean(id))).join("; "),
-      person.evidence.filter(e=>e.verificationStatus==="verified").map(e=>e.id).join("; "),
-      person.evidence.filter(e=>e.verificationStatus==="verified")
+      person.evidence.filter(e=>e.verificationStatus==="verified"&&e.attribution==="in_period").map(e=>e.id).join("; "),
+      person.evidence.filter(e=>e.verificationStatus==="verified"&&e.attribution==="in_period")
         .map(e=>e.verifiedByEventId).filter(Boolean).join("; "),
+      person.staffSnapshotStatus,person.staffReviewEventId??"",
+      person.evidence.map(e=>e.id+":"+e.attribution+
+        "("+String(e.startDate??"undated")+".."+String(e.endDate??e.startDate??"undated")+")").join("; "),
     ]),
   ];
 }

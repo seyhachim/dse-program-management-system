@@ -231,6 +231,10 @@ const EXPECTED_LECTURER_ANNUAL_TABLES = [
   "AnnualTeachingReviewEvent",
   "AnnualEvidenceLink",
   "AnnualReportRelease",
+  "AnnualReportingWindow",
+  "AnnualReportingWindowEvent",
+  "AnnualStaffReview",
+  "AnnualStaffReviewEvent",
 ] as const;
 
 const FORBIDDEN_GRANTEES = new Set([

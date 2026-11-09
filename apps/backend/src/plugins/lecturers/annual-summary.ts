@@ -1,10 +1,10 @@
 import type {
-  AnnualEvidence, AnnualLecturer, AnnualSummary, AnnualTeaching, AnnualYear,
+  AnnualEvidence, AnnualLecturer, AnnualReportingWindow, AnnualSummary, AnnualTeaching, AnnualYear,
 } from "@dse-pms/shared-types";
 
 export type AnnualStaffInput = {
   lecturerId: string; name: string; employmentType: string | null;
-  qualification: string | null; submitted: boolean;
+  qualification: string | null; staffSnapshotStatus: "verified" | "missing"; staffReviewEventId: string | null; submitted: boolean;
   teaching: AnnualTeaching[]; evidence: AnnualEvidence[];
 };
 
@@ -22,7 +22,7 @@ export function publicationIdentity(item: AnnualEvidence): string {
  * employment alone; missing submissions stay 'unreported', never zero.
  */
 export function summarizeAnnualLecturers(
-  year: AnnualYear, staff: AnnualStaffInput[], generatedAt: string,
+  year: AnnualYear, staff: AnnualStaffInput[], generatedAt: string, reportingWindow: AnnualReportingWindow | null,
 ): AnnualSummary {
   const publicationIds = new Set<string>();
   const cpdIds = new Set<string>();
@@ -33,7 +33,7 @@ export function summarizeAnnualLecturers(
       discrepancy: row.verdict === "not_delivered" && row.deliveredSessions > 0,
     }));
     const evidence = person.evidence;
-    const verified = evidence.filter(item => item.verificationStatus === "verified");
+    const verified = evidence.filter(item => item.verificationStatus === "verified" && item.attribution === "in_period");
     for (const item of verified) {
       if (item.kind === "publication") publicationIds.add(publicationIdentity(item));
       if (item.kind === "professional_development") cpdIds.add(item.id);
@@ -47,6 +47,8 @@ export function summarizeAnnualLecturers(
       name: person.name,
       employmentType: person.employmentType,
       qualification: person.qualification,
+      staffSnapshotStatus: person.staffSnapshotStatus,
+      staffReviewEventId: person.staffReviewEventId,
       submissionStatus: person.submitted ? "submitted" as const : "unreported" as const,
       teaching,
       evidence,
@@ -58,6 +60,7 @@ export function summarizeAnnualLecturers(
     schemaVersion: "annual-lecturer-v1",
     academicYear: year,
     generatedAt,
+    reportingWindow,
     staff: result,
     statistics: {
       totalInRegistry: result.length,
@@ -68,15 +71,21 @@ export function summarizeAnnualLecturers(
       distinctPublications: publicationIds.size,
       verifiedCpdActivities: cpdIds.size,
       evidenceGaps: result.filter(r => r.submissionStatus === "unreported" ||
+        r.staffSnapshotStatus === "missing" && r.classification !== "unconfirmed" ||
+        r.evidence.some(e => e.attribution !== "in_period") ||
         r.teaching.some(t => t.discrepancy) ||
         r.teaching.some(t => !t.confirmed && t.verdict === null)).length,
+      staffSnapshotsMissing: result.filter(r => r.classification !== "unconfirmed" && r.staffSnapshotStatus === "missing").length,
+      unattributedEvidence: result.reduce((n,r) => n+r.evidence.filter(e =>
+        e.verificationStatus === "verified" && e.attribution !== "in_period").length,0),
     },
     releaseVersion: null,
     notes: [
       "Only confirmed delivery counts as active teaching, not assignments alone.",
       "Verified programme-related research, publication, supervision or service without teaching is reported separately.",
       "Unreported lecturer activities are missing information, not zero achievements.",
-      "Annual employment classification is a current profile value until a historical HR snapshot is validated.",
+      "Historical employment and qualification are reported only from coordinator-reviewed annual staff snapshots.",
+      "Only verified evidence whose recorded activity dates overlap the approved annual window contributes to totals.",
       "Counts use distinct lecturer IDs and publication identities; no headcount/FTE ratio is inferred.",
     ],
   };

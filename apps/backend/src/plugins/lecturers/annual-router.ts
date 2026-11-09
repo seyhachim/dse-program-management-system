@@ -41,7 +41,7 @@ export function createLecturerAnnualRouter():Router {
   router.get("/:yearId/me",requireAnnualSelf,async(req,res)=>{
     try {
       const summary=await lecturerAnnualService.summary(req.params.yearId!);
-      res.json({academicYear:summary.academicYear,
+      res.json({academicYear:summary.academicYear,reportingWindow:summary.reportingWindow,
         staff:summary.staff.find(s=>s.lecturerId===req.user!.id)??null});
     } catch(error){replyError(res,error);}
   });

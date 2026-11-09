@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 import type { AnnualEvidence, AnnualTeaching, AnnualYear } from "@dse-pms/shared-types";
 import { summarizeAnnualLecturers, type AnnualStaffInput } from "./annual-summary.ts";
 import { annualReportCsv, annualReportExcelXml } from "./annual-export.ts";
+import { annualEvidenceAttribution } from "./annual-attribution.ts";
 
 const year:AnnualYear={id:"year-2025",label:"2025–2026",startYear:2025,endYear:2026};
+const reportingWindow={startDate:"2025-09-01",endDate:"2026-08-31",evidenceUrl:"https://example.edu/calendar",reviewedAt:"2026-11-09T00:00:00.000Z"};
 const nextYear:AnnualYear={id:"year-2026",label:"2026–2027",startYear:2026,endYear:2027};
 function teaching(offeringId:string, overrides:Partial<AnnualTeaching>={}):AnnualTeaching {
   return {offeringId,courseCode:"TSA301",courseTitle:"Time Series Analysis",term:"2025–2026",
@@ -15,14 +17,16 @@ function evidence(id:string,kind:AnnualEvidence["kind"],status:AnnualEvidence["v
   identifier=""):AnnualEvidence {
   return {id,kind,title:kind==="publication"?"Shared Paper":"Training",
     identifier,organization:"RUPP",url:"https://example.edu/"+id,
-    verificationStatus:status,verifiedByEventId:status==="verified"?"review-"+id:null};
+    verificationStatus:status,verifiedByEventId:status==="verified"?"review-"+id:null,
+    startDate:"2026-02-15",endDate:null,attribution:"in_period"};
 }
 function person(id:string,overrides:Partial<AnnualStaffInput>={}):AnnualStaffInput {
   return {lecturerId:id,name:"Lecturer "+id,employmentType:"Part-time",qualification:"Master's",
+    staffSnapshotStatus:"verified",staffReviewEventId:"review-staff-"+id,
     submitted:false,teaching:[],evidence:[],...overrides};
 }
 const report=(people:AnnualStaffInput[],target=year)=>
-  summarizeAnnualLecturers(target,people,"2026-11-09T00:00:00.000Z");
+  summarizeAnnualLecturers(target,people,"2026-11-09T00:00:00.000Z",reportingWindow);
 
 describe("annual lecturer MVP acceptance scenarios",()=>{
   test("1. Previous-year teaching survives no teaching next year",()=>{
@@ -85,6 +89,25 @@ describe("annual lecturer MVP acceptance scenarios",()=>{
     expect(r.statistics.activeTeaching).toBe(1);
     expect(r.staff[0]!.teaching[0]!.discrepancy).toBe(true);
     expect(r.statistics.evidenceGaps).toBe(1);
+  });
+  test("Year attribution excludes out-of-period and undated verified activities",()=>{
+    expect(annualEvidenceAttribution(reportingWindow,"2026-01-01",null)).toBe("in_period");
+    expect(annualEvidenceAttribution(reportingWindow,"2024-01-01",null)).toBe("out_of_period");
+    expect(annualEvidenceAttribution(reportingWindow,null,null)).toBe("undated");
+    expect(annualEvidenceAttribution(null,"2026-01-01",null)).toBe("period_unconfigured");
+    const wrongYear={...evidence("old","publication","verified"),attribution:"out_of_period" as const};
+    const r=report([person("l1",{evidence:[wrongYear]})]);
+    expect(r.statistics.distinctPublications).toBe(0);
+    expect(r.statistics.otherContributors).toBe(0);
+    expect(r.statistics.unattributedEvidence).toBe(1);
+  });
+  test("Missing historical employment verification does not inherit current profile",()=>{
+    const r=report([person("l1",{teaching:[teaching("o1")],
+      staffSnapshotStatus:"missing",staffReviewEventId:null,
+      employmentType:null,qualification:null})]);
+    expect(r.statistics.activeTeaching).toBe(1);
+    expect(r.statistics.staffSnapshotsMissing).toBe(1);
+    expect(r.staff[0]!.employmentType).toBeNull();
   });
   test("Only assignment without delivery or coordinator confirmation is not active",()=>{
     const r=report([person("l1",{teaching:[teaching("o1",{

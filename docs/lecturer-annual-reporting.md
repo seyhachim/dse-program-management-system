@@ -4,10 +4,15 @@
 This adds the **annual programme review layer**, not a new lecturer portfolio.
 Teaching is derived from canonical Offerings plus actual class-delivery records.
 Lecturers reuse the existing professional evidence forms and link relevant items
-to an AcademicYear. Verification continues through existing portfolio review.
+to an AcademicYear. Only items with a recorded date **overlapping the configured
+  reporting window** may be linked or counted. Undated/out-of-window items are
+  blocked, and records edited out of period later are flagged in summaries.
+  Verification continues through existing portfolio review.
 
 ## Workflows
 - Coordinator: `/annual-lecturer-activities` → select an academic year →
+  **configure its verified reporting window (dates + official source)** and
+  **verify historical staff employment/qualification against an HR record** →
   inspect classifications and assigned offerings → confirm or reject delivery
   with reasons/evidence → review linked portfolio evidence → release a
   versioned annual report → export CSV or Excel-compatible XML.
@@ -28,6 +33,16 @@ to an AcademicYear. Verification continues through existing portfolio review.
   DSE programme-scoped roles server-side. Self-review is rejected.
 - Reviewed teaching has append-only event history; annual releases are
   immutable JSONB snapshots, corrected by issuing a new version.
+- Historical employment type and qualification are available in the annual report
+  **only after** coordinator verification of an annual staff snapshot with a source
+  URL and append-only review history. Current profile values are never used as
+  silent historical evidence.
+- Report release fails closed while the reporting window is missing, verified
+  contributors lack annual staff review, or verified linked activities are
+  undated/outside the reporting period. Unreported lecturer submissions remain
+  explicit and are not silently treated as zero.
+- Reporting-window corrections create append-only history. Previous report
+  versions are immutable snapshots with their own official dates and staff evidence.
 - Reports explicitly distinguish full-time/part-time headcounts from FTE,
   and never claim a computed FTE ratio from current staff profiles.
 
@@ -42,9 +57,9 @@ IDs. No private contact information is exported.
 - Legacy Offerings without a canonical calendar link are matched **only if**
   their term string explicitly contains the academic-year label. Ambiguous
   legacy assignments require data cleanup; do not infer the reporting year.
-- Current employment type and qualification are informational, not a verified
-  historical HR snapshot. The approved release preserves the values as shown
-  when it was released.
+- The UI requires the coordinator to provide an official date range and year-specific
+  HR evidence; no calendar-year assumptions or unreviewed current HR data may
+  be counted in the verified report.
 - Reports show unresolved evidence and contradictions. A `not_delivered`
   review cannot override an authoritative recorded delivery; such conflicts
   require correcting the source record through its existing audit workflow.
