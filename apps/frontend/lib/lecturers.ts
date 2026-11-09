@@ -1,4 +1,11 @@
 import type {
+  AnnualYear,
+  AnnualSummary,
+  AnnualLecturer,
+  AnnualReportingWindow,
+  ReviewAnnualTeachingInput,
+  ReviewAnnualStaffInput,
+  UpdateAnnualReportingWindowInput,
   CreateLecturerInput,
   CreateLecturerPortfolioItemInput,
   Lecturer,
@@ -12,6 +19,17 @@ import type {
 import { api } from "./api";
 
 export const lecturersApi = {
+  annualYears(): Promise<AnnualYear[]> { return api.get<AnnualYear[]>("/api/lecturers/annual/years"); },
+  annualSummary(yearId: string): Promise<AnnualSummary> { return api.get<AnnualSummary>(`/api/lecturers/annual/${yearId}/summary`); },
+  annualMe(yearId: string): Promise<{ academicYear: AnnualYear; reportingWindow: AnnualReportingWindow | null; staff: AnnualLecturer | null }> { return api.get(`/api/lecturers/annual/${yearId}/me`); },
+  annualLinkEvidence(yearId: string, itemId: string): Promise<void> { return api.post(`/api/lecturers/annual/${yearId}/me/evidence`, { itemId }); },
+  annualUnlinkEvidence(yearId:string,itemId:string):Promise<void>{return api.delete(`/api/lecturers/annual/${yearId}/me/evidence/${itemId}`);},
+  annualConfigureWindow(yearId:string,input:UpdateAnnualReportingWindowInput):Promise<void>{return api.put(`/api/lecturers/annual/${yearId}/reporting-window`,input);},
+  annualReviewStaff(yearId:string,input:ReviewAnnualStaffInput):Promise<void>{return api.post(`/api/lecturers/annual/${yearId}/review-staff`,input);},
+  annualSubmit(yearId: string, note = ""): Promise<void> { return api.post(`/api/lecturers/annual/${yearId}/me/submit`, { note }); },
+  annualReviewTeaching(yearId: string, input: ReviewAnnualTeachingInput): Promise<void> { return api.post(`/api/lecturers/annual/${yearId}/review-teaching`, input); },
+  annualRelease(yearId: string): Promise<AnnualSummary> { return api.post(`/api/lecturers/annual/${yearId}/release`, {}); },
+  annualExport(yearId: string): Promise<{ academicYear: string; version: number; csv: string; excelXml: string }> { return api.get(`/api/lecturers/annual/${yearId}/export`); },
   me(): Promise<Lecturer> {
     return api.get<Lecturer>("/api/lecturers/me");
   },

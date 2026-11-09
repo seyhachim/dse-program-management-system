@@ -225,6 +225,18 @@ const EXPECTED_LECTURER_PORTFOLIO_TABLES = [
   "LecturerPortfolioVerification",
 ] as const;
 
+const EXPECTED_LECTURER_ANNUAL_TABLES = [
+  "AnnualSubmission",
+  "AnnualTeachingReview",
+  "AnnualTeachingReviewEvent",
+  "AnnualEvidenceLink",
+  "AnnualReportRelease",
+  "AnnualReportingWindow",
+  "AnnualReportingWindowEvent",
+  "AnnualStaffReview",
+  "AnnualStaffReviewEvent",
+] as const;
+
 const FORBIDDEN_GRANTEES = new Set([
   "PUBLIC",
   "anon",
@@ -241,6 +253,7 @@ const PROTECTED_SCHEMAS = [
   "public_analytics",
   "student_handbook",
   "lecturer_portfolio",
+  "lecturer_annual",
 ] as const;
 
 const ALL_VERIFIED_SCHEMAS = ["public", ...PROTECTED_SCHEMAS] as const;
@@ -321,6 +334,7 @@ async function main(): Promise<void> {
     publicAnalyticsTables,
     studentHandbookTables,
     lecturerPortfolioTables,
+    lecturerAnnualTables,
   ] = await Promise.all([
     tablesForSchema("public"),
     tablesForSchema("pms_attendance"),
@@ -331,6 +345,7 @@ async function main(): Promise<void> {
     tablesForSchema("public_analytics"),
     tablesForSchema("student_handbook"),
     tablesForSchema("lecturer_portfolio"),
+    tablesForSchema("lecturer_annual"),
   ]);
 
   errors.push(
@@ -379,6 +394,11 @@ async function main(): Promise<void> {
       EXPECTED_LECTURER_PORTFOLIO_TABLES,
       lecturerPortfolioTables.map((table) => table.table_name),
     ),
+    ...compareInventory(
+      "lecturer_annual schema",
+      EXPECTED_LECTURER_ANNUAL_TABLES,
+      lecturerAnnualTables.map((table) => table.table_name),
+    ),
   );
 
   for (const table of [
@@ -391,6 +411,7 @@ async function main(): Promise<void> {
     ...publicAnalyticsTables,
     ...studentHandbookTables,
     ...lecturerPortfolioTables,
+    ...lecturerAnnualTables,
   ]) {
     if (!table.rls_enabled) {
       errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
@@ -500,7 +521,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, ${courseSpecGovernanceTables.length} course-spec governance tables, ${publicAnalyticsTables.length} public-analytics tables, ${studentHandbookTables.length} student-handbook tables, and ${lecturerPortfolioTables.length} lecturer-portfolio tables are classified, RLS-protected, and not granted to Data API roles.`,
+    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, ${courseSpecGovernanceTables.length} course-spec governance tables, ${publicAnalyticsTables.length} public-analytics tables, ${studentHandbookTables.length} student-handbook tables, and ${lecturerPortfolioTables.length} lecturer-portfolio tables, and ${lecturerAnnualTables.length} lecturer-annual tables are classified, RLS-protected, and not granted to Data API roles.`,
   );
 }
 
