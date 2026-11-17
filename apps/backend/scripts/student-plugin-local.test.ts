@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { validateStudentPluginLocalTarget } from "./student-plugin-local.ts";
 
-const LOCAL: Record<string, string> = {
+const LOCAL = {
   DSE_STUDENT_PLUGIN_LOCAL: "true",
   AUTH_MODE: "dev",
   NODE_ENV: "development",
