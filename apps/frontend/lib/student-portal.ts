@@ -14,6 +14,15 @@ import type {
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
+export interface PermissionDocumentView {
+  id: string;
+  studentId: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  submittedAt: string;
+}
+
 export const studentPortalApi = {
   home: () => api.get<StudentPortalHome>("/api/student-portal/home"),
   academicCalendar: () =>
@@ -23,6 +32,10 @@ export const studentPortalApi = {
     api.get<PortalCourseAchievementSummary[]>("/api/student-portal/course-achievements"),
   course: (offeringId: string) =>
     api.get<PortalCourseDetail>(`/api/student-portal/courses/${offeringId}`),
+  permissionLetter: (offeringId: string, date: string) =>
+    api.get<PermissionDocumentView | null>(`/api/offerings/${offeringId}/attendance/${encodeURIComponent(date)}/permission-letter`),
+  uploadPermissionLetter: (offeringId: string, date: string, file: File) =>
+    api.upload<PermissionDocumentView>(`/api/offerings/${offeringId}/attendance/${encodeURIComponent(date)}/permission-letter`, file),
   courseAttendance: (offeringId: string) =>
     api.get<PortalStudentAttendanceHistory>(
       `/api/student-portal/courses/${offeringId}/attendance`,

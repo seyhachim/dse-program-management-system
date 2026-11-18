@@ -2,6 +2,7 @@ import { offeringsManifest } from "@dse-pms/shared-types";
 import { Router } from "express";
 import type { BackendPlugin } from "../../core/plugins/registry.ts";
 import { createAttendanceRecheckRouter } from "./attendance-recheck-router.ts";
+import { createPermissionDocumentRouter } from "./permission-document-router.ts";
 import { attendanceRecheckService } from "./attendance-recheck-service.ts";
 import { attendanceService } from "./attendance-service.ts";
 import { classDeliveryService } from "./class-delivery-service.ts";
@@ -52,6 +53,7 @@ router.use(createUnassignedTeachingRequestRouter());
 router.use(createTeachingSessionDeliveryRouter());
 router.use(createCurriculumBoundOfferingRouter());
 router.use(createAttendanceRecheckRouter());
+router.use(createPermissionDocumentRouter());
 router.use(createRosterSyncRouter());
 router.use(createOfferingRouter());
 

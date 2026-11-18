@@ -9,6 +9,7 @@ import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { offeringsApi } from "@/lib/offerings";
+import { safePermissionDocuments } from "@/lib/permission-documents";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 import { attendanceRecheckState, isLateArrivalCandidate, recheckStateLabel, type AttendanceRecheckState } from "./attendance-recheck-state";
@@ -115,6 +116,7 @@ export function AttendanceClient() {
   const sessionKey = protectedQueryKey(queryScope, "attendance", "session", offeringId || "none", date || "none");
   const historyKey = protectedQueryKey(queryScope, "attendance", "history", offeringId || "none");
   const semesterNotesKey = protectedQueryKey(queryScope, "attendance", "semester-notes", offeringId || "none");
+  const permissionDocumentsKey = protectedQueryKey(queryScope, "attendance", "permission-letters", offeringId || "none", date || "none");
   const sessionQuery = useQuery({
     queryKey: sessionKey,
     queryFn: () => offeringsApi.attendance(offeringId, date),
@@ -135,6 +137,15 @@ export function AttendanceClient() {
   });
   const semesterNotes = semesterNotesQuery.data ?? [];
   const semesterNotesByStudent = new Map(semesterNotes.map((item) => [item.studentId, item]));
+  const permissionDocumentsQuery = useQuery({
+    queryKey: permissionDocumentsKey,
+    queryFn: () => offeringsApi.permissionLetters(offeringId, date),
+    enabled: Boolean(me?.id && offeringId && date),
+    staleTime: QUERY_STALE_MS.review,
+  });
+  // Keep canonical attendance usable even when an optional evidence endpoint returns an unexpected payload.
+  const permissionDocuments = safePermissionDocuments(permissionDocumentsQuery.data);
+  const permissionDocumentsByStudent = new Map(permissionDocuments.map((item) => [item.studentId, item]));
   const session: AttendanceSessionView | null = sessionQuery.data ?? null;
   const history: AttendanceSessionSummary[] = historyQuery.data ?? [];
 
@@ -372,6 +383,15 @@ export function AttendanceClient() {
     }
   }
 
+  async function downloadPermissionLetter(studentId: string) {
+    try {
+      const { url } = await offeringsApi.permissionLetterDownload(offeringId, date, studentId);
+      window.location.assign(url);
+    } catch (error) {
+      setMutationError(error instanceof ApiError ? error.message : "Could not download the permission letter");
+    }
+  }
+
   function openRecheck(studentId: string) {
     if (hasUnsavedChanges) {
       setMutationError("Save attendance changes before opening an individual recheck so no unsaved marks are lost.");
@@ -556,7 +576,7 @@ export function AttendanceClient() {
             <div className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <h2 className="font-semibold text-foreground">Attendance register</h2>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Record the class once, then use Late arrivals for a student who arrives after being marked absent. A second check is optional unless required by your class. Permission Pending requires confirmation of the paper letter.</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Record the class once, then use Late arrivals for a student who arrives after being marked absent. A second check is optional unless required by your class. Permission Pending requires reviewing the paper letter or uploaded evidence before resolving attendance.</p>
                 {hasUnsavedChanges && records.length > 0 ? <p id="attendance-recheck-save-hint" role="status" className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">Save attendance first to enable Recheck. Unsaved marks must be saved before opening Check 2.</p> : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -573,6 +593,7 @@ export function AttendanceClient() {
               </div>
             </div>
             {semesterNotesQuery.isError ? <p role="alert" className="border-b border-destructive/30 px-4 py-2 text-sm text-destructive">Could not load private semester notes. Reload this page before editing notes.</p> : null}
+            {permissionDocumentsQuery.isError ? <p role="alert" className="border-b border-amber-300/60 bg-amber-50 px-4 py-2 text-sm text-amber-900">Permission letters are temporarily unavailable. Attendance marking still works.</p> : null}
             {showAdvancedRecheck ? (
               <div id="attendance-advanced-recheck" className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
                 <span>Check 2: {checkedTwiceCount}/{records.length} recorded. Optional unless required by your class.</span>
@@ -597,6 +618,7 @@ export function AttendanceClient() {
                         <span>Sex: {record.studentGender ?? "—"}</span>
                       </div>
                     </div>
+                    {permissionDocumentsByStudent.has(record.studentId) ? <button type="button" onClick={() => void downloadPermissionLetter(record.studentId)} className={MOBILE_ATTENDANCE_LAYOUT.secondaryAction}>Download permission letter</button> : null}
                     {showAdvancedRecheck ? <RecheckAction record={record} disabled={saving || hasUnsavedChanges} requiresSave={hasUnsavedChanges} onOpen={() => openRecheck(record.studentId)} /> : null}
                     {semesterNotesQuery.isSuccess ? <SemesterNoteButton note={semesterNotesByStudent.get(record.studentId) ?? null} onClick={() => setEditingSemesterNote({ studentId: record.studentId, studentName: record.studentName, readOnly: selectedOffering?.status === "Completed" || record.recheckEligible === false })} /> : null}
                     <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Status
@@ -622,6 +644,7 @@ export function AttendanceClient() {
                         <td className="px-3 py-1.5">
                           {record.studentKhmerName ? <p lang="km" className="break-words text-base font-semibold leading-relaxed text-foreground">{record.studentKhmerName}</p> : null}
                           <p className="break-words text-sm font-medium text-foreground">{record.studentName}</p>
+                          {permissionDocumentsByStudent.has(record.studentId) ? <button type="button" onClick={() => void downloadPermissionLetter(record.studentId)} className="mt-1 text-xs font-medium text-primary underline underline-offset-2">Download permission letter</button> : null}
                           <p className="mt-1 text-xs text-muted-foreground"><span className="font-mono">{record.studentNumber ?? "Pending ID"}</span> · {record.studentGender ?? "—"}</p>
                         </td>
                         <td className="px-3 py-1.5"><select value={record.permissionPending ? PENDING_VALUE : record.status ?? ""} onChange={(event) => setRecordMark(record.studentId, event.target.value)} className={`h-10 w-full min-w-0 rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-ring ${statusClass(record)}`}>

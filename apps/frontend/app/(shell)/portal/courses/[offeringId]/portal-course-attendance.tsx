@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { studentPortalApi } from "@/lib/student-portal";
+import { PortalPermissionLetterUpload } from "./portal-permission-letter-upload";
 import { PortalError, PortalLoading, usePortalData } from "../../portal-state";
 
 const STATUS_ORDER: AttendanceStatus[] = ["Present", "Late", "Absent", "Excused"];
@@ -183,8 +184,9 @@ export function PortalCourseAttendance({ offeringId }: { offeringId: string }) {
               return (
                 <div
                   key={`${row.date}-${row.updatedAt}`}
-                  className="flex min-w-0 items-center justify-between gap-3 px-4 py-3.5 sm:px-5"
+                  className="px-4 py-3.5 sm:px-5"
                 >
+                  <div className="flex min-w-0 items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/55 text-muted-foreground">
                       <CalendarDays className="h-4 w-4" aria-hidden="true" />
@@ -200,6 +202,8 @@ export function PortalCourseAttendance({ offeringId }: { offeringId: string }) {
                     </div>
                   </div>
                   <AttendanceStatusPill status={status} />
+                  </div>
+                  {row.permissionPending ? <PortalPermissionLetterUpload offeringId={offeringId} date={row.date} /> : null}
                 </div>
               );
             })}
@@ -216,7 +220,7 @@ export function PortalCourseAttendance({ offeringId }: { offeringId: string }) {
       </section>
 
       <p className="px-1 text-xs leading-5 text-muted-foreground">
-        Attendance is read-only and shows only your record for this course.
+        Attendance records are updated only by authorized lecturers. You may submit evidence when Permission Pending is recorded.
       </p>
     </div>
   );
