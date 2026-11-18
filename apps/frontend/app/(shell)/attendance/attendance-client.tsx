@@ -142,7 +142,9 @@ export function AttendanceClient() {
     enabled: Boolean(me?.id && offeringId && date),
     staleTime: QUERY_STALE_MS.review,
   });
-  const permissionDocumentsByStudent = new Map((permissionDocumentsQuery.data ?? []).map((item) => [item.studentId, item]));
+  // Keep canonical attendance usable even when an optional evidence endpoint returns an unexpected payload.
+  const permissionDocuments = Array.isArray(permissionDocumentsQuery.data) ? permissionDocumentsQuery.data : [];
+  const permissionDocumentsByStudent = new Map(permissionDocuments.map((item) => [item.studentId, item]));
   const session: AttendanceSessionView | null = sessionQuery.data ?? null;
   const history: AttendanceSessionSummary[] = historyQuery.data ?? [];
 
@@ -590,6 +592,7 @@ export function AttendanceClient() {
               </div>
             </div>
             {semesterNotesQuery.isError ? <p role="alert" className="border-b border-destructive/30 px-4 py-2 text-sm text-destructive">Could not load private semester notes. Reload this page before editing notes.</p> : null}
+            {permissionDocumentsQuery.isError ? <p role="alert" className="border-b border-amber-300/60 bg-amber-50 px-4 py-2 text-sm text-amber-900">Permission letters are temporarily unavailable. Attendance marking still works.</p> : null}
             {showAdvancedRecheck ? (
               <div id="attendance-advanced-recheck" className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
                 <span>Check 2: {checkedTwiceCount}/{records.length} recorded. Optional unless required by your class.</span>
