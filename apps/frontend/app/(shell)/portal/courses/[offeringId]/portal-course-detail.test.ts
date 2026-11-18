@@ -48,10 +48,11 @@ describe("Student Course Detail tabs", () => {
     expect(courseSource).toContain("Learning resources are not available yet. They will appear here when they are published.");
   });
 
-  test("attendance is self-scoped and read-only in the student UI", () => {
+  test("attendance marks stay self-scoped and read-only while evidence upload is available", () => {
     expect(courseSource).toContain("<PortalCourseAttendance offeringId={offeringId} />");
     expect(attendanceSource).toContain("Your attendance");
-    expect(attendanceSource).toContain("Attendance is read-only and shows only your record");
+    expect(attendanceSource).toContain("Attendance records are updated only by authorized lecturers");
+    expect(attendanceSource).toContain("<PortalPermissionLetterUpload offeringId={offeringId} date={row.date} />");
     expect(attendanceSource).not.toContain("row.note");
     expect(attendanceSource).not.toContain("studentId");
     expect(attendanceSource).not.toContain("sessionId");
