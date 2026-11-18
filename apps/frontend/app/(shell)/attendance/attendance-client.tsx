@@ -9,6 +9,7 @@ import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { offeringsApi } from "@/lib/offerings";
+import { safePermissionDocuments } from "@/lib/permission-documents";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 import { attendanceRecheckState, isLateArrivalCandidate, recheckStateLabel, type AttendanceRecheckState } from "./attendance-recheck-state";
@@ -143,7 +144,7 @@ export function AttendanceClient() {
     staleTime: QUERY_STALE_MS.review,
   });
   // Keep canonical attendance usable even when an optional evidence endpoint returns an unexpected payload.
-  const permissionDocuments = Array.isArray(permissionDocumentsQuery.data) ? permissionDocumentsQuery.data : [];
+  const permissionDocuments = safePermissionDocuments(permissionDocumentsQuery.data);
   const permissionDocumentsByStudent = new Map(permissionDocuments.map((item) => [item.studentId, item]));
   const session: AttendanceSessionView | null = sessionQuery.data ?? null;
   const history: AttendanceSessionSummary[] = historyQuery.data ?? [];
