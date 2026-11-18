@@ -1,0 +1,62 @@
+name: Permission Letter — Real Isolated Supabase Storage
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/permission-real-storage-ci.yml"
+      - "apps/backend/src/integration/permission-document-real-storage.integration.test.ts"
+      - "apps/backend/src/plugins/offerings/permission-document-*.ts"
+      - "apps/backend/prisma/migrations/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: permission-real-storage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-storage-integration:
+    name: Actual local Storage student → lecturer integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AUTH_MODE: dev
+      JWT_SECRET: permission-local-storage-ci-test-secret-min-32-characters
+      PERMISSION_REAL_STORAGE_TEST: "1"
+      TELEGRAM_PMS_ENABLED: "false"
+      TELEGRAM_PUBLIC_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Install PMS dependencies
+        run: bun install --frozen-lockfile
+      - name: Setup local-only Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+      - name: Start isolated Supabase PostgreSQL and real Storage API
+        run: |
+          supabase init --yes
+          supabase start --exclude realtime,studio,edge-runtime,logflare,vector,supavisor,imgproxy,mailpit,postgres-meta
+      - name: Export ephemeral local-only service URL, key and DB connection
+        shell: bash
+        run: |
+          supabase status -o env \
+            --override-name api.url=SUPABASE_URL \
+            --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
+            --override-name db.url=DATABASE_URL \
+            >> "$GITHUB_ENV"
+      - name: Apply PMS migrations to isolated Supabase Postgres
+        run: bun run db:migrate:deploy
+      - name: Seed synthetic PMS identities and enrollments
+        run: bun run seed
+      - name: Run real Storage student submission and lecturer download/security tests
+        run: bun test apps/backend/src/integration/permission-document-real-storage.integration.test.ts
+      - name: Stop isolated containers and discard test data
+        if: always()
+        run: supabase stop --no-backup || true
