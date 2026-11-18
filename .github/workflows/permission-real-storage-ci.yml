@@ -46,11 +46,21 @@ jobs:
       - name: Export ephemeral local-only service URL, key and DB connection
         shell: bash
         run: |
+          status_file="$(mktemp)"
           supabase status -o env \
             --override-name api.url=SUPABASE_URL \
             --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
-            --override-name db.url=DATABASE_URL \
-            >> "$GITHUB_ENV"
+            > "$status_file"
+          # The CLI quotes values in -o env output. Remove quotes, export ONLY
+          # local Storage credentials and do not overwrite the dev JWT_SECRET.
+          awk '/^(SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY)=/ {
+            n=index($0,"="); name=substr($0,1,n-1); value=substr($0,n+1);
+            sub(/^"/,"",value); sub(/"$/,"",value);
+            print name "=" value;
+          }' "$status_file" >> "$GITHUB_ENV"
+          rm -f "$status_file"
+          # Private ephemeral Postgres started by supabase, never hosted DB.
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres?schema=public" >> "$GITHUB_ENV"
       - name: Apply PMS migrations to isolated Supabase Postgres
         run: bun run db:migrate:deploy
       - name: Seed synthetic PMS identities and enrollments
