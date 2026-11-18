@@ -40,7 +40,7 @@ describe("Private permission document authorization constraints", () => {
   test("student upload checks exact active enrollment and canonical unresolved pending", () => {
     expect(routes).toContain("student.status !== \"Active\"");
     expect(routes).toContain("offeringId_studentId");
-    expect(routes).toContain("pending.\"resolvedAt\" IS NULL");
+    expect(routes).toContain("p.\"resolvedAt\" IS NULL");
     expect(routes).toContain("requirePermission(\"student-portal:read\")");
   });
   test("staff downloads require scoped access and short-lived signed URLs", () => {
