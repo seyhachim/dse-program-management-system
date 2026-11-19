@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { RecheckAttendanceInput, SaveAttendanceInput } from "@dse-pms/shared-types";
+import type { AttendanceSessionView, RecheckAttendanceInput, SaveAttendanceInput } from "@dse-pms/shared-types";
 import { ApiError } from "./api";
 import {
   ATTENDANCE_SAVE_TIMEOUT_MS,
@@ -97,7 +97,7 @@ describe("Check 2 recheck timeout", () => {
   });
 
   test("preserves an acknowledged attendance-session response", async () => {
-    const session = { sessionId: "session-1", records: [] };
+    const session = { sessionId: "session-1", records: [] } as AttendanceSessionView;
     let path = "";
     const post = <T>(requestPath: string): Promise<T> => {
       path = requestPath;
