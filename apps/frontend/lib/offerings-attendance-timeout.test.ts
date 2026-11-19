@@ -97,7 +97,14 @@ describe("Check 2 recheck timeout", () => {
   });
 
   test("preserves an acknowledged attendance-session response", async () => {
-    const session = { sessionId: "session-1", records: [] } as AttendanceSessionView;
+    const session: AttendanceSessionView = {
+      sessionId: "session-1",
+      offeringId: "offering-1",
+      date: "2026-11-19",
+      records: [],
+      counts: { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0, Unmarked: 0 },
+      updatedAt: null,
+    };
     let path = "";
     const post = <T>(requestPath: string): Promise<T> => {
       path = requestPath;
