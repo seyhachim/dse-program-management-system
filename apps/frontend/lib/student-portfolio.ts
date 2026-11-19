@@ -1,5 +1,7 @@
 import type {
   PublicStudentPortfolio,
+  StudentProjectDirectoryPage,
+  StudentProjectDirectoryQuery,
   StudentPortfolioCompetencySummary,
   StudentPortfolioEligibleAssessmentSource,
   StudentPortfolioEvidence,
@@ -44,6 +46,13 @@ export const studentPortfolioApi = {
   competencies: () => api.get<StudentPortfolioCompetencySummary[]>("/api/student-portal/portfolio/competencies"),
   verificationHistory: (evidenceId: string) =>
     api.get<StudentPortfolioVerificationEvent[]>(`/api/student-portal/portfolio/evidence/${evidenceId}/verification`),
+  projectDirectory: (filters: StudentProjectDirectoryQuery) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== "") params.set(key, String(value));
+    }
+    return api.get<StudentProjectDirectoryPage>(`/api/student-portal/portfolio/directory?${params.toString()}`);
+  },
   verificationInbox: () =>
     api.get<StudentPortfolioVerificationInboxItem[]>("/api/student-portal/portfolio/verification/inbox"),
   decideVerification: (evidenceId: string, input: StudentPortfolioVerificationDecisionInput) =>
