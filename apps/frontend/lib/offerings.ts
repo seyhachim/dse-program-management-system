@@ -18,8 +18,10 @@ import type {
 import { ApiError, api } from "./api";
 
 export const ATTENDANCE_SAVE_TIMEOUT_MS = 65_000;
+export const ATTENDANCE_RECHECK_TIMEOUT_MS = 65_000;
 
 type AttendancePut = <T>(path: string, body: unknown, signal?: AbortSignal) => Promise<T>;
+type AttendancePost = <T>(path: string, body: unknown, signal?: AbortSignal) => Promise<T>;
 
 export async function saveAttendanceWithTimeout(
   id: string,
@@ -43,6 +45,39 @@ export async function saveAttendanceWithTimeout(
       throw new ApiError(
         504,
         "Attendance save response timed out. Your marks remain on this device, but the server may have saved them. Check this date in another tab before retrying.",
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Check 2 is an immutable, one-time academic observation.
+ * On timeout, never retry automatically: an aborted response is not proof
+ * the server rolled back. The lecturer must verify the current register.
+ */
+export async function recheckAttendanceWithTimeout(
+  id: string,
+  date: string,
+  input: RecheckAttendanceInput,
+  timeoutMs = ATTENDANCE_RECHECK_TIMEOUT_MS,
+  post: AttendancePost = api.post,
+): Promise<AttendanceSessionView> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await post<AttendanceSessionView>(
+      `/api/offerings/${id}/attendance/${encodeURIComponent(date)}/recheck`,
+      input,
+      controller.signal,
+    );
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new ApiError(
+        504,
+        "Check 2 save response timed out. The server may have recorded Check 2. Reload attendance for this date in another tab before attempting another recheck.",
       );
     }
     throw error;
@@ -114,10 +149,7 @@ export const offeringsApi = {
     date: string,
     input: RecheckAttendanceInput,
   ): Promise<AttendanceSessionView> {
-    return api.post<AttendanceSessionView>(
-      `/api/offerings/${id}/attendance/${encodeURIComponent(date)}/recheck`,
-      input,
-    );
+    return recheckAttendanceWithTimeout(id, date, input);
   },
   semesterNotes(id: string): Promise<StudentSemesterNoteView[]> {
     return api.get<StudentSemesterNoteView[]>(`/api/offerings/${id}/attendance/semester-notes`);
