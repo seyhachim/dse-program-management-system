@@ -148,7 +148,11 @@ async function deliverRecheckNotifications(
       }),
     );
   }
-  const evaluation = await studentAttendanceHistoryService.healthForStudent(studentId, offeringId);
+  // The set-based warning calculation makes one query regardless of class history.
+  const evaluation = (await studentAttendanceHistoryService.warningHealthForStudents(
+    [studentId],
+    offeringId,
+  )).get(studentId);
   if (evaluation) {
     for (const candidate of evaluation.warningCandidates) {
       work.push(
@@ -158,8 +162,8 @@ async function deliverRecheckNotifications(
           warningKind: candidate.kind,
           count: candidate.count,
           eventSessionId: candidate.eventSessionId,
-          absentCount: evaluation.history.counts.Absent,
-          excusedCount: evaluation.history.counts.Excused,
+          absentCount: evaluation.counts.Absent,
+          excusedCount: evaluation.counts.Excused,
         }),
       );
     }
@@ -173,7 +177,7 @@ export const attendanceRecheckService = {
     date: string,
     input: RecheckAttendanceData,
     actorUserId: string,
-  ): Promise<void> {
+  ): Promise<{ newlyPendingId: string | null }> {
     const studentRows = await students().findByIds([input.studentId]);
     const student = studentRows[0] ?? null;
     if (!student) throw new ReferenceError("Student no longer exists");
@@ -290,7 +294,17 @@ export const attendanceRecheckService = {
       `;
     });
 
-    await deliverRecheckNotifications(offeringId, date, input.studentId, newlyPendingId);
+    // Only the committed academic state determines the save response.
+    return { newlyPendingId };
+  },
+
+  async notifyAfterRecheck(
+    offeringId: string,
+    date: string,
+    studentId: string,
+    newlyPendingId: string | null,
+  ): Promise<void> {
+    await deliverRecheckNotifications(offeringId, date, studentId, newlyPendingId);
   },
 
   async history(offeringId: string, studentId: string): Promise<AttendanceStudentHistoryView> {
