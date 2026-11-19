@@ -137,6 +137,12 @@ async function deliverRecheckNotifications(
 ) {
   if (!registry.has("telegram")) return;
   const telegram = registry.get<TelegramNotificationContract>("telegram").service;
+  // Evaluate first so a database error cannot leave a newly started notification
+  // promise rejected and unobserved before the Promise.allSettled boundary.
+  const evaluation = (await studentAttendanceHistoryService.warningHealthForStudents(
+    [studentId],
+    offeringId,
+  )).get(studentId);
   const work: Array<Promise<void>> = [];
   if (newlyPendingId) {
     work.push(
@@ -148,11 +154,6 @@ async function deliverRecheckNotifications(
       }),
     );
   }
-  // The set-based warning calculation makes one query regardless of class history.
-  const evaluation = (await studentAttendanceHistoryService.warningHealthForStudents(
-    [studentId],
-    offeringId,
-  )).get(studentId);
   if (evaluation) {
     for (const candidate of evaluation.warningCandidates) {
       work.push(
@@ -304,7 +305,14 @@ export const attendanceRecheckService = {
     studentId: string,
     newlyPendingId: string | null,
   ): Promise<void> {
-    await deliverRecheckNotifications(offeringId, date, studentId, newlyPendingId);
+    const startedAt = performance.now();
+    try {
+      await deliverRecheckNotifications(offeringId, date, studentId, newlyPendingId);
+    } finally {
+      if (process.env.PERF_ATTENDANCE_SAVE_TIMING === "true") {
+        console.warn("[perf] attendance-recheck phase=notifications duration=" + (performance.now() - startedAt).toFixed(1) + "ms");
+      }
+    }
   },
 
   async history(offeringId: string, studentId: string): Promise<AttendanceStudentHistoryView> {
