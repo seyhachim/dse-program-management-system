@@ -89,7 +89,7 @@ test.describe("#1321 DSE Student Projects Directory staging smoke", () => {
       const page = await coordinator.newPage();
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.goto("/student-projects");
-      await expect(page.getByRole("heading", { name: "Student Projects" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Student Projects", exact: true })).toBeVisible();
       await page.getByRole("textbox", { name: "Search" }).fill(suffix);
       await page.getByRole("button", { name: "Apply filters" }).click();
       await expect(page.getByRole("heading", { name: projectTitle })).toBeVisible();
