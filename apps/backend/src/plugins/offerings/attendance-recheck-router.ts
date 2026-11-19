@@ -46,13 +46,35 @@ export function createAttendanceRecheckRouter(): Router {
         return;
       }
       try {
-        await attendanceRecheckService.recheck(
+        const startedAt = performance.now();
+        const { newlyPendingId } = await attendanceRecheckService.recheck(
           req.params.id!,
           parsedDate.data,
           parsedBody.data,
           req.user!.id,
         );
-        res.json(await attendanceService.get(req.params.id!, parsedDate.data));
+        const committedAt = performance.now();
+        const savedSession = await attendanceService.get(req.params.id!, parsedDate.data);
+        const readbackAt = performance.now();
+        if (process.env.PERF_ATTENDANCE_SAVE_TIMING === "true") {
+          // Phase-only performance metadata; no student or offering identifiers.
+          console.warn("[perf] attendance-recheck phase=commit duration=" + (committedAt - startedAt).toFixed(1) + "ms");
+          console.warn("[perf] attendance-recheck phase=readback duration=" + (readbackAt - committedAt).toFixed(1) + "ms");
+        }
+
+        res.json(savedSession);
+
+        // Telegram notifications are best-effort and idempotent. They must not
+        // keep the lecturer waiting or turn a committed save into a false failure.
+        void attendanceRecheckService.notifyAfterRecheck(
+          req.params.id!,
+          parsedDate.data,
+          parsedBody.data.studentId,
+          newlyPendingId,
+        ).catch((error: unknown) => {
+          const kind = error instanceof Error ? error.name : "UnknownError";
+          console.warn("Post-commit attendance notification failed (" + kind + ")");
+        });
       } catch (err) {
         handleAttendanceRecheckError(err, res, "Could not recheck attendance");
       }
