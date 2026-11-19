@@ -7,6 +7,7 @@ import { createApp } from "../core/app.ts";
 import { signToken, type AuthUser, type Role } from "../core/auth/token.ts";
 import { prisma } from "../core/db/prisma.ts";
 import { attendanceService } from "../plugins/offerings/attendance-service.ts";
+import { attendanceRecheckService } from "../plugins/offerings/attendance-recheck-service.ts";
 
 const runIntegration = process.env.BACKEND_INTEGRATION_TESTS === "1";
 const integrationDescribe = runIntegration ? describe : describe.skip;
@@ -97,11 +98,25 @@ integrationDescribe("Attendance individual recheck authorization", () => {
         (lecturerHistory.body as { studentId: string }).studentId,
       ).toBe(fixture.studentId);
 
-      const rechecked = await request(recheckPath, {
-        method: "POST",
-        token: signToken(lecturer),
-        body: recheckBody,
+      // Hold best-effort notifications indefinitely until this request finishes.
+      // A successful recheck response must not be blocked by Telegram work.
+      const notifyOriginal = attendanceRecheckService.notifyAfterRecheck;
+      let releaseNotifications: () => void = () => {};
+      const notificationGate = new Promise<void>((resolve) => {
+        releaseNotifications = resolve;
       });
+      attendanceRecheckService.notifyAfterRecheck = () => notificationGate;
+      let rechecked: HttpResult;
+      try {
+        rechecked = await request(recheckPath, {
+          method: "POST",
+          token: signToken(lecturer),
+          body: recheckBody,
+        });
+      } finally {
+        releaseNotifications();
+        attendanceRecheckService.notifyAfterRecheck = notifyOriginal;
+      }
       expect(rechecked.status).toBe(200);
       const record = (
         rechecked.body as {
