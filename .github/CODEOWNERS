@@ -1,0 +1,4 @@
+# Issue #1304 — student plugin contribution review ownership.
+# The PMS maintainer reviews proposed application code and documentation.
+# CODEOWNERS requests a review; the main-branch ruleset must separately enforce it.
+* @seyhachim
