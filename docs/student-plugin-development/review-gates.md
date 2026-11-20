@@ -1,6 +1,6 @@
 # Student plugin review and release gates (Issue #1304)
 
-**Status:** policy and checklist proposed in PR; effective repository protections must be checked in GitHub **Settings**. This file does not enable branch rules.
+**Status (verified 2026-11-20):** `Protect main` enforces one independent approval, dismisses stale approvals, and requires the three existing CI checks. PR #1308 is blocked without review. This source PR remains unmerged; an actual student-fork denial test, separate trusted reviewer for maintainer-authored PRs, and maintainer approval are still outstanding. These notes do not change GitHub settings.
 
 ## Design decision
 
@@ -8,27 +8,30 @@ Phase 1 supports **student-authored source plugins submitted in reviewed pull re
 
 No student uploads, dynamic code loading, production credentials, direct deployment or unreviewed database migrations. Students develop in a disposable local PostgreSQL environment with fictional records (see #1303).
 
-## Current ruleset snapshot (2026-11-17)
+## Verified Protect main ruleset (rechecked 2026-11-20)
 
-[Protect main](https://github.com/seyhachim/dse-program-management-system/rules/21180169) applies to the default branch. It currently requires PRs and these checks:
+[Protect main](https://github.com/seyhachim/dse-program-management-system/rules/21180169) targets the default branch and is active. The current GitHub ruleset API snapshot reports:
 
-- `Typecheck, lint, test, build`
-- `Fresh database migration, seed, and security`
-- `Backend integration authorization`
+- `required_approving_review_count: 1` — GitHub requires approval from someone other than the PR author.
+- `dismiss_stale_reviews_on_push: true` — a new commit invalidates earlier approvals.
+- `require_code_owner_review: false`; `require_last_push_approval: false` — do not claim either extra rule is enabled.
+- `bypass_actors: []`; `current_user_can_bypass: never`.
+- Deletion and non-fast-forward updates are prohibited.
+- All **three existing** CI checks remain required:
+  - `Typecheck, lint, test, build`
+  - `Fresh database migration, seed, and security`
+  - `Backend integration authorization`
 
-It blocks deletion/non-fast-forward updates, but the ruleset **currently has 0 required approving reviews** and does not require CODEOWNERS, stale review dismissal or approval of the latest push. That is a P0 student contribution blocker.
+GitHub reports `mergeable_state: blocked` for ready-for-review [PR #1308](https://github.com/seyhachim/dse-program-management-system/pull/1308), authored by `@seyhachim`, with no approving review. Its CI workflow succeeded on the prior head SHA `6beca34` (before this documentation update). This **proves an owner-authored PR is blocked without independent approval**, not that every fork-specific negative case has been exercised.
 
-## Required one-time repository-admin changes (not achievable by source PR)
+## Remaining owner actions and reviewer capacity
 
-As repository administrator, open **Settings → Rules → Rulesets → Protect main → Edit** and keep the existing default-branch targeting and all mandatory CI checks.
+1. **Arrange an independent trusted reviewer** able to submit a qualifying approval for maintainer-authored PRs, including #1308. On a personal-account GitHub repository, collaborator write access is a meaningful privilege: invite only someone trusted with source code, never a random student solely to clear this check.
+2. **Do not turn on `require_code_owner_review` blindly.** Proposed `.github/CODEOWNERS` lists only `@seyhachim`. GitHub cannot accept the PR author's own approval; enforcing that owner on an `@seyhachim`-authored PR could deadlock the merge. After confirming independent reviewer coverage, update ownership policy if needed, then enable and verify the extra rule if feasible.
+3. **Perform a real separate-account fork PR acceptance test**: unapproved merge denied even when CI passes; student cannot self-approve or merge; failing required CI denies merge; newly pushed commit invalidates previous approval. Keep non-sensitive evidence in #1304.
+4. Obtain a genuine independent review of #1308 before merging; recheck branch protections after any settings change. Maintain three required statuses and no bypass users.
 
-1. Under pull request rules, set **Required approvals = 1** (minimum).
-2. Enable **Require review from Code Owners**, with `.github/CODEOWNERS` identifying the PMS maintainer. If this feature is unavailable on the plan, maintain a compensating procedure and **do not claim enforcement** until tested.
-3. Enable **Dismiss stale approvals when new commits are pushed**, or **Require approval of the most recent reviewable push**, to ensure added commits cannot bypass review.
-4. Prefer requiring all review conversations to be resolved. Keep existing no-bypass protection.
-5. Save the ruleset and re-fetch its parameters to verify changes took effect. Read-only status is insufficient; test an actual unapproved PR.
-
-Do not reduce the current three status checks or create bypass actors. Do not allow automatic merging or production deployment from student PRs.
+For settings changes, use **Settings → Rules → Rulesets → Protect main**; a source-code PR cannot enable or change an admin ruleset. Do not grant production database, Vercel, Render, Supabase or GitHub deployment credentials to student contributors.
 
 ## Enforcement verification
 
@@ -41,7 +44,7 @@ Do not reduce the current three status checks or create bypass actors. Do not al
 
 Main `.github/workflows/ci.yml` uses `pull_request` and `contents: read` and operates with ephemeral PostgreSQL; do not introduce `pull_request_target`/privileged `workflow_run` jobs that execute untrusted contributor code. Prevent fork PR jobs from receiving production DB URLs, Supabase/Neon/Render/Vercel/GitHub deployment keys and real academic records. Review any new workflow or dependency script, not just files under `apps/backend/src/plugins`.
 
-A 2026-11-17 review of 23 workflows found no `pull_request_target`, `workflow_run` or `secrets.` references. `.github/workflows/tmp-issue-231-schema.yml` is **push-only** and has `contents: write`; assess whether it can be removed or made read-only in a separate, reviewed change. This is **not** evidence that fork PRs receive write tokens.
+A refreshed 2026-11-20 inspection of the 23 workflow YAML files on `main` found no `pull_request_target`, `workflow_run`, or literal `secrets.` references. `.github/workflows/tmp-issue-231-schema.yml` is **push-only** and has `contents: write`; assess whether it can be removed or made read-only in a separate, reviewed change. This is **not** evidence that fork PRs receive write tokens.
 
 ## Human review checklist
 
@@ -60,4 +63,4 @@ A 2026-11-17 review of 23 workflows found no `pull_request_target`, `workflow_ru
 - #1302 supplies a build-time starter only **after** ADR #1301 and suitable review/CI gates; it must not provide runtime installation.
 - #1305 uses the starter as a low-risk non-official event example; #1306 covers student documentation and contribution/licence policy.
 
-**Status criterion:** #1304 cannot be closed until ruleset enforcement and a denied-merge test have been verified. A documentation PR alone is not sufficient.
+**Closure criterion:** keep #1304 open until an actual unapproved *fork* PR and post-approval-push denial are verified, a trusted independent maintainer approves and merges #1308 through protected `main`, and release ownership is confirmed. A blocked owner-authored PR and this documentation alone are insufficient.
