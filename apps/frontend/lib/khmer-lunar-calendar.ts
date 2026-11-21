@@ -124,14 +124,20 @@ export function publishedItemsOnDate(
   const items: PublishedDayItem[] = [];
   for (const period of calendar.periods) {
     const semester = period.semester === "First" ? "Semester 1" : "Semester 2";
-    if (period.teachingStart <= dateKey && dateKey <= period.teachingEnd) {
-      items.push({ key: period.id + ":teaching", title: semester + " teaching period", kind: "teaching" });
-    }
-    if (period.examStart && period.examEnd && period.examStart <= dateKey && dateKey <= period.examEnd) {
-      items.push({ key: period.id + ":exam", title: semester + " examinations", kind: "exam" });
-    }
-    if (period.breakStart && period.breakEnd && period.breakStart <= dateKey && dateKey <= period.breakEnd) {
+    const inBreak = Boolean(
+      period.breakStart && period.breakEnd &&
+      period.breakStart <= dateKey && dateKey <= period.breakEnd,
+    );
+    const inExam = Boolean(
+      period.examStart && period.examEnd &&
+      period.examStart <= dateKey && dateKey <= period.examEnd,
+    );
+    if (inBreak) {
       items.push({ key: period.id + ":break", title: semester + " break", kind: "break" });
+    } else if (inExam) {
+      items.push({ key: period.id + ":exam", title: semester + " examinations", kind: "exam" });
+    } else if (period.teachingStart <= dateKey && dateKey <= period.teachingEnd) {
+      items.push({ key: period.id + ":teaching", title: semester + " teaching period", kind: "teaching" });
     }
   }
   for (const event of calendar.events) {
