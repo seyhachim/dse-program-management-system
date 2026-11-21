@@ -26,7 +26,7 @@ const MODES: { value: DisplayMode; label: string }[] = [
 function initialCalendarDate(calendar: AvailableCalendar): string {
   const today = cambodiaTodayDateKey();
   const starts = calendar.periods.map((period) => period.teachingStart);
-  const ends = calendar.periods.map((period) => period.breakEnd ?? period.examEnd ?? period.teachingEnd);
+  const ends = calendar.periods.flatMap((period) => [period.teachingEnd, period.examEnd, period.breakEnd].filter((date): date is string => Boolean(date)));
   if (!starts.length) return calendar.events[0]?.startDate ?? today;
   const first = [...starts].sort()[0];
   const last = [...ends].sort().at(-1) ?? first;
@@ -151,6 +151,7 @@ export function StudentKhmerLunarMonth({ calendar }: { calendar: AvailableCalend
               key={cell.dateKey}
               type="button"
               aria-pressed={selected}
+              disabled={cell.dateKey < "1900-01-01"}
               aria-current={isToday ? "date" : undefined}
               aria-label={
                 formatGregorianCalendarDate(cell.dateKey) +
