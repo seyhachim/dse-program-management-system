@@ -12,7 +12,9 @@ type Advisory = {
 type AuditReport = Record<string, Advisory[]>;
 
 const DEV_ONLY_ADVISORIES: Record<string, Set<number>> = {
-  "@hono/node-server": new Set([1139322, 1243661]),
+  // Lockfile: shadcn (frontend/UI devDependency) → @modelcontextprotocol/sdk → @hono/node-server.
+  // The app does not ship the shadcn CLI or this Hono adapter to production.
+  "@hono/node-server": new Set([1139322, 1243661, 1246357]),
   // @modelcontextprotocol/sdk is reachable only via the devDependency shadcn CLI;
   // neither the Bun API nor Next.js deployed production entrypoint imports it.
   "@modelcontextprotocol/sdk": new Set([1241339, 1242628, 1242649, 1242667, 1243488, 1244498]),
@@ -21,10 +23,20 @@ const DEV_ONLY_ADVISORIES: Record<string, Set<number>> = {
   // `bun pm why hono` on the refreshed #1010 lockfile resolves this copy only
   // through shadcn -> @modelcontextprotocol/sdk / @hono/node-server. shadcn is
   // explicitly dev-only in both frontend and UI workspaces.
-  hono: new Set([1130733, 1138771, 1138772, 1138773, 1193729, 1193730, 1193731, 1240640, 1242595]),
+  // Same dev-only shadcn → @modelcontextprotocol/sdk path; the Hono
+  // router/middleware/JSX APIs are not PMS production entrypoints.
+  hono: new Set([1130733, 1138771, 1138772, 1138773, 1193729, 1193730, 1193731, 1240640, 1242595,
+    1246368, 1246369, 1246370, 1246373, 1246374]),
   // New 2026-09-29 advisories affect the same dev-only copy previously traced through shadcn tooling.
   "ip-address": new Set([1130722, 1130723, 1130724, 1239948, 1239949, 1240097, 1240098, 1242883]),
   minimatch: new Set([1244623]), // apps/frontend devDependency eslint -> minimatch
+  // Lockfile: shadcn (dev only) → @dotenvx/dotenvx → picomatch@4.0.5;
+  // eslint tooling → @typescript-eslint/typescript-estree /
+  // eslint-import-resolver-typescript → tinyglobby → picomatch@4.0.5.
+  // These call sites process local build/configuration globs, not untrusted
+  // student-uploaded patterns. GHSA-fc5q-39xc-vjpf (CVE-2026-112366)
+  // has no patched 4.x release as of 2026-11-18; recheck by 2026-12-02.
+  picomatch: new Set([1247710]),
   "postcss-selector-parser": new Set([1243380]), // shadcn CLI (dev only)
   systeminformation: new Set([1243663, 1243616, 1243617]), // shadcn -> @dotenvx/dotenvx (dev only)
   // `bun pm why js-yaml` resolves this copy only through ESLint/eslint-config-next
