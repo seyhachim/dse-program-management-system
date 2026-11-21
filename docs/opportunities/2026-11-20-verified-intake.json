@@ -1,0 +1,36 @@
+{
+  "importStatus": "NOT_IMPORTED_OR_PUBLISHED",
+  "asOf": "2026-11-20",
+  "scope": "DSE student opportunities; staff-only review queue",
+  "origin": "two user-supplied social-media screenshots, independently checked against official organizer sites",
+  "cautions": [
+    "PR #1285 is draft; production Opportunity table absent as of 2026-11-20.",
+    "Do not import or publish until staff review and authenticated staging-to-production release gates pass.",
+    "ApplicationUrl is null until verified direct official application URLs are captured.",
+    "Obamas final exact deadline is Dec 5 01:00 Cambodia; date-only PMS field deliberately uses Dec 4 for conservative expiry."
+  ],
+  "opportunities": [
+    {
+      "programmeId": "dse",
+      "type": "conference",
+      "title": "Road to 50: U.S.–ASEAN Rising Stars (2027)",
+      "organizer": "U.S.-ASEAN Center at Arizona State University and U.S. Mission to ASEAN",
+      "summary": "A fully funded U.S.-ASEAN exchange-alumni leadership forum in Jakarta, Indonesia, February 18–19, 2027 (travel February 17–20). Activities include regional strategy challenges, digital economy themes, cross-border team projects, and networking. Application deadline: December 6, 2026 at 11:59 p.m. Jakarta/Phnom Penh time. No participation fee; official travel and accommodation support for selected participants. NOT a general undergraduate opportunity: qualifying prior U.S. government exchange alumni status is required.",
+      "eligibility": "Must be an alumnus/alumna of an eligible U.S. government exchange program (e.g., YSEALI, Fulbright, IVLP), age 20–40, an ASEAN citizen residing in ASEAN, with relevant professional experience, demonstrated community impact/leadership, English proficiency, and availability for the full program. Check complete official criteria before applying.",
+      "sourceUrl": "https://us-asean.asu.edu/road-50-us-asean-rising-stars",
+      "applicationUrl": null,
+      "deadline": "2026-12-06"
+    },
+    {
+      "programmeId": "dse",
+      "type": "training",
+      "title": "Obama Foundation Leaders Asia-Pacific 2027–2028",
+      "organizer": "Obama Foundation",
+      "summary": "An eight-month virtual values-based leadership development program for emerging changemakers, planned September 2027–May 2028, requiring roughly 8–12 hours a month. No participation fee; no stipend or grant. Priority application deadline: November 23, 2026. Final deadline: December 4, 2026 at noon U.S. Central Time (December 5 at 1:00 a.m. Phnom Penh time). The PMS stores the earlier December 4 date as its calendar deadline because it cannot represent hour/time zone.",
+      "eligibility": "Must reside in an eligible Asia-Pacific country/territory (Cambodia included); meet specified citizenship/residency requirements; be age 24–45 as of September 1, 2027; have 3+ years of relevant leadership/change-making experience, professional English proficiency, an Asia-Pacific impact focus, and availability for program activities. Not intended for students without substantive leadership experience.",
+      "sourceUrl": "https://www.obama.org/programs/leaders/asia-pacific/faq/",
+      "applicationUrl": null,
+      "deadline": "2026-12-04"
+    }
+  ]
+}

@@ -20,6 +20,12 @@ const config = {
     // PWA service worker can persist only this explicit public-data allowlist.
     // Do not replace these with a broad /api proxy.
     return [
+      // Preview-only same-origin proxy. No new Vercel Function and no third-party
+      // session cookies. Never enabled on the production Supabase build.
+      ...(process.env.NEXT_PUBLIC_AUTH_MODE === "neon-staging" ? [{
+        source: "/staging-auth/:path*",
+        destination: `${process.env.NEXT_PUBLIC_NEON_AUTH_BASE_URL}/:path*`,
+      }] : []),
       {
         source: "/api/programme/public/programmes/:programmeId",
         destination: `${apiUrl}/api/programme/public/programmes/:programmeId`,
