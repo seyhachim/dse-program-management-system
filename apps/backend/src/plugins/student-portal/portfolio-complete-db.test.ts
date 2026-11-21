@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, test } from "bun:test";
 import type { AuthUser } from "../../core/auth/token.ts";
+import { StudentProjectDirectoryQuery } from "@dse-pms/shared-types";
+import { studentPortfolioDirectoryService } from "./portfolio-directory.ts";
 import { prisma } from "../../core/db/prisma.ts";
 import { studentPortfolioCompetencyService } from "./portfolio-competencies.ts";
 import { studentPortfolioEvidenceService } from "./portfolio-evidence.ts";
@@ -206,6 +208,40 @@ dbDescribe("student portfolio integrated database boundary", () => {
       expect(JSON.stringify(publicPortfolio)).not.toContain(sourceA.offering.id);
       expect(JSON.stringify(publicPortfolio)).not.toContain("Verified against the linked offering");
 
+      // Directory uses the same explicit public consent, academic source and
+      // programme boundaries as the individually published portfolio.
+      const programmeActor: AuthUser = {
+        id: lecturer.id,
+        email: lecturer.email,
+        roles: ["program_coordinator"],
+        programmeRoles: [{ role: "program_coordinator", programmeId: "dse" }],
+      };
+      const directoryPage = await studentPortfolioDirectoryService.list(
+        programmeActor,
+        StudentProjectDirectoryQuery.parse({ course: courseCodeA, verification: "verified", limit: "1" }),
+      );
+      expect(directoryPage.total).toBe(1);
+      expect(directoryPage.items.map((item) => item.evidenceId)).toEqual([evidenceA.id]);
+      expect(directoryPage.items[0]?.courseCode).toBe(courseCodeA);
+      expect(directoryPage.items[0]?.verification).toBe("verified");
+      expect(JSON.stringify(directoryPage)).not.toContain(student.studentId);
+      expect(JSON.stringify(directoryPage)).not.toContain(studentUser.email);
+      expect(
+        (await studentPortfolioDirectoryService.list(
+          programmeActor,
+          StudentProjectDirectoryQuery.parse({ skill: "not-a-real-skill", course: courseCodeA }),
+        )).total,
+      ).toBe(0);
+      await expect(studentPortfolioDirectoryService.list(
+        lecturerActor(lecturer.id),
+        StudentProjectDirectoryQuery.parse({ course: courseCodeA }),
+      )).rejects.toThrow();
+      await expect(studentPortfolioDirectoryService.list(
+        { ...programmeActor, programmeRoles: [{ role: "program_coordinator", programmeId: "different" }] },
+        StudentProjectDirectoryQuery.parse({ programmeId: "dse", course: courseCodeA }),
+      )).rejects.toThrow();
+
+
       const academicBefore = await prisma.courseSpecAssessmentItem.findUniqueOrThrow({
         where: { courseSpecId_id: { courseSpecId: sourceA.spec.id, id: sourceA.assessment.id } },
         select: { name: true, type: true, cloCodes: true, status: true },
@@ -246,6 +282,9 @@ dbDescribe("student portfolio integrated database boundary", () => {
       const publicAfterArchive = await studentPortfolioPublicService.get(slug);
       expect(publicAfterArchive.evidence.some((item) => item.id === evidenceA.id)).toBe(false);
       expect(publicAfterArchive.evidence.some((item) => item.id === evidenceB.id)).toBe(true);
+      expect((await studentPortfolioDirectoryService.list(
+        programmeActor, StudentProjectDirectoryQuery.parse({ course: courseCodeA }),
+      )).total).toBe(0);
 
       const academicAfter = await prisma.courseSpecAssessmentItem.findUniqueOrThrow({
         where: { courseSpecId_id: { courseSpecId: sourceA.spec.id, id: sourceA.assessment.id } },
@@ -261,6 +300,9 @@ dbDescribe("student portfolio integrated database boundary", () => {
         publicSlug: slug,
       });
       await expect(studentPortfolioPublicService.get(slug)).rejects.toThrow("Public portfolio was not found");
+      expect((await studentPortfolioDirectoryService.list(
+        programmeActor, StudentProjectDirectoryQuery.parse({ course: courseCodeB }),
+      )).total).toBe(0);
     } finally {
       // Verification rows are append-only by database trigger, so remove their parent
       // test records only after explicitly dropping the temporary rows through a
