@@ -14,6 +14,7 @@ import {
   formatAcademicDate,
 } from "@/lib/academic-calendar";
 import { studentPortalApi } from "@/lib/student-portal";
+import { StudentKhmerLunarMonth } from "./student-khmer-lunar-month";
 import { MOBILE_STUDENT_PORTAL_LAYOUT } from "../mobile-student-portal-layout";
 import { PortalError, PortalLoading, useCachedPortalData } from "../portal-state";
 
@@ -341,6 +342,8 @@ export function PortalAcademicCalendar() {
           </span>
         </div>
       </section>
+
+      <StudentKhmerLunarMonth calendar={data} />
 
       <section>
         <div className="mb-3">
