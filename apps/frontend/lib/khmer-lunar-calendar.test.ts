@@ -99,7 +99,7 @@ describe("calendar month grid", () => {
     expect(shiftCalendarMonth(2026, 12, 1)).toEqual({ year: 2027, month: 1 });
     expect(shiftCalendarMonth(2027, 1, -1)).toEqual({ year: 2026, month: 12 });
     expect(monthHeading(2026, 11)).toBe("November 2026");
-    expect(formatGregorianCalendarDate("2026-11-21")).toBe("Saturday, 21 November 2026");
+    expect(formatGregorianCalendarDate("2026-11-21")).toBe("Saturday 21 November 2026");
   });
 });
 
