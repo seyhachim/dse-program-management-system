@@ -387,11 +387,11 @@ function getKhmerReferenceYear(date: Date): number {
 }
 
 function getAnimalYearForReferenceYear(referenceYear: number): AnimalYear {
-  return ANIMAL_YEARS[mod(referenceYear - 2020, ANIMAL_YEARS.length)];
+  return ANIMAL_YEARS[mod(referenceYear - 2020, ANIMAL_YEARS.length)]!;
 }
 
 function getSakForReferenceYear(referenceYear: number): Sak {
-  return SAKS[mod(referenceYear - 2019, SAKS.length)];
+  return SAKS[mod(referenceYear - 2019, SAKS.length)]!;
 }
 
 function isGregorianLeapYear(year: number): boolean {
@@ -494,7 +494,7 @@ function getKhmerMonthName(month: number, year: number): KhmerMonth {
   const normalizedMonth = normalizeKhmerMonthNumber(month, year);
   const months =
     getKhmerYearType(year) === 'leap-month' ? LEAP_MONTHS_BY_NUMBER : NORMAL_MONTHS_BY_NUMBER;
-  return months[normalizedMonth - 1];
+  return months[normalizedMonth - 1]!;
 }
 
 function getKhmerMonthLength(month: number, year: number): number {
@@ -660,7 +660,7 @@ function buildKhmerGregorianDayValue(date: Date): string {
 }
 
 function buildKhmerGregorianMonthValue(date: Date): string {
-  return GREGORIAN_MONTHS_KM[date.getMonth()];
+  return GREGORIAN_MONTHS_KM[date.getMonth()]!;
 }
 
 function buildKhmerGregorianYearValue(date: Date): string {
@@ -687,7 +687,7 @@ function convertCore(date: Date): Omit<KhmerLunarDate, 'holidays'> {
   const khmerYear = buddhistEraYear;
   const animalYear = getAnimalYearForReferenceYear(referenceYear);
   const sak = getSakForReferenceYear(referenceYear);
-  const dayOfWeek = DAYS_OF_WEEK_KM[date.getDay()];
+  const dayOfWeek = DAYS_OF_WEEK_KM[date.getDay()]!;
   const isSilDay = isBuddhistHolyDay(khmerCivilDate.monthDay, khmerCivilDate.monthLength);
   const observanceText = getObservanceText(khmerCivilDate.monthDay, moonStatus, isSilDay);
   const buddhistEraYearKhmer = toKhmerNumber(buddhistEraYear);
@@ -757,7 +757,7 @@ function addHoliday(accumulator: KhmerHoliday[], holiday: KhmerHoliday): void {
     return;
   }
 
-  if (accumulator[existingIndex].type !== 'public' && holiday.type === 'public') {
+  if (accumulator[existingIndex]!.type !== 'public' && holiday.type === 'public') {
     accumulator[existingIndex] = holiday;
   }
 }

@@ -41,6 +41,7 @@ const published: AvailableCalendar = {
   events: [
     {
       id: "event-1",
+      sortOrder: 1,
       calendarId: "calendar-1",
       title: "Official programme event",
       type: "Other",
@@ -90,7 +91,7 @@ describe("calendar month grid", () => {
     expect(buildKhmerLunarMonthCells(2027, 2)).toHaveLength(28);
     expect(buildKhmerLunarMonthCells(2028, 2).some((cell) => cell.dateKey === "2028-02-29")).toBe(true);
     const oldest = buildKhmerLunarMonthCells(1900, 1);
-    expect(oldest[0].dateKey).toBe("1900-01-01");
+    expect(oldest[0]?.dateKey).toBe("1900-01-01");
     expect(() => buildKhmerLunarMonthCells(1899, 12)).toThrow();
   });
 

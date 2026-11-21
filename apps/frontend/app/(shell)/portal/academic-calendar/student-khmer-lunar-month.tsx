@@ -28,7 +28,7 @@ function initialCalendarDate(calendar: AvailableCalendar): string {
   const starts = calendar.periods.map((period) => period.teachingStart);
   const ends = calendar.periods.flatMap((period) => [period.teachingEnd, period.examEnd, period.breakEnd].filter((date): date is string => Boolean(date)));
   if (!starts.length) return calendar.events[0]?.startDate ?? today;
-  const first = [...starts].sort()[0];
+  const first = [...starts].sort()[0] ?? today;
   const last = [...ends].sort().at(-1) ?? first;
   return today >= first && today <= last ? today : first;
 }
