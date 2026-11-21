@@ -21,10 +21,13 @@ describe("student portal home cold-start read path", () => {
     const source = await serviceSource();
     const home = homeBlock(source);
 
-    expect(home).toContain("rows.map(homeCourseSnapshot)");
+    expect(home).toContain("rows.map((row) => homeCourseSnapshot(");
     expect(home).not.toContain("toDetail(");
     expect(home).not.toContain("courseFeedback.findUnique");
-    expect(home).not.toContain("feedbackKey(");
+    // An enabled result-access gate needs a single batched lookup of anonymous
+    // survey completion. Never replace this with per-offering findUnique calls.
+    expect(home).toContain("courseFeedback.findMany");
+    expect(home).toContain("gatedPolicies.map");
   });
 
   test("loads the validated student once and overlaps independent home reads", async () => {

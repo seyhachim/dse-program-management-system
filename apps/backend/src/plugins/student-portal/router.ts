@@ -24,7 +24,7 @@ import { resultCorrectionsService } from "./result-corrections.ts";
 import { groupAssessmentService } from "./group-assessment-results.ts";
 import { resultsLifecycleService } from "./results-lifecycle.ts";
 import {
-  applyProvisionalResultAccessPolicy,
+  studentVisibleCourse,
   getOfferingResultAccessPolicy,
   setOfferingResultAccessPolicy,
 } from "./result-access-policy.ts";
@@ -77,8 +77,7 @@ export function createStudentPortalRouter(): Router {
   router.get("/courses/:offeringId", requirePermission("student-portal:read"), async (req, res) => {
     try {
       const offeringId = req.params.offeringId!;
-      const detail = await studentPortalService.course(req.user!.id, offeringId);
-      res.json(await applyProvisionalResultAccessPolicy(offeringId, detail));
+      res.json(await studentVisibleCourse(req.user!.id, offeringId));
     } catch (error) { handleError(error, res); }
   });
   router.get("/announcements", requirePermission("student-portal:read"), async (req, res) => {

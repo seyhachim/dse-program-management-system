@@ -24,6 +24,7 @@ import { registry } from "../../core/plugins/registry.ts";
 import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
 import { buildPortalCourseDocument } from "./course-document.ts";
+import { isPublishedResultVisibleUnderSurveyGate } from "./student-result-visibility.ts";
 
 export class PortalNotFoundError extends Error {}
 export class PortalConflictError extends Error {}
@@ -768,7 +769,39 @@ export const studentPortalService = {
       enrolledRowsForStudent(student),
       academicCalendarForStudentRecord(student),
     ]);
-    const snapshots = rows.map(homeCourseSnapshot);
+    // Aggregate achievements on Home must not reveal provisional marks hidden by
+    // the optional final-survey gate. Batch policy and anonymous survey checks.
+    const gatedPolicies = await prisma.offeringResultAccessPolicy.findMany({
+      where: {
+        offeringId: { in: rows.map((row) => row.offeringId) },
+        requireSurveyBeforeResults: true,
+      },
+      select: { offeringId: true },
+    });
+    const completedSurveys = gatedPolicies.length
+      ? await prisma.courseFeedback.findMany({
+          where: {
+            OR: gatedPolicies.map(({ offeringId }) => ({
+              offeringId,
+              responseKeyHash: feedbackKey(userId, offeringId),
+            })),
+          },
+          select: { offeringId: true },
+        })
+      : [];
+    const surveyCompleteIds = new Set(completedSurveys.map((item) => item.offeringId));
+    const gatedPendingIds = new Set(
+      gatedPolicies
+        .filter(({ offeringId }) => !surveyCompleteIds.has(offeringId))
+        .map(({ offeringId }) => offeringId),
+    );
+    const snapshots = rows.map((row) => homeCourseSnapshot({
+      ...row,
+      results: gatedPendingIds.has(row.offeringId)
+        ? row.results.filter((result) =>
+            isPublishedResultVisibleUnderSurveyGate(true, false, result.finalizedAt !== null))
+        : row.results,
+    }));
     const measured = snapshots.flatMap((course) =>
       course.overallAchievement === null ? [] : [course.overallAchievement],
     );

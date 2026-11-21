@@ -5,7 +5,8 @@ import type {
   ProvisionalResultAccess,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
-import { PortalAccessError, PortalNotFoundError } from "./service.ts";
+import { PortalAccessError, PortalNotFoundError, studentPortalService } from "./service.ts";
+import { isPublishedResultVisibleUnderSurveyGate } from "./student-result-visibility.ts";
 
 async function assertPolicyManager(
   offeringId: string,
@@ -125,7 +126,11 @@ export async function applyProvisionalResultAccessPolicy(
   );
   const hiddenAssessmentIds = new Set(
     detail.assessments.flatMap((assessment) =>
-      assessment.result && finalizedByAssessment.get(assessment.id) !== true
+      assessment.result && !isPublishedResultVisibleUnderSurveyGate(
+        true,
+        false,
+        finalizedByAssessment.get(assessment.id) === true,
+      )
         ? [assessment.id]
         : [],
     ),
@@ -175,4 +180,14 @@ export async function applyProvisionalResultAccessPolicy(
       : null,
     provisionalResultAccess,
   };
+}
+
+/**
+ * The canonical student-facing course result projection for both the web route
+ * and the plugin registry consumed by Telegram. Do not expose the ungated
+ * studentPortalService.course() through external student surfaces.
+ */
+export async function studentVisibleCourse(userId: string, offeringId: string): Promise<PortalCourseDetail> {
+  const detail = await studentPortalService.course(userId, offeringId);
+  return applyProvisionalResultAccessPolicy(offeringId, detail);
 }
