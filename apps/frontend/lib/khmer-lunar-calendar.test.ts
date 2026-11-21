@@ -48,7 +48,7 @@ const published: AvailableCalendar = {
       semester: "First",
       startDate: "2026-11-21",
       endDate: null,
-      note: null,
+      note: "",
     },
   ],
   nextEvent: null,
