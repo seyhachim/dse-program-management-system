@@ -7,8 +7,10 @@ const source = (file: string) => readFileSync(join(import.meta.dir, file), "utf8
 describe("Neon staging authentication release guardrails", () => {
   test("uses the Better Auth JWT endpoint, never the opaque session identifier as an API bearer", () => {
     const text = source("staging-auth.ts");
-    expect(text).toContain("getStagingAuth().token()");
-    expect(text).toContain('token.split(".").length !== 3');
+    expect(text).toContain("/staging-auth/token");
+    expect(text).toContain('credentials: "same-origin"');
+    expect(text).toContain('cache: "no-store"');
+    expect(text).toContain('token.split(".").length === 3');
     expect(text).not.toContain("return sessionToken");
   });
 
