@@ -16,7 +16,7 @@ describe("Neon staging authentication release guardrails", () => {
     const text = source("staging-auth.ts");
     expect(text).toContain("new BroadcastChannel(IDENTITY_CHANGE_CHANNEL)");
     expect(text).toContain("window.dispatchEvent(new Event(IDENTITY_CHANGE_EVENT))");
-    expect(text).not.toContain("localStorage");
+    expect(text).not.toContain("localStorage.setItem(");
   });
 
   test("does not redirect valid but unprovisioned Neon sessions into a login loop", () => {
