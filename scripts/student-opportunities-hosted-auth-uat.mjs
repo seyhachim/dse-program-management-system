@@ -5,7 +5,10 @@
  * An operator explicitly provisions the generated auth UUIDs in the isolated
  * staging PMS database while this script waits. Unknown accounts must fail shut.
  */
-import { chromium } from "@playwright/test";
+import { createRequire } from "node:module";
+// Browser dependencies are pinned in the isolated tests/browser package.
+const browserRequire = createRequire(new URL("../tests/browser/package.json", import.meta.url));
+const { chromium } = browserRequire("@playwright/test");
 import { randomBytes, randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 
@@ -144,6 +147,10 @@ try {
   // Actual hosted browser login: coordinator manage and student mobile browse.
   for (const role of ["coord","student"]) {
     const user = users[role];
+    const signedOut = await user.context.request.post(PREVIEW + "/staging-auth/sign-out", {
+      headers: { Origin: PREVIEW, Referer: PREVIEW + "/login" }, data: {},
+    });
+    assert.equal(signedOut.status(), 200, `Hosted sign-out preflight failed for ${role}`);
     const page = await user.context.newPage();
     await page.goto(PREVIEW + "/login", { waitUntil: "domcontentloaded", timeout: 90000 });
     await page.locator("#email").fill(user.email);
