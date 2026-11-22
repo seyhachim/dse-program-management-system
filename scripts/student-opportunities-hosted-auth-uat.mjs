@@ -17,7 +17,9 @@ const API = "https://dse-pms-staging-isolated-free.onrender.com";
 const AUTH_ORIGIN = "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech";
 const RUN_ID = process.env.GITHUB_RUN_ID;
 assert.match(RUN_ID ?? "", /^\d+$/, "Only a GitHub Actions staging run can execute this script");
-assert.equal(process.env.GITHUB_REF, "refs/heads/feat/student-opportunities-manual-mvp-1284");
+assert.equal(process.env.GITHUB_EVENT_NAME, "pull_request");
+assert.equal(process.env.GITHUB_HEAD_REF, "feat/student-opportunities-manual-mvp-1284");
+assert.equal(process.env.GITHUB_BASE_REF, "main");
 
 const browser = await chromium.launch({ headless: true });
 const users = {};
