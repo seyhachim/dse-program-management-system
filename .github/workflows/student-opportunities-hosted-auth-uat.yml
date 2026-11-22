@@ -3,9 +3,7 @@ name: Student Opportunities Hosted Auth UAT (Staging Only)
 # One-shot release gate. This creates no production identities or data.
 # The staging identities are assigned PMS roles only after external verification.
 on:
-  push:
-    branches:
-      - feat/student-opportunities-manual-mvp-1284
+  pull_request:
     paths:
       - .github/workflows/student-opportunities-hosted-auth-uat.yml
   workflow_dispatch:
@@ -15,7 +13,7 @@ permissions:
 
 concurrency:
   group: student-opportunities-hosted-auth-uat
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   hosted-staging-real-auth:
