@@ -71,8 +71,11 @@ try {
       data: { name: "STAGING UAT " + role.toUpperCase(), email, password },
       timeout: 90000,
     });
-    assert.ok([200, 201].includes(signup.status()), `Staging auth signup (${role}) returned ${signup.status()}`);
     const info = await json(signup);
+    if (![200, 201].includes(signup.status())) {
+      const reason = String(info?.message ?? info?.error?.message ?? info?.code ?? "no error details").slice(0, 180);
+      throw new Error(`Staging auth signup failed role=${role} status=${signup.status()} reason=${reason}`);
+    }
     const id = info?.user?.id ?? info?.data?.user?.id;
     assert.match(id ?? "", /^[0-9a-f-]{36}$/i, `Missing staged auth UUID for ${role}`);
 
