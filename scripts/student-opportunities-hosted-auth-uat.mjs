@@ -33,17 +33,18 @@ async function json(response) {
 }
 
 async function backend(user, path, method = "GET", data) {
-  const response = await user.context.request.fetch(API + path, {
+  const response = await fetch(API + path, {
     method,
     headers: {
       Origin: PREVIEW,
       Authorization: "Bearer " + user.jwt,
       ...(data === undefined ? {} : { "Content-Type": "application/json" }),
     },
-    ...(data === undefined ? {} : { data }),
-    timeout: 90000,
+    ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+    signal: AbortSignal.timeout(90000),
+    cache: "no-store",
   });
-  return { status: response.status(), body: await json(response) };
+  return { status: response.status, body: await json(response) };
 }
 
 function payloadFor(title) {
@@ -66,25 +67,38 @@ try {
       viewport: { width: role === "student" ? 390 : 1366, height: 844 },
     });
 
-    const signup = await context.request.post(PREVIEW + "/staging-auth/sign-up/email", {
-      headers: { Origin: PREVIEW, Referer: PREVIEW + "/login" },
-      data: { name: "STAGING UAT " + role.toUpperCase(), email, password },
-      timeout: 90000,
+    // Use native Fetch for API setup: Playwright 1.58's request cookie parser
+    // crashes on the provider's Partitioned HttpOnly Set-Cookie header.
+    const signup = await fetch(PREVIEW + "/staging-auth/sign-up/email", {
+      method: "POST",
+      headers: { Origin: PREVIEW, Referer: PREVIEW + "/login", "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "STAGING UAT " + role.toUpperCase(), email, password }),
+      signal: AbortSignal.timeout(90000),
+      cache: "no-store",
     });
     const info = await json(signup);
-    if (![200, 201].includes(signup.status())) {
+    if (![200, 201].includes(signup.status)) {
       const reason = String(info?.message ?? info?.error?.message ?? info?.code ?? "no error details").slice(0, 180);
-      throw new Error(`Staging auth signup failed role=${role} status=${signup.status()} reason=${reason}`);
+      throw new Error(`Staging auth signup failed role=${role} status=${signup.status} reason=${reason}`);
     }
     const id = info?.user?.id ?? info?.data?.user?.id;
     assert.match(id ?? "", /^[0-9a-f-]{36}$/i, `Missing staged auth UUID for ${role}`);
 
-    const session = await context.request.get(PREVIEW + "/staging-auth/get-session", { timeout: 90000 });
-    assert.equal(session.status(), 200, `Provider get-session for ${role}`);
-    assert.ok((await json(session))?.session, `No first-party session cookie for ${role}`);
+    const setCookies = signup.headers.getSetCookie();
+    const cookie = setCookies.map((item) => item.split(";")[0]).filter(Boolean).join("; ");
+    assert.ok(cookie.includes("session_token="), `No session cookie set for ${role}`);
+    const session = await fetch(PREVIEW + "/staging-auth/get-session", {
+      headers: { Origin: PREVIEW, Cookie: cookie },
+      signal: AbortSignal.timeout(90000), cache: "no-store",
+    });
+    assert.equal(session.status, 200, `Provider get-session for ${role}`);
+    assert.ok((await json(session))?.session, `Session cannot be recovered for ${role}`);
 
-    const tokenResponse = await context.request.get(PREVIEW + "/staging-auth/token", { timeout: 90000 });
-    assert.equal(tokenResponse.status(), 200, `JWT endpoint for ${role}`);
+    const tokenResponse = await fetch(PREVIEW + "/staging-auth/token", {
+      headers: { Origin: PREVIEW, Cookie: cookie },
+      signal: AbortSignal.timeout(90000), cache: "no-store",
+    });
+    assert.equal(tokenResponse.status, 200, `JWT endpoint for ${role}`);
     const jwt = (await json(tokenResponse))?.token;
     assert.equal(typeof jwt, "string", `Signed JWT missing for ${role}`);
     assert.equal(jwt.split(".").length, 3, `Bearer is not a JWT for ${role}`);
@@ -152,10 +166,8 @@ try {
   // Actual hosted browser login: coordinator manage and student mobile browse.
   for (const role of ["coord","student"]) {
     const user = users[role];
-    const signedOut = await user.context.request.post(PREVIEW + "/staging-auth/sign-out", {
-      headers: { Origin: PREVIEW, Referer: PREVIEW + "/login" }, data: {},
-    });
-    assert.equal(signedOut.status(), 200, `Hosted sign-out preflight failed for ${role}`);
+    // This browser context was never logged in by the API setup. Exercise the
+    // actual hosted email/password form as an independent session test.
     const page = await user.context.newPage();
     await page.goto(PREVIEW + "/login", { waitUntil: "domcontentloaded", timeout: 90000 });
     await page.locator("#email").fill(user.email);
