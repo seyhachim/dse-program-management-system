@@ -27,6 +27,22 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Verify hosted first-party auth hostname before browser setup
+        shell: bash
+        env:
+          PREVIEW: https://dse-pms-git-feat-student-opportuniti-650954-seyhachims-projects.vercel.app
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --retry 4 --retry-delay 3 --max-time 45 \
+            -o /tmp/staging-session-check.json -w '%{http_code}' \
+            -H "Origin: ${PREVIEW}" -H "Referer: ${PREVIEW}/login" \
+            "${PREVIEW}/staging-auth/get-session")"
+          if [ "$status" != "200" ]; then
+            reason="$(jq -r '.code // .message // "invalid response"' /tmp/staging-session-check.json 2>/dev/null || echo invalid-response)"
+            echo "::error::Staging auth hostname/session check failed: HTTP ${status}, code ${reason}"
+            exit 1
+          fi
+          echo "Staging same-origin auth hostname check passed"
       - name: Set up pinned Bun
         uses: oven-sh/setup-bun@v2
         with:
