@@ -15,9 +15,6 @@ type StagingAuthResult = {
 };
 type StagingAuthClient = {
   getSession(): Promise<StagingAuthResult>;
-  // Better Auth's JWT plugin endpoint returns a signed JWT. The session token is
-  // an opaque cookie/session identifier and must NEVER be sent to the PMS API.
-  token(): Promise<{ data?: { token?: string } | null; error?: { message?: string } | null }>;
   signIn: {
     email(credentials: { email: string; password: string }): Promise<{ error?: { message?: string } | null }>;
   };
@@ -45,11 +42,22 @@ export function getStagingAuth(): StagingAuthClient {
  * Fail closed if the JWT plugin is unavailable or returns malformed data.
  */
 export async function stagingBearerToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
   try {
-    const { data, error } = await getStagingAuth().token();
-    const token = data?.token;
-    if (error || typeof token !== "string" || token.split(".").length !== 3) return null;
-    return token;
+    // Call the JWT plugin endpoint directly through the existing exact-host
+    // first-party rewrite. The SDK's .token() method has differed across beta
+    // releases; the endpoint is the authoritative signed-token source.
+    const response = await fetch(`${window.location.origin}/staging-auth/token`, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) return null;
+    const body: unknown = await response.json();
+    if (!body || typeof body !== "object" || !("token" in body)) return null;
+    const token = (body as { token: unknown }).token;
+    return typeof token === "string" && token.split(".").length === 3 ? token : null;
   } catch {
     return null;
   }
