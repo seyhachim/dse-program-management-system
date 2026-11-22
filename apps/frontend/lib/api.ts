@@ -8,7 +8,7 @@ import { createInflightGetDeduper } from "./inflight-get";
 import { createInflightLoader } from "./inflight-value";
 import { runConfirmedMutation } from "./mutation-invalidation";
 import { AUTH_MODE, getSupabase } from "./supabase";
-import { stagingBearerToken } from "./staging-auth";
+import { getStagingAuth, stagingBearerToken } from "./staging-auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "";
@@ -67,6 +67,25 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
   });
 
   if (res.status === 401 && AUTH_MODE === "neon-staging" && !isRetry) {
+    // A valid Neon session does not grant a PMS role. Redirecting every 401 to
+    // /login would loop forever: login sees that session and returns to /.
+    // Show AuthGuard's recoverable access-denied screen instead, where the user
+    // can sign out and switch to a correctly provisioned staging account.
+    let hasProviderSession = false;
+    if (typeof window !== "undefined") {
+      try {
+        const { data } = await getStagingAuth().getSession();
+        hasProviderSession = Boolean(data?.session);
+      } catch {
+        // Fail closed if the provider session cannot be confirmed.
+      }
+    }
+    if (hasProviderSession) {
+      throw new ApiError(
+        401,
+        "Your staging identity is not authorized for DSE PMS. Sign out and use a provisioned test account.",
+      );
+    }
     if (typeof window !== "undefined") window.location.replace("/login");
     throw new ApiError(401, "Staging session expired. Please sign in again.");
   }
