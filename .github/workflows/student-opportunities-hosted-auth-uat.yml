@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/student-opportunities-hosted-auth-uat.yml
+      - scripts/student-opportunities-hosted-auth-uat.mjs
   workflow_dispatch:
 
 permissions:
