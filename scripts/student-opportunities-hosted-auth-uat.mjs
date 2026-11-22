@@ -172,11 +172,26 @@ try {
     await page.goto(PREVIEW + "/login", { waitUntil: "domcontentloaded", timeout: 90000 });
     await page.locator("#email").fill(user.email);
     await page.locator("#password").fill(user.password);
+    const loginRequest = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/staging-auth/sign-in/email",
+      { timeout: 45000 },
+    );
     await page.getByRole("button", { name: /^Sign in$/ }).click();
+    const loginResponse = await loginRequest;
+    assert.equal(loginResponse.status(), 200, `Browser login rejected for ${role}`);
+    // Do not abort the asynchronous form login before the provider writes its
+    // session cookie and the Next.js router completes the redirect.
+    await page.waitForURL((url) => url.pathname !== "/login", { timeout: 45000 });
     const path = role === "coord" ? "/opportunities/manage" : "/opportunities";
     await page.goto(PREVIEW + path, { waitUntil: "domcontentloaded", timeout: 90000 });
     const heading = role === "coord" ? "Create a verified opportunity" : "Discover your next opportunity";
-    await page.getByRole("heading", { name: heading }).waitFor({ state: "visible", timeout: 45000 });
+    try {
+      await page.getByRole("heading", { name: heading }).waitFor({ state: "visible", timeout: 45000 });
+    } catch {
+      const currentPath = new URL(page.url()).pathname;
+      const alerts = (await page.getByRole("alert").allTextContents()).join(" ").slice(0, 200);
+      throw new Error(`Hosted UI failed role=${role} path=${currentPath} alert=${alerts}`);
+    }
     if (role === "student") {
       await page.getByRole("searchbox", { name: "Search opportunities" }).fill(title);
       await page.getByRole("article").filter({ hasText: title }).waitFor({ state: "visible", timeout: 20000 });
@@ -199,7 +214,16 @@ try {
   assert.equal(hiddenDetail.status, 404, "Archived detail remains publicly readable");
   console.log("HOSTED_STAGING_UAT_PASS signed JWT, explicit identity, RBAC, publish, mobile browsing, archive");
 } finally {
-  // Keep staging auth users for evidence until manually reviewed. No credentials
-  // or JWTs are written to output; all role records and opportunities are staged.
+  // A failed browser assertion must never leave a synthetic staged opportunity
+  // published to students. Use the normal audited staff archive endpoint.
+  if (draftId && users.coord?.jwt) {
+    try {
+      const cleanup = await backend(users.coord, `/api/opportunities/manage/${draftId}/archive`, "POST", {});
+      if (cleanup.status === 200) console.log("Archived temporary staging opportunity after UAT");
+    } catch {
+      console.error("Warning: test opportunity may require manual staging cleanup");
+    }
+  }
+  // Test accounts remain only in the isolated staging system for review.
   await browser.close();
 }
