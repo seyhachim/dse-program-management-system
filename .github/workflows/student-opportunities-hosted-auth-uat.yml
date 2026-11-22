@@ -1,0 +1,40 @@
+name: Student Opportunities Hosted Auth UAT (Staging Only)
+
+# One-shot release gate. This creates no production identities or data.
+# The staging identities are assigned PMS roles only after external verification.
+on:
+  push:
+    branches:
+      - feat/student-opportunities-manual-mvp-1284
+    paths:
+      - .github/workflows/student-opportunities-hosted-auth-uat.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: student-opportunities-hosted-auth-uat
+  cancel-in-progress: false
+
+jobs:
+  hosted-staging-real-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 23
+    env:
+      CI: "true"
+    steps:
+      - name: Checkout reviewed feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up pinned Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Install reviewed dependencies
+        run: bun install --frozen-lockfile
+      - name: Install isolated Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Test live staging auth, permissions, publishing and mobile experience
+        run: bun scripts/student-opportunities-hosted-auth-uat.mjs
