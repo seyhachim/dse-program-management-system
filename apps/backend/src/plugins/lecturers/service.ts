@@ -190,6 +190,17 @@ export const lecturerService = {
       select: { id: true, authId: true },
     });
     if (!existing) throw new NotFoundError("Lecturer not found");
+    // The history row has RESTRICT FKs; check before touching the external
+    // Supabase credential so we never delete a Head's login then fail in DB.
+    const headHistory = await prisma.programmeHeadAppointment.findFirst({
+      where: { OR: [{ lecturerId: id }, { appointedById: id }, { endedById: id }] },
+      select: { id: true },
+    });
+    if (headHistory) {
+      throw new LecturerHeadAppointmentError(
+        "This lecturer has Head of Program appointment history and cannot be deleted. Keep the academic record.",
+      );
+    }
     // Course/Offering.lecturerId is ON DELETE SET NULL, so this won't orphan rows;
     // any OfferingCoLecturer rows for this lecturer cascade-delete instead (#79).
     // Delete the Supabase Auth identity (if any) before the app row, so a failure
@@ -198,6 +209,8 @@ export const lecturerService = {
     return prisma.user.delete({ where: { id } });
   },
 } satisfies LecturersServiceContract & Record<string, unknown>;
+
+export class LecturerHeadAppointmentError extends Error {}
 
 /** Thrown when a lecturer id doesn't resolve to a lecturer User. */
 export class NotFoundError extends Error {}

@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 const EXPECTED_PUBLIC_TABLES = [
   "User",
   "UserSecurityAuditEvent",
+  "ProgrammeHeadAppointment",
   "LecturerProfile",
   "Role",
   "Programme",
