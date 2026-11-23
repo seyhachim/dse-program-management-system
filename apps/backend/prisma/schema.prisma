@@ -383,6 +383,9 @@ model User {
 
   coursesLed                         Course[]                                  @relation("CourseLecturer")
   offeringsLed                       Offering[]                                @relation("OfferingLecturer")
+  offeringActivitiesCreated OfferingActivity[] @relation("OfferingActivityCreatedBy")
+  offeringActivitiesUpdated OfferingActivity[] @relation("OfferingActivityUpdatedBy")
+  offeringActivityAudits OfferingActivityAuditEvent[] @relation("OfferingActivityAuditActor")
   rubricsOwned                       Rubric[]                                  @relation("RubricOwner")
   coLecturerOf                       OfferingCoLecturer[]                      @relation("OfferingCoLecturer")
   offeringMeetingAssignments             OfferingMeetingLecturer[]                 @relation("OfferingMeetingLecturerUser")
@@ -2618,6 +2621,7 @@ model Offering {
   enrollments                    Enrollment[]
   coLecturers                    OfferingCoLecturer[]
   meetings                       OfferingMeeting[]
+  activities OfferingActivity[]
   assessmentDeadlines            OfferingAssessmentDeadline[]
   announcements                  CourseAnnouncement[]
   feedbackResponses              CourseFeedback[]
@@ -3451,4 +3455,49 @@ model OpportunityAuditEvent {
   createdAt      DateTime @default(now())
 
   @@index([opportunityId, createdAt])
+}
+
+
+//// Offering-owned delivery evidence, separate from the canonical calendar and CourseSpec plans.
+model OfferingActivity {
+  id               String   @id @default(uuid())
+  offeringId       String
+  offering         Offering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  type             String   @db.VarChar(32)
+  title            String   @db.VarChar(160)
+  date             DateTime @db.Date
+  startTime        String?  @db.VarChar(5)
+  endTime          String?  @db.VarChar(5)
+  host             String   @db.VarChar(160)
+  location         String   @default("") @db.VarChar(240)
+  description      String   @default("") @db.VarChar(2000)
+  objectives       String   @default("") @db.VarChar(2000)
+  reflectionPrompt String   @default("") @db.VarChar(1200)
+  evidenceLinks    Json     @default("[]")
+  status           String   @default("Draft")
+  version          Int      @default(1)
+  createdById      String
+  updatedById      String
+  createdBy        User     @relation("OfferingActivityCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy        User     @relation("OfferingActivityUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  auditEvents      OfferingActivityAuditEvent[]
+
+  @@index([offeringId, date])
+  @@index([status])
+}
+
+model OfferingActivityAuditEvent {
+  id         String           @id @default(uuid())
+  activityId String
+  activity   OfferingActivity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  actorId    String
+  actor      User             @relation("OfferingActivityAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action     String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([activityId, createdAt])
 }
