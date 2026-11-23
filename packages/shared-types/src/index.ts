@@ -28,6 +28,7 @@ export * from "./offerings.ts";
 export * from "./offering-roster-sync.ts";
 export * from "./offering-curriculum.ts";
 export * from "./dashboard.ts";
+export * from "./weekly-teaching.ts";
 export * from "./attendance.ts";
 export * from "./class-responsibilities.ts";
 export * from "./class-delivery.ts";

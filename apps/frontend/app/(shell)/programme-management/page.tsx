@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Topbar } from "../topbar";
 import { ProgrammeManagementClient } from "./programme-management-client";
+import { WeeklyTeachingNavCard } from "./weekly-teaching/weekly-teaching-nav-card";
 
 export default function ProgrammeManagementPage() {
   return (
@@ -12,6 +13,7 @@ export default function ProgrammeManagementPage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <WeeklyTeachingNavCard />
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex h-full flex-col gap-4">
               <div>
