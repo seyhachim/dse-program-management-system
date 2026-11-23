@@ -200,11 +200,15 @@ describeIsolated("Course Activities Sindora pilot — isolated API/database rele
     expect((await request(detail, lecturer)).status).toBe(200);
 
     // Activities do not make attendance or portfolio evidence automatically.
-    const [att, portfolios] = await Promise.all([
-      prisma.attendanceSession.count({ where: { offeringId } }).catch(() => 0),
+    const [attendanceRows, portfolios] = await Promise.all([
+      prisma.$queryRaw<Array<{ total: bigint }>>`
+        SELECT count(*)::bigint AS total
+        FROM pms_attendance."AttendanceSession"
+        WHERE "offeringId" = ${offeringId}
+      `,
       prisma.studentPortfolioEvidence.count({ where: { sourceOfferingId: offeringId } }),
     ]);
-    expect(att).toBe(0);
+    expect(Number(attendanceRows[0]?.total ?? 0n)).toBe(0);
     expect(portfolios).toBe(0);
   });
 });
