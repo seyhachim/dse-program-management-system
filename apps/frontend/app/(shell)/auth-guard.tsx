@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMe } from "@/lib/auth";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
+import { getStagingAuth, notifyStagingAuthChange } from "@/lib/staging-auth";
 import { ShellLoadingFrame } from "./shell-loading";
 
 /**
@@ -21,6 +22,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { me, loading: meLoading, error: meError, retry } = useMe();
 
   useEffect(() => {
+    if (AUTH_MODE === "neon-staging") {
+      void getStagingAuth().getSession().then(({ data }) => {
+        if (data?.session) setSessionReady(true);
+        else router.replace("/login");
+      });
+      return;
+    }
     if (AUTH_MODE !== "supabase") return;
     const supabase = getSupabase();
     supabase.auth.getSession().then(({ data }) => {
@@ -45,6 +53,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     try {
       if (AUTH_MODE === "supabase") {
         await getSupabase().auth.signOut();
+      } else if (AUTH_MODE === "neon-staging") {
+        await getStagingAuth().signOut();
+        notifyStagingAuthChange();
       }
     } finally {
       router.replace("/login");

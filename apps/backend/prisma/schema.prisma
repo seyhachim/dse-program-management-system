@@ -404,6 +404,11 @@ model User {
   portfolioSupervisorAssignments     StudentPortfolioSupervisorRelationship[]  @relation("PortfolioSupervisorUser")
   portfolioSupervisorApprovals       StudentPortfolioSupervisorRelationship[]  @relation("PortfolioSupervisorApprovedBy")
   portfolioSupervisorRevocations     StudentPortfolioSupervisorRelationship[]  @relation("PortfolioSupervisorRevokedBy")
+  opportunitiesCreated               Opportunity[] @relation("OpportunityCreator")
+  opportunitiesPublished             Opportunity[] @relation("OpportunityPublisher")
+  opportunityAuditEvents             OpportunityAuditEvent[] @relation("OpportunityAuditActor")
+  opportunityExperiencesConsented    OpportunityExperience[] @relation("OpportunityExperienceConsenter")
+  opportunityExperiencesReviewed     OpportunityExperience[] @relation("OpportunityExperienceReviewer")
   announcementsAuthored              CourseAnnouncement[]                      @relation("AnnouncementAuthor")
   assessmentResultsPublished         AssessmentResult[]                        @relation("AssessmentResultPublishedBy")
   assessmentResultsFinalized         AssessmentResult[]                        @relation("AssessmentResultFinalizedBy")
@@ -487,6 +492,7 @@ model Programme {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  opportunities            Opportunity[]
   roleAssignments          UserRoleAssignment[]
   courses                  Course[]
   curricula                ProgrammeCurriculum[]
@@ -1642,6 +1648,7 @@ model StudentPortfolioEvidence {
   updatedAt              DateTime                            @updatedAt
   archivedAt             DateTime?
   links                  StudentPortfolioEvidenceLink[]
+  opportunityExperiences OpportunityExperience[]
   verificationEvents     StudentPortfolioVerificationEvent[]
   softSkills             StudentPortfolioEvidenceSoftSkill[]
 
@@ -3380,4 +3387,68 @@ model UserSecurityAuditEvent {
 
   @@index([actorUserId, createdAt])
   @@index([targetUserId, createdAt])
+}
+
+ 
+/// Manual, staff-reviewed opportunity notice; external organizer remains authoritative.
+/// No crawler, AI, cron, or Vercel-side persistence.
+model Opportunity {
+  id              String   @id @default(uuid())
+  programmeId     String
+  programme       Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  type            String
+  title           String
+  organizer       String
+  summary         String
+  eligibility     String
+  sourceUrl       String
+  applicationUrl  String?
+  deadline        DateTime? @db.Date
+  status          String   @default("Draft")
+  createdById     String
+  createdBy       User     @relation("OpportunityCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedById   String?
+  publishedBy     User?    @relation("OpportunityPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  publishedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  experiences     OpportunityExperience[]
+  auditEvents     OpportunityAuditEvent[]
+
+  @@index([programmeId, status, deadline])
+  @@index([createdAt])
+}
+
+model OpportunityExperience {
+  id             String   @id @default(uuid())
+  opportunityId  String
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  evidenceId     String
+  evidence       StudentPortfolioEvidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  outcome        String
+  status         String   @default("Pending")
+  consentedById  String
+  consentedBy    User     @relation("OpportunityExperienceConsenter", fields: [consentedById], references: [id], onDelete: Restrict)
+  consentedAt    DateTime @default(now())
+  reviewedById   String?
+  reviewedBy     User?    @relation("OpportunityExperienceReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  @@unique([opportunityId, evidenceId])
+  @@index([opportunityId, status])
+  @@index([status, createdAt])
+}
+
+model OpportunityAuditEvent {
+  id             String @id @default(uuid())
+  opportunityId  String
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  actorId        String
+  actor          User @relation("OpportunityAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action         String
+  details        String @default("")
+  createdAt      DateTime @default(now())
+
+  @@index([opportunityId, createdAt])
 }

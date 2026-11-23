@@ -20,6 +20,7 @@ const config = {
     // PWA service worker can persist only this explicit public-data allowlist.
     // Do not replace these with a broad /api proxy.
     return [
+      // Staging authentication uses a restricted route handler, never a broad rewrite.
       {
         source: "/api/programme/public/programmes/:programmeId",
         destination: `${apiUrl}/api/programme/public/programmes/:programmeId`,

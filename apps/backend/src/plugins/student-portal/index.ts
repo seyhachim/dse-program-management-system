@@ -12,6 +12,7 @@ import { createStudentPortalRouter } from "./router.ts";
 import { createStudentScheduleImpactRouter } from "./schedule-impact-router.ts";
 import { studentScheduleImpactProjectionService } from "./schedule-impact-service.ts";
 import { studentPortalService } from "./service.ts";
+import { getPublicOpportunityEvidence } from "./public-opportunity-evidence.ts";
 import { createStudentAttendanceRouter } from "./student-attendance-router.ts";
 import { studentPortalAttendanceService } from "./student-attendance-service.ts";
 import { createStudentWeeklyNotesRouter } from "./weekly-notes-router.ts";
@@ -34,6 +35,7 @@ router.use("/portfolio", createStudentPortfolioCompleteRouter());
 
 export const studentPortalPluginService = {
   ...studentPortalService,
+  getPublicOpportunityEvidence,
   courseAchievements: courseAchievementService,
   attendance: studentPortalAttendanceService,
   scheduleImpacts: studentScheduleImpactProjectionService,

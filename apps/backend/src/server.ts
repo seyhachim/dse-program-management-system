@@ -1,8 +1,12 @@
 import { createApp } from "./core/app.ts";
 import { validateAuthConfig } from "./core/config/auth.ts";
+import { main as verifyStagingDatabase } from "../scripts/verify-staging-db.ts";
 import { validateTelegramConfig } from "./plugins/telegram/config.ts";
 
 validateAuthConfig();
+// Protect direct starts as well as the Render pre-migration guard.
+// Neither staging-auth nor any app route can listen against an unmarked DB.
+if (process.env.AUTH_MODE === "neon-staging") await verifyStagingDatabase();
 validateTelegramConfig();
 
 const app = createApp();

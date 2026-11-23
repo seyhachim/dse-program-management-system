@@ -13,6 +13,7 @@ import type {
 import { api } from "./api";
 import { createAuthMeCache } from "./auth-me-cache";
 import { AUTH_MODE, getSupabase } from "./supabase";
+import { getStagingAuth } from "./staging-auth";
 
 /** Auth plugin calls. Privileged recovery still goes through the backend. */
 export const authApi = {
@@ -101,6 +102,18 @@ export function subscribeAuthIdentityChange(
 ): () => void {
   authIdentityListeners.add(listener);
   return () => authIdentityListeners.delete(listener);
+}
+
+if (AUTH_MODE === "neon-staging" && typeof window !== "undefined") {
+  window.addEventListener("dse-staging-identity-change", () => {
+    authIdentityListeners.forEach((listener) => listener(undefined));
+    invalidateMe();
+  });
+  // Handle a restored, first-party session on a new browser tab.
+  void getStagingAuth().getSession().then(({ data }) => {
+    authIdentityListeners.forEach((listener) => listener(data?.user?.id));
+    invalidateMe();
+  });
 }
 
 if (AUTH_MODE === "supabase" && typeof window !== "undefined") {

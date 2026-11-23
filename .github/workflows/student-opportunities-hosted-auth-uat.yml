@@ -1,0 +1,57 @@
+name: Student Opportunities Hosted Auth UAT (Staging Only)
+
+# One-shot release gate. This creates no production identities or data.
+# The staging identities are assigned PMS roles only after external verification.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/student-opportunities-hosted-auth-uat.yml
+      - scripts/student-opportunities-hosted-auth-uat.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: student-opportunities-hosted-auth-uat
+  cancel-in-progress: true
+
+jobs:
+  hosted-staging-real-auth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 23
+    env:
+      CI: "true"
+    steps:
+      - name: Checkout reviewed feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify hosted first-party auth hostname before browser setup
+        shell: bash
+        env:
+          PREVIEW: https://dse-pms-git-feat-student-opportuniti-650954-seyhachims-projects.vercel.app
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --retry 4 --retry-delay 3 --max-time 45 \
+            -o /tmp/staging-session-check.json -w '%{http_code}' \
+            -H "Origin: ${PREVIEW}" -H "Referer: ${PREVIEW}/login" \
+            "${PREVIEW}/staging-auth/get-session")"
+          if [ "$status" != "200" ]; then
+            reason="$(jq -r '.code // .message // "invalid response"' /tmp/staging-session-check.json 2>/dev/null || echo invalid-response)"
+            echo "::error::Staging auth hostname/session check failed: HTTP ${status}, code ${reason}"
+            exit 1
+          fi
+          echo "Staging same-origin auth hostname check passed"
+      - name: Set up pinned Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - name: Install reviewed dependencies
+        run: bun install --frozen-lockfile
+      - name: Install pinned browser-smoke dependencies
+        run: bun install --cwd tests/browser --frozen-lockfile
+      - name: Install isolated Chromium
+        run: cd tests/browser && bunx playwright install --with-deps chromium
+      - name: Test live staging auth, permissions, publishing and mobile experience
+        run: bun scripts/student-opportunities-hosted-auth-uat.mjs
