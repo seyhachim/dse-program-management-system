@@ -18,6 +18,8 @@ describe("Student Opportunities navigation and mobile shell", () => {
     const browse = readFileSync(join(root, "opportunities-client.tsx"), "utf8");
     expect(management).toContain("Restore to draft");
     expect(management).toContain("Poster / thumbnail");
+    expect(management).toContain("preparePosterUpload");
+    expect(management).toContain("posterProcessing");
     expect(browse).toContain("item.posterUrl");
   });
   test("every opportunity page retains its top bar and vertical scroll container", () => {
