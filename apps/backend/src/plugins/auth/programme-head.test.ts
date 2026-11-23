@@ -144,9 +144,9 @@ dbDescribe("Head of Program end-to-end authorization and history", () => {
     expect(await prisma.userRoleAssignment.count({ where: { userId: lecturerAId, role: { slug: "program_coordinator" }, programmeId } })).toBe(1);
 
     // The partial unique index prevents two simultaneous active Heads.
-    await expect(prisma.programmeHeadAppointment.create({
+    await expect(Promise.resolve().then(() => prisma.programmeHeadAppointment.create({
       data: { programmeId, lecturerId: lecturerBId, appointedById: actorId },
-    })).rejects.toMatchObject({ code: "P2002" });
+    }))).rejects.toMatchObject({ code: "P2002" });
 
     // B had an independent coordinator grant: replacing Head should not revoke it later.
     await prisma.userRoleAssignment.create({
