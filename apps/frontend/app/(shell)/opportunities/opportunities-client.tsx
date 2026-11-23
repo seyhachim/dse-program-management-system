@@ -78,9 +78,14 @@ export function OpportunitiesClient() {
                 <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold capitalize text-primary">{item.type}</span>
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-4 w-4" />{formatDeadline(item.deadline)}</span>
               </div>
-              <div>
-                <h2 className="break-words text-lg font-semibold leading-snug">{item.title}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{item.organizer}</p>
+              <div className="flex items-start gap-3">
+                {item.posterUrl
+                  ? <img src={item.posterUrl} alt={item.title + " poster"} loading="lazy" className="h-28 w-24 shrink-0 rounded-xl border object-cover" />
+                  : <div className="flex h-28 w-24 shrink-0 items-center justify-center rounded-xl border bg-muted" aria-label="Opportunity without a poster"><GraduationCap className="h-8 w-8 text-muted-foreground" /></div>}
+                <div className="min-w-0 flex-1">
+                  <h2 className="break-words text-lg font-semibold leading-snug">{item.title}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{item.organizer}</p>
+                </div>
               </div>
               <p className="line-clamp-3 break-words text-sm leading-6">{item.summary}</p>
               <p className="line-clamp-2 text-sm text-muted-foreground">Eligibility: {item.eligibility}</p>

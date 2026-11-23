@@ -3407,6 +3407,7 @@ model Opportunity {
   eligibility     String
   sourceUrl       String
   applicationUrl  String?
+  posterPath      String?  // Upload-managed Supabase Storage object path; never user-supplied URL
   deadline        DateTime? @db.Date
   status          String   @default("Draft")
   createdById     String
@@ -3456,7 +3457,6 @@ model OpportunityAuditEvent {
 
   @@index([opportunityId, createdAt])
 }
-
 
 //// Offering-owned delivery evidence, separate from the canonical calendar and CourseSpec plans.
 model OfferingActivity {

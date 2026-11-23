@@ -1,5 +1,5 @@
-import { Router, type Request, type Response } from "express";
-import { CreateOpportunityInput, ReviewOpportunityExperienceInput, SubmitOpportunityExperienceInput } from "@dse-pms/shared-types";
+import { Router, raw, type Request, type Response } from "express";
+import { CreateOpportunityInput, ReviewOpportunityExperienceInput, SubmitOpportunityExperienceInput, UpdateOpportunityInput } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { OpportunityError, opportunitiesService } from "./service.ts";
 
@@ -50,6 +50,20 @@ export function createOpportunitiesRouter(): Router {
     const input = CreateOpportunityInput.safeParse(req.body);
     if (!input.success) throw new OpportunityError(400, "Invalid opportunity: " + input.error.issues[0]?.message);
     res.status(201).json(await opportunitiesService.create(req.user!, input.data));
+  }));
+  router.patch("/manage/:id", route(async (req, res) => {
+    const input = UpdateOpportunityInput.safeParse(req.body);
+    if (!input.success) throw new OpportunityError(400, "Invalid opportunity: " + input.error.issues[0]?.message);
+    res.json(await opportunitiesService.updateDraft(req.user!, parsedId(req.params.id), input.data));
+  }));
+  router.post("/manage/:id/restore", route(async (req, res) => {
+    res.json(await opportunitiesService.restoreToDraft(req.user!, parsedId(req.params.id)));
+  }));
+  router.post("/manage/:id/poster", raw({
+    type: ["image/jpeg", "image/png", "image/webp"], limit: "5mb",
+  }), route(async (req, res) => {
+    if (!(req.body instanceof Uint8Array)) throw new OpportunityError(400, "Choose a JPG, PNG or WebP image");
+    res.json(await opportunitiesService.uploadPoster(req.user!, parsedId(req.params.id), req.body, req.headers["content-type"] ?? ""));
   }));
   router.post("/manage/:id/publish", route(async (req, res) => {
     res.json(await opportunitiesService.publish(req.user!, parsedId(req.params.id)));

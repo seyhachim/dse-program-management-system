@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import type { Opportunity } from "@prisma/client";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   CreateOpportunityInput, OpportunityDetailView, OpportunityExperienceReviewView,
   OpportunityExperienceView, OpportunityKind, OpportunityStatus,
-  OpportunityView, SubmitOpportunityExperienceInput,
+  OpportunityView, SubmitOpportunityExperienceInput, UpdateOpportunityInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { hasAnyRoleInProgramme, type AuthUser, type Role } from "../../core/auth/token.ts";
@@ -11,6 +13,37 @@ import { registry } from "../../core/plugins/registry.ts";
 const READ_ROLES: Role[] = ["student", "lecturer", "admin", "program_coordinator", "program_secretary"];
 const STAFF_ROLES: Role[] = ["admin", "program_coordinator"];
 const MAX_LIST_SIZE = 100;
+export const POSTER_BUCKET = "opportunity-posters";
+export const MAX_POSTER_BYTES = 5 * 1024 * 1024;
+let posterClient: SupabaseClient | null = null;
+
+function getPosterClient(): SupabaseClient {
+  if (posterClient) return posterClient;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new OpportunityError(503, "Poster uploads are not configured");
+  posterClient = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return posterClient;
+}
+
+function publicPosterUrl(path: string | null): string | null {
+  const url = process.env.SUPABASE_URL?.replace(/\/+$/, "");
+  if (!path || !url) return null;
+  return `${url}/storage/v1/object/public/${POSTER_BUCKET}/${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+/** Validate actual image signatures, not just the browser-provided MIME label. */
+export function posterExtension(file: Uint8Array, mime: string): "png" | "jpg" | "webp" {
+  if (!file.length || file.length > MAX_POSTER_BYTES) throw new OpportunityError(400, "Poster must be 5 MB or smaller");
+  if (mime === "image/png" && file.length >= 8 &&
+      [137, 80, 78, 71, 13, 10, 26, 10].every((byte, i) => file[i] === byte)) return "png";
+  if (mime === "image/jpeg" && file.length >= 4 &&
+      file[0] === 0xff && file[1] === 0xd8 && file[2] === 0xff) return "jpg";
+  if (mime === "image/webp" && file.length >= 12 &&
+      String.fromCharCode(...file.slice(0, 4)) === "RIFF" &&
+      String.fromCharCode(...file.slice(8, 12)) === "WEBP") return "webp";
+  throw new OpportunityError(400, "Choose a valid JPG, PNG or WebP image");
+}
 
 type SafePortfolioEvidence = {
   studentUserId: string;
@@ -63,6 +96,7 @@ function dto(row: Opportunity): OpportunityView {
     title: row.title, organizer: row.organizer, summary: row.summary,
     eligibility: row.eligibility, sourceUrl: row.sourceUrl,
     applicationUrl: row.applicationUrl,
+    posterUrl: publicPosterUrl(row.posterPath),
     deadline: row.deadline ? row.deadline.toISOString().slice(0, 10) : null,
     status: row.status as OpportunityStatus,
     publishedAt: row.publishedAt?.toISOString() ?? null,
@@ -143,6 +177,68 @@ export const opportunitiesService = {
       return opportunity;
     });
     return dto(row);
+  },
+
+  async updateDraft(actor: AuthUser, id: string, input: UpdateOpportunityInput): Promise<OpportunityView> {
+    const row = await prisma.opportunity.findUnique({ where: { id } });
+    if (!row) throw new OpportunityError(404, "Opportunity not found");
+    requireRole(actor, row.programmeId, STAFF_ROLES);
+    if (row.status !== "Draft") throw new OpportunityError(409, "Only drafts can be edited; archive and restore first");
+    return dto(await prisma.$transaction(async (tx) => {
+      const result = await tx.opportunity.updateMany({
+        where: { id, status: "Draft" },
+        data: {
+          ...input, deadline: input.deadline ? new Date(input.deadline + "T00:00:00.000Z") : null,
+        },
+      });
+      if (!result.count) throw new OpportunityError(409, "Opportunity changed during review");
+      await audit(tx, id, actor.id, "DraftUpdated");
+      return tx.opportunity.findUniqueOrThrow({ where: { id } });
+    }));
+  },
+
+  async restoreToDraft(actor: AuthUser, id: string): Promise<OpportunityView> {
+    const row = await prisma.opportunity.findUnique({ where: { id } });
+    if (!row) throw new OpportunityError(404, "Opportunity not found");
+    requireRole(actor, row.programmeId, STAFF_ROLES);
+    if (row.status !== "Archived") throw new OpportunityError(409, "Only archived opportunities can be restored");
+    return dto(await prisma.$transaction(async (tx) => {
+      const result = await tx.opportunity.updateMany({
+        where: { id, status: "Archived" },
+        data: { status: "Draft", publishedAt: null, publishedById: null },
+      });
+      if (!result.count) throw new OpportunityError(409, "Opportunity changed during review");
+      await audit(tx, id, actor.id, "RestoredToDraft");
+      return tx.opportunity.findUniqueOrThrow({ where: { id } });
+    }));
+  },
+
+  async uploadPoster(actor: AuthUser, id: string, file: Uint8Array, mime: string): Promise<OpportunityView> {
+    const row = await prisma.opportunity.findUnique({ where: { id } });
+    if (!row) throw new OpportunityError(404, "Opportunity not found");
+    requireRole(actor, row.programmeId, STAFF_ROLES);
+    if (row.status !== "Draft") throw new OpportunityError(409, "Restore to draft before changing the poster");
+    const extension = posterExtension(file, mime);
+    const client = getPosterClient();
+    const path = `${id}/${randomUUID()}.${extension}`;
+    const bucket = client.storage.from(POSTER_BUCKET);
+    const result = await bucket.upload(path, file, { upsert: false, contentType: mime, cacheControl: "3600" });
+    if (result.error) throw new OpportunityError(502, "Poster could not be uploaded to storage");
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        const changed = await tx.opportunity.updateMany({
+          where: { id, status: "Draft" }, data: { posterPath: path },
+        });
+        if (!changed.count) throw new OpportunityError(409, "Opportunity changed during upload");
+        await audit(tx, id, actor.id, "PosterUpdated");
+        return tx.opportunity.findUniqueOrThrow({ where: { id } });
+      });
+      if (row.posterPath) await bucket.remove([row.posterPath]);
+      return dto(updated);
+    } catch (cause) {
+      await bucket.remove([path]);
+      throw cause;
+    }
   },
 
   async publish(actor: AuthUser, id: string, now = new Date()): Promise<OpportunityView> {

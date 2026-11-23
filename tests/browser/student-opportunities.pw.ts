@@ -98,3 +98,37 @@ test("#1284 staff publish → mobile student browse → archive; secretary/stude
     await staff.close();
   }
 });
+
+test("coordinator poster selection runs real browser-side WebP compression before any upload", async ({ browser }) => {
+  const staff = await newRoleContext(browser, "coordinator");
+  const page = await staff.newPage();
+  try {
+    await page.goto("/opportunities/manage");
+    await expect(page.getByRole("heading", { name: "Create a verified opportunity" })).toBeVisible();
+    // Encode an actual local image in Chromium; do not call Storage or create a production record.
+    const pngData = await page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 2400;
+      canvas.height = 1600;
+      const ctx = canvas.getContext("2d")!;
+      for (let i = 0; i < 20; i += 1) {
+        ctx.fillStyle = "hsl(" + (i * 17) + " 60% 60%)";
+        ctx.fillRect(i * 120, 0, 120, canvas.height);
+      }
+      return canvas.toDataURL("image/png").split(",")[1];
+    });
+    await page.getByLabel("Poster / thumbnail (optional)").setInputFiles({
+      name: "hackathon.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(pngData, "base64"),
+    });
+    await expect(page.getByRole("status").filter({ hasText: "Optimized:" })).toBeVisible();
+    const preview = page.getByRole("img", { name: "Selected poster preview" });
+    await expect(preview).toBeVisible();
+    await expect.poll(async () => preview.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBe(1200);
+    await expect.poll(async () => preview.evaluate((img) => (img as HTMLImageElement).naturalHeight)).toBe(800);
+    await expect(page.getByRole("button", { name: "Save draft" })).toBeEnabled();
+  } finally {
+    await staff.close();
+  }
+});
