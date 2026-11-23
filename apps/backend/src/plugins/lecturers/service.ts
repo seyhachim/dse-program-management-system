@@ -193,7 +193,7 @@ export const lecturerService = {
     // The history row has RESTRICT FKs; check before touching the external
     // Supabase credential so we never delete a Head's login then fail in DB.
     const headHistory = await prisma.programmeHeadAppointment.findFirst({
-      where: { lecturerId: id },
+      where: { OR: [{ lecturerId: id }, { appointedById: id }, { endedById: id }] },
       select: { id: true },
     });
     if (headHistory) {
