@@ -36,6 +36,7 @@ export const CreateOpportunityInput = z.object({
   sourceUrl: httpsUrl,
   applicationUrl: httpsUrl.nullable().default(null),
   deadline: OpportunityDate.nullable().default(null),
+  deadlineTime: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "Use a valid Cambodia local HH:mm time").nullable().optional(),
 }).strict();
 export type CreateOpportunityInput = z.infer<typeof CreateOpportunityInput>;
 
@@ -67,6 +68,7 @@ export interface OpportunityView {
   applicationUrl: string | null;
   posterUrl: string | null;
   deadline: string | null;
+  deadlineTime: string | null;
   status: OpportunityStatus;
   publishedAt: string | null;
 }
@@ -101,4 +103,28 @@ export interface OpportunityExperienceReviewView {
   status: "Pending" | "Approved" | "Hidden";
   consentedAt: string;
   publicStudent: OpportunityExperienceView | null;
+}
+
+/** Anonymous count + only the signed-in student's own choice. Never includes names. */
+export interface OpportunityInterestSummary {
+  count: number;
+  joined: boolean;
+  canJoin: boolean;
+}
+
+/** Only authorized programme lecturers and staff may fetch these identities. */
+export interface OpportunityInterestedStudent {
+  studentId: string | null;
+  name: string;
+  yearGroup: string;
+  joinedAt: string;
+}
+
+export interface OpportunityInterestOverviewItem {
+  id: string;
+  title: string;
+  status: OpportunityStatus;
+  deadline: string | null;
+  deadlineTime: string | null;
+  count: number;
 }

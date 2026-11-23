@@ -409,6 +409,7 @@ model User {
   opportunityAuditEvents             OpportunityAuditEvent[] @relation("OpportunityAuditActor")
   opportunityExperiencesConsented    OpportunityExperience[] @relation("OpportunityExperienceConsenter")
   opportunityExperiencesReviewed     OpportunityExperience[] @relation("OpportunityExperienceReviewer")
+  opportunityInterests               OpportunityInterest[]   @relation("OpportunityInterestedStudent")
   announcementsAuthored              CourseAnnouncement[]                      @relation("AnnouncementAuthor")
   assessmentResultsPublished         AssessmentResult[]                        @relation("AssessmentResultPublishedBy")
   assessmentResultsFinalized         AssessmentResult[]                        @relation("AssessmentResultFinalizedBy")
@@ -3405,6 +3406,7 @@ model Opportunity {
   applicationUrl  String?
   posterPath      String?  // Upload-managed Supabase Storage object path; never user-supplied URL
   deadline        DateTime? @db.Date
+  deadlineTime    String?  // HH:mm Cambodia time; null = end of the local deadline day
   status          String   @default("Draft")
   createdById     String
   createdBy       User     @relation("OpportunityCreator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -3414,10 +3416,29 @@ model Opportunity {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   experiences     OpportunityExperience[]
+  interests       OpportunityInterest[]
   auditEvents     OpportunityAuditEvent[]
 
   @@index([programmeId, status, deadline])
   @@index([createdAt])
+}
+
+/// Student intention to join. Separate from organizer registration and verified outcomes.
+/// One current choice per student/opportunity; withdrawals remain recorded with timestamps.
+model OpportunityInterest {
+  id            String      @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  userId        String
+  user          User        @relation("OpportunityInterestedStudent", fields: [userId], references: [id], onDelete: Restrict)
+  status        String      @default("Joined")
+  joinedAt      DateTime    @default(now())
+  withdrawnAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([opportunityId, userId])
+  @@index([opportunityId, status])
 }
 
 model OpportunityExperience {

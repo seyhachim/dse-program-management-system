@@ -12,7 +12,7 @@ import { protectedQueryKey } from "@/lib/query-client";
 const control = "mt-1 min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm";
 const initialForm = {
   type: "competition" as OpportunityKind, title: "", organizer: "", summary: "",
-  eligibility: "", sourceUrl: "", applicationUrl: "", deadline: "",
+  eligibility: "", sourceUrl: "", applicationUrl: "", deadline: "", deadlineTime: "",
 };
 
 export function ManageOpportunitiesClient() {
@@ -60,7 +60,7 @@ export function ManageOpportunitiesClient() {
     setForm({
       type: item.type, title: item.title, organizer: item.organizer,
       summary: item.summary, eligibility: item.eligibility, sourceUrl: item.sourceUrl,
-      applicationUrl: item.applicationUrl ?? "", deadline: item.deadline ?? "",
+      applicationUrl: item.applicationUrl ?? "", deadline: item.deadline ?? "", deadlineTime: item.deadlineTime ?? "",
     });
     posterSelection.current += 1;
     setPosterFile(null);
@@ -100,7 +100,7 @@ export function ManageOpportunitiesClient() {
         type: form.type, title: form.title.trim(), organizer: form.organizer.trim(),
         summary: form.summary.trim(), eligibility: form.eligibility.trim(),
         sourceUrl: form.sourceUrl.trim(), applicationUrl: form.applicationUrl.trim() || null,
-        deadline: form.deadline || null,
+        deadline: form.deadline || null, deadlineTime: form.deadline ? form.deadlineTime || null : null,
       };
       const saved = editingId
         ? await opportunitiesApi.update(editingId, input)
@@ -154,8 +154,12 @@ export function ManageOpportunitiesClient() {
             <input type="url" pattern="https://.*" value={form.applicationUrl} onChange={(e) => setForm({ ...form, applicationUrl: e.target.value })} className={control} />
           </label>
           <label className="text-sm font-medium">Deadline (optional)
-            <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className={control} />
+            <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value, deadlineTime: e.target.value ? form.deadlineTime : "" })} className={control} />
             <span className="mt-1 block text-xs text-muted-foreground">Cambodia local calendar day; blank means unconfirmed</span>
+          </label>
+          <label className="text-sm font-medium">Deadline time (Cambodia, optional)
+            <input type="time" value={form.deadlineTime} disabled={!form.deadline} onChange={(e) => setForm({ ...form, deadlineTime: e.target.value })} className={control} />
+            <span className="mt-1 block text-xs text-muted-foreground">For example, 17:00. If blank, joining closes at midnight after the deadline date.</span>
           </label>
           <label className="text-sm font-medium md:col-span-2">Poster / thumbnail (optional)
             <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(event) => {
@@ -197,7 +201,7 @@ export function ManageOpportunitiesClient() {
                   : <div aria-label="No poster" className="flex h-24 w-20 shrink-0 items-center justify-center rounded-lg border bg-muted text-xs text-muted-foreground">No poster</div>}
                 <div className="min-w-0 space-y-1">
                   <p className="break-words font-semibold">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.type} · {item.status} · Deadline {item.deadline ?? "unknown"}</p>
+                  <p className="text-xs text-muted-foreground">{item.type} · {item.status} · Deadline {item.deadline ?? "unknown"}{item.deadlineTime ? " " + item.deadlineTime + " ICT" : ""}</p>
                   <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">Check original source</a>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { CreateOpportunityInput, SubmitOpportunityExperienceInput, UpdateOpportunityInput } from "@dse-pms/shared-types";
 import { cambodiaToday, deadlineStillOpen, posterExtension } from "./service.ts";
+import { interestOpen } from "./service-interest.ts";
 
 const good = {
   programmeId: "dse" as const, type: "hackathon" as const,
@@ -33,6 +34,15 @@ describe("Student Opportunities source and consent contracts", () => {
     expect(() => posterExtension(png, "image/jpeg")).toThrow();
     expect(() => posterExtension(new Uint8Array(5 * 1024 * 1024 + 1), "image/png")).toThrow();
     expect(() => posterExtension(new Uint8Array(0), "image/png")).toThrow();
+  });
+  test("interest cutoff respects the exact Cambodia local clock and never opens undated entries", () => {
+    const opportunity = { status: "Published", deadline: new Date("2026-11-26T00:00:00.000Z"), deadlineTime: "17:00" };
+    expect(interestOpen(opportunity, new Date("2026-11-26T09:59:59.000Z"))).toBe(true);
+    expect(interestOpen(opportunity, new Date("2026-11-26T10:00:00.000Z"))).toBe(false);
+    expect(interestOpen({ ...opportunity, deadlineTime: null }, new Date("2026-11-26T16:59:59.999Z"))).toBe(true);
+    expect(interestOpen({ ...opportunity, deadlineTime: null }, new Date("2026-11-26T17:00:00.000Z"))).toBe(false);
+    expect(interestOpen({ ...opportunity, deadline: null }, new Date("2026-11-25T10:00:00.000Z"))).toBe(false);
+    expect(interestOpen({ ...opportunity, status: "Archived" }, new Date("2026-11-25T10:00:00.000Z"))).toBe(false);
   });
   test("requires explicit student consent for a portfolio reference", () => {
     const evidenceId = "31231231-1111-4222-8888-0123456789ab";

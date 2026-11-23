@@ -162,6 +162,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "CopComment",
   "CopAction",
   "Opportunity",
+  "OpportunityInterest",
   "OpportunityExperience",
   "OpportunityAuditEvent",
 ] as const;

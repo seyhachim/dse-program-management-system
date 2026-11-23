@@ -21,9 +21,17 @@ describe("Student Opportunities navigation and mobile shell", () => {
     expect(management).toContain("preparePosterUpload");
     expect(management).toContain("posterProcessing");
     expect(browse).toContain("item.posterUrl");
+    expect(browse).toContain("/opportunities/participation");
+  });
+  test("student choice is private; lecturer dashboard is a separate route", () => {
+    const detail = readFileSync(join(root, "[id]/opportunity-detail-client.tsx"), "utf8");
+    const dashboard = readFileSync(join(root, "participation/participation-client.tsx"), "utf8");
+    expect(detail).toContain("I'm planning to join");
+    expect(detail).toContain("Other students see only the total");
+    expect(dashboard).toContain("Interested students");
   });
   test("every opportunity page retains its top bar and vertical scroll container", () => {
-    for (const page of ["page.tsx", "manage/page.tsx", "[id]/page.tsx"]) {
+    for (const page of ["page.tsx", "manage/page.tsx", "[id]/page.tsx", "participation/page.tsx"]) {
       const source = readFileSync(join(root, page), "utf8");
       expect(source).toContain("<Topbar");
       expect(source).toContain("overflow-y-auto");

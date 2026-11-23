@@ -2,6 +2,7 @@ import { Router, raw, type Request, type Response } from "express";
 import { CreateOpportunityInput, ReviewOpportunityExperienceInput, SubmitOpportunityExperienceInput, UpdateOpportunityInput } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { OpportunityError, opportunitiesService } from "./service.ts";
+import { opportunityInterestService } from "./service-interest.ts";
 
 type RouteTask = (req: Request, res: Response) => Promise<void>;
 function route(task: RouteTask) {
@@ -43,6 +44,10 @@ export function createOpportunitiesRouter(): Router {
   router.get("/", route(async (req, res) => {
     res.json(await opportunitiesService.list(req.user!, programmeId(req)));
   }));
+  // Role-scoped lecturer/coordinator dashboard; route must precede /:id.
+  router.get("/participation", route(async (req, res) => {
+    res.json(await opportunityInterestService.overview(req.user!, programmeId(req)));
+  }));
   router.get("/manage", route(async (req, res) => {
     res.json(await opportunitiesService.manage(req.user!, programmeId(req)));
   }));
@@ -83,6 +88,18 @@ export function createOpportunitiesRouter(): Router {
     const body = ReviewOpportunityExperienceInput.safeParse(req.body);
     if (!body.success) throw new OpportunityError(400, "Invalid review note");
     res.json(await opportunitiesService.reviewExperience(req.user!, parsedId(req.params.id), "hide", body.data.reason));
+  }));
+  router.get("/:id/interest", route(async (req, res) => {
+    res.json(await opportunityInterestService.summary(req.user!, parsedId(req.params.id)));
+  }));
+  router.post("/:id/interest", route(async (req, res) => {
+    res.json(await opportunityInterestService.join(req.user!, parsedId(req.params.id)));
+  }));
+  router.post("/:id/interest/withdraw", route(async (req, res) => {
+    res.json(await opportunityInterestService.withdraw(req.user!, parsedId(req.params.id)));
+  }));
+  router.get("/:id/interest/students", route(async (req, res) => {
+    res.json(await opportunityInterestService.students(req.user!, parsedId(req.params.id)));
   }));
   router.get("/:id", route(async (req, res) => {
     res.json(await opportunitiesService.detail(req.user!, parsedId(req.params.id)));
