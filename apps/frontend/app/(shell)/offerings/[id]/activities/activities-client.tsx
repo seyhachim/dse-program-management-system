@@ -62,7 +62,7 @@ function evidenceInput(text: string) {
     .map((url) => ({ kind: "other" as const, label: "Evidence link", url }));
 }
 
-export function ActivitiesClient({ offeringId }: { offeringId: string }) {
+export function ActivitiesClient({ offeringId, backHref = "/offerings", backLabel = "Course Offerings" }: { offeringId: string; backHref?: string; backLabel?: string }) {
   const [items, setItems] = useState<OfferingActivityView[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -159,8 +159,8 @@ export function ActivitiesClient({ offeringId }: { offeringId: string }) {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link className="text-sm text-muted-foreground underline-offset-2 hover:underline" href="/offerings">
-          ← Course Offerings
+        <Link className="text-sm text-muted-foreground underline-offset-2 hover:underline" href={backHref}>
+          ← {backLabel}
         </Link>
         <button type="button" onClick={beginNew} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
           Add Activity
