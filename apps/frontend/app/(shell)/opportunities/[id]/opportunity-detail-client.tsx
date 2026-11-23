@@ -82,6 +82,7 @@ export function OpportunityDetailClient() {
             </div>
             <h1 className="mt-3 break-words text-2xl font-bold md:text-3xl">{item.title}</h1>
             <p className="mt-2 text-sm text-muted-foreground">Organizer: {item.organizer}</p>
+            {item.posterUrl ? <img src={item.posterUrl} alt={item.title + " official poster"} loading="lazy" className="mt-5 max-h-[440px] w-full rounded-xl border bg-muted object-contain" /> : null}
             <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">{item.summary}</p>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl bg-muted/60 p-4"><h2 className="text-xs font-semibold uppercase text-muted-foreground">Eligibility</h2><p className="mt-2 whitespace-pre-wrap break-words text-sm">{item.eligibility}</p></div>

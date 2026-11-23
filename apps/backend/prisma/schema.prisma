@@ -3403,6 +3403,7 @@ model Opportunity {
   eligibility     String
   sourceUrl       String
   applicationUrl  String?
+  posterPath      String?  // Upload-managed Supabase Storage object path; never user-supplied URL
   deadline        DateTime? @db.Date
   status          String   @default("Draft")
   createdById     String

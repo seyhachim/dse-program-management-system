@@ -126,6 +126,12 @@ export const api = {
     runConfirmedMutation("PUT", path, () =>
       request<T>(path, { method: "PUT", body: JSON.stringify(body), signal }),
     ),
+  uploadFile: <T>(path: string, file: File) =>
+    runConfirmedMutation("POST", path, () =>
+      request<T>(path, {
+        method: "POST", headers: { "Content-Type": file.type }, body: file,
+      }),
+    ),
   delete: <T>(path: string, body?: unknown) =>
     runConfirmedMutation("DELETE", path, () =>
       request<T>(path, {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { OpportunityKind, type OpportunityView } from "@dse-pms/shared-types";
@@ -18,6 +18,16 @@ export function ManageOpportunitiesClient() {
   const { me, loading } = useMe();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(initialForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [posterPreview, setPosterPreview] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  useEffect(() => {
+    if (!posterFile) { setPosterPreview(null); return; }
+    const url = URL.createObjectURL(posterFile);
+    setPosterPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [posterFile]);
   const [busy, setBusy] = useState(false);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
@@ -40,18 +50,43 @@ export function ManageOpportunitiesClient() {
     } finally { setBusy(false); }
   }
 
+  function startEditing(item: OpportunityView) {
+    setEditingId(item.id);
+    setForm({
+      type: item.type, title: item.title, organizer: item.organizer,
+      summary: item.summary, eligibility: item.eligibility, sourceUrl: item.sourceUrl,
+      applicationUrl: item.applicationUrl ?? "", deadline: item.deadline ?? "",
+    });
+    setPosterFile(null);
+    document.getElementById("opportunity-editor")?.scrollIntoView({ behavior: "smooth" });
+  }
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    await perform(async () => {
-      await opportunitiesApi.create({
-        programmeId: "dse", type: form.type, title: form.title.trim(),
-        organizer: form.organizer.trim(), summary: form.summary.trim(),
-        eligibility: form.eligibility.trim(), sourceUrl: form.sourceUrl.trim(),
-        applicationUrl: form.applicationUrl.trim() || null,
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const input = {
+        type: form.type, title: form.title.trim(), organizer: form.organizer.trim(),
+        summary: form.summary.trim(), eligibility: form.eligibility.trim(),
+        sourceUrl: form.sourceUrl.trim(), applicationUrl: form.applicationUrl.trim() || null,
         deadline: form.deadline || null,
-      });
-      setForm(initialForm);
-    }, "Draft saved. Review the official source and publish separately.");
+      };
+      const saved = editingId
+        ? await opportunitiesApi.update(editingId, input)
+        : await opportunitiesApi.create({ programmeId: "dse", ...input });
+      let posterFailed = false;
+      if (posterFile) {
+        try { await opportunitiesApi.uploadPoster(saved.id, posterFile); }
+        catch { posterFailed = true; }
+      }
+      setForm(initialForm); setEditingId(null); setPosterFile(null);
+      await queryClient.invalidateQueries({ queryKey: key });
+      setMessage(posterFailed
+        ? "Draft saved, but the poster upload failed. Edit this draft to try the image again."
+        : "Draft saved. Review the official source and publish separately.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not save draft");
+    } finally { setBusy(false); }
   };
 
   if (loading) return <p role="status">Checking staff access…</p>;
@@ -59,8 +94,8 @@ export function ManageOpportunitiesClient() {
   return (
     <div className="mx-auto max-w-6xl space-y-5 pb-12">
       <Link href="/opportunities" className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">← Student opportunities</Link>
-      <section className="rounded-2xl border bg-card p-5">
-        <h1 className="text-xl font-semibold">Create a verified opportunity</h1>
+      <section id="opportunity-editor" className="rounded-2xl border bg-card p-5">
+        <h1 className="text-xl font-semibold">{editingId ? "Edit opportunity draft" : "Create a verified opportunity"}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Manually confirm title, eligibility and deadline against the organizer website. Drafts never appear to students until published.</p>
         <form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="text-sm font-medium">Opportunity type
@@ -90,27 +125,55 @@ export function ManageOpportunitiesClient() {
             <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className={control} />
             <span className="mt-1 block text-xs text-muted-foreground">Cambodia local calendar day; blank means unconfirmed</span>
           </label>
-          <div className="flex items-end">
-            <button type="submit" disabled={busy} className="min-h-11 rounded-lg bg-primary px-5 font-medium text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : "Save draft"}</button>
+          <label className="text-sm font-medium md:col-span-2">Poster / thumbnail (optional)
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              if (file && (file.size > 5 * 1024 * 1024 || !["image/png", "image/jpeg", "image/webp"].includes(file.type))) {
+                setError("Choose a JPG, PNG or WebP poster no larger than 5 MB.");
+                setPosterFile(null);
+                event.target.value = "";
+              } else { setError(""); setPosterFile(file); }
+            }} className="mt-1 block w-full rounded-lg border border-input bg-background p-3 text-sm" />
+            <span className="mt-1 block text-xs text-muted-foreground">Uploaded after the draft is saved; images are promotional posters, not private student records.</span>
+            {posterPreview ? <img src={posterPreview} alt="Selected poster preview" className="mt-3 max-h-44 rounded-lg border object-contain" /> : null}
+          </label>
+          <div className="flex flex-wrap items-end gap-2">
+            <button type="submit" disabled={busy} className="min-h-11 rounded-lg bg-primary px-5 font-medium text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : editingId ? "Save changes" : "Save draft"}</button>
+            {editingId ? <button type="button" disabled={busy} onClick={() => { setEditingId(null); setForm(initialForm); setPosterFile(null); }} className="min-h-11 rounded-lg border px-4 text-sm">Cancel edit</button> : null}
           </div>
         </form>
       </section>
       {message ? <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
       {error ? <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{error}</p> : null}
       <section className="rounded-2xl border bg-card p-5">
-        <h2 className="text-lg font-semibold">Review and publication</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">Review and publication</h2>
+          <button type="button" aria-pressed={showArchived} onClick={() => setShowArchived(!showArchived)} className="min-h-10 rounded-lg border px-3 text-sm font-medium">
+            {showArchived ? "Show active and draft" : "View archived"}
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">Restore archived opportunities to draft, review their source and deadline, then publish again.</p>
         {managed.isError ? <p role="alert" className="mt-3 text-sm text-destructive">Could not load opportunity drafts.</p>
           : managed.isPending ? <p role="status" className="mt-3 text-sm">Loading…</p>
           : !managed.data?.length ? <p className="mt-3 text-sm text-muted-foreground">No opportunities created yet.</p>
-          : <div className="mt-3 space-y-3">{managed.data.map((item: OpportunityView) => (
+          : !(managed.data ?? []).some((item) => showArchived ? item.status === "Archived" : item.status !== "Archived")
+            ? <p className="mt-3 text-sm text-muted-foreground">{showArchived ? "No archived opportunities." : "No active or draft opportunities."}</p>
+          : <div className="mt-3 space-y-3">{managed.data.filter((item) => showArchived ? item.status === "Archived" : item.status !== "Archived").map((item: OpportunityView) => (
             <article key={item.id} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border p-4">
-              <div className="min-w-0 space-y-1">
-                <p className="break-words font-semibold">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{item.type} · {item.status} · Deadline {item.deadline ?? "unknown"}</p>
-                <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">Check original source</a>
+              <div className="flex min-w-0 items-start gap-3">
+                {item.posterUrl
+                  ? <img src={item.posterUrl} alt={item.title + " poster"} loading="lazy" className="h-24 w-20 shrink-0 rounded-lg border object-cover" />
+                  : <div aria-label="No poster" className="flex h-24 w-20 shrink-0 items-center justify-center rounded-lg border bg-muted text-xs text-muted-foreground">No poster</div>}
+                <div className="min-w-0 space-y-1">
+                  <p className="break-words font-semibold">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">{item.type} · {item.status} · Deadline {item.deadline ?? "unknown"}</p>
+                  <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">Check original source</a>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
+                {item.status === "Draft" ? <button type="button" disabled={busy} onClick={() => startEditing(item)} className="min-h-11 rounded-lg border px-3 text-sm font-medium disabled:opacity-50">Edit / poster</button> : null}
                 {item.status === "Draft" ? <button type="button" disabled={busy} onClick={() => void perform(() => opportunitiesApi.publish(item.id), "Opportunity published to students.")} className="min-h-11 rounded-lg border px-3 text-sm font-medium disabled:opacity-50">Publish</button> : null}
+                {item.status === "Archived" ? <button type="button" disabled={busy} onClick={() => void perform(() => opportunitiesApi.restore(item.id), "Restored to draft. Recheck the deadline and publish when ready.")} className="min-h-11 rounded-lg border px-3 text-sm font-medium disabled:opacity-50">Restore to draft</button> : null}
                 {item.status !== "Archived" ? <button type="button" disabled={busy} onClick={() => void perform(() => opportunitiesApi.archive(item.id), "Opportunity archived.")} className="min-h-11 rounded-lg border px-3 text-sm disabled:opacity-50">Archive</button> : null}
               </div>
             </article>

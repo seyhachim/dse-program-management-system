@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { CreateOpportunityInput, SubmitOpportunityExperienceInput } from "@dse-pms/shared-types";
-import { cambodiaToday, deadlineStillOpen } from "./service.ts";
+import { CreateOpportunityInput, SubmitOpportunityExperienceInput, UpdateOpportunityInput } from "@dse-pms/shared-types";
+import { cambodiaToday, deadlineStillOpen, posterExtension } from "./service.ts";
 
 const good = {
   programmeId: "dse" as const, type: "hackathon" as const,
@@ -21,6 +21,18 @@ describe("Student Opportunities source and consent contracts", () => {
     expect(CreateOpportunityInput.safeParse({ ...good, deadline: "2026-02-30" }).success).toBe(false);
     expect(CreateOpportunityInput.safeParse({ ...good, deadline: null, applicationUrl: null }).success).toBe(true);
     expect(CreateOpportunityInput.safeParse({ ...good, adminApproved: true }).success).toBe(false);
+  });
+  test("draft edits cannot transfer the opportunity into another programme", () => {
+    const { programmeId: _programmeId, ...edit } = good;
+    expect(UpdateOpportunityInput.safeParse(edit).success).toBe(true);
+    expect(UpdateOpportunityInput.safeParse(good).success).toBe(false);
+  });
+  test("poster uploads reject fake MIME and oversized files", () => {
+    const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(posterExtension(png, "image/png")).toBe("png");
+    expect(() => posterExtension(png, "image/jpeg")).toThrow();
+    expect(() => posterExtension(new Uint8Array(5 * 1024 * 1024 + 1), "image/png")).toThrow();
+    expect(() => posterExtension(new Uint8Array(0), "image/png")).toThrow();
   });
   test("requires explicit student consent for a portfolio reference", () => {
     const evidenceId = "31231231-1111-4222-8888-0123456789ab";

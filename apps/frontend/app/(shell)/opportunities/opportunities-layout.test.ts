@@ -13,6 +13,13 @@ describe("Student Opportunities navigation and mobile shell", () => {
     const staff = getNavRoutes(["program_coordinator"]);
     expect(staff.some((route) => route.path === "/opportunities/manage")).toBe(true);
   });
+  test("supports archival restore and optional opportunity posters", () => {
+    const management = readFileSync(join(root, "manage/manage-opportunities-client.tsx"), "utf8");
+    const browse = readFileSync(join(root, "opportunities-client.tsx"), "utf8");
+    expect(management).toContain("Restore to draft");
+    expect(management).toContain("Poster / thumbnail");
+    expect(browse).toContain("item.posterUrl");
+  });
   test("every opportunity page retains its top bar and vertical scroll container", () => {
     for (const page of ["page.tsx", "manage/page.tsx", "[id]/page.tsx"]) {
       const source = readFileSync(join(root, page), "utf8");
