@@ -34,3 +34,15 @@ FOREIGN KEY ("appointedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDA
 
 ALTER TABLE "ProgrammeHeadAppointment" ADD CONSTRAINT "ProgrammeHeadAppointment_endedById_fkey"
 FOREIGN KEY ("endedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Leadership records and appointment references are backend-only governance data.
+ALTER TABLE "ProgrammeHeadAppointment" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE "ProgrammeHeadAppointment" FROM PUBLIC;
+DO $$
+DECLARE api_role text;
+BEGIN
+  FOR api_role IN SELECT rolname FROM pg_roles WHERE rolname = ANY(ARRAY['anon','authenticated','service_role']) LOOP
+    EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE "ProgrammeHeadAppointment" FROM %I', api_role);
+  END LOOP;
+END
+$$;
