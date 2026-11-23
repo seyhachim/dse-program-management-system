@@ -52,7 +52,7 @@ test.describe("Course Activities #1328 Sindora lecturer workflow", () => {
         await reply(404, { error: "Not found" });
       });
 
-      await page.goto("/offerings/" + offeringId + "/activities");
+      await page.goto("/course-delivery/activities/" + offeringId);
       await expect(page.getByText("No recorded activities yet.")).toBeVisible();
       await page.getByRole("button", { name: "Add Activity" }).click();
       await page.getByLabel("Title").fill("Sindora Garden Field Visit");
