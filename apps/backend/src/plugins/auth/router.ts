@@ -135,6 +135,10 @@ export function createAuthRouter(): Router {
     try {
       res.status(201).json(await authService.createAccount(parsed.data));
     } catch (err) {
+      if (err instanceof ProgrammeRoleAssignmentError) {
+        res.status(409).json({ error: err.message });
+        return;
+      }
       if (err instanceof ProvisioningError) {
         res.status(502).json({ error: err.message });
         return;
