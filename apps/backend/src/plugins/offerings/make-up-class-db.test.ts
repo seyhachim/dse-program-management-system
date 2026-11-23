@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { PrismaClient } from "@prisma/client";
+import { isNewAttendanceDateEligible } from "./attendance-service.ts";
 import type { AuthUser } from "../../core/auth/token.ts";
 import {
   MakeUpClassConflictError, MakeUpClassForbiddenError, makeUpClassService,
@@ -81,6 +82,8 @@ describeDb("make-up class requests and approved attendance dates", () => {
     await expect(makeUpClassService.propose(f.stranger, input)).rejects.toThrow(MakeUpClassForbiddenError);
     const proposed = await makeUpClassService.propose(f.lecturer, input);
     expect(proposed.status).toBe("PENDING");
+    expect(await isNewAttendanceDateEligible(f.offering.id, "2026-11-16")).toBe(true);
+    expect(await isNewAttendanceDateEligible(f.offering.id, "2026-11-21")).toBe(false);
     expect(await makeUpClassService.approvedForDate(f.lecturer, "2026-11-21")).toEqual([]);
 
     await expect(makeUpClassService.review(f.lecturer, proposed.id, {
@@ -95,6 +98,7 @@ describeDb("make-up class requests and approved attendance dates", () => {
       decision: "APPROVE", confirmedMissed: true,
     });
     expect(approved.status).toBe("APPROVED");
+    expect(await isNewAttendanceDateEligible(f.offering.id, "2026-11-21")).toBe(true);
     expect(approved.originalOccurrenceId).toBe(proposed.originalOccurrenceId);
     expect(await makeUpClassService.approvedForDate(f.lecturer, "2026-11-21")).toEqual([{
       id: approved.id, offeringId: f.offering.id,
