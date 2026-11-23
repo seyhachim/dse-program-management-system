@@ -1,6 +1,7 @@
 import type {
   CreateOpportunityInput, UpdateOpportunityInput, OpportunityDetailView, OpportunityExperienceReviewView,
   OpportunityView, OwnOpportunityExperienceView, SubmitOpportunityExperienceInput,
+  OpportunityInterestSummary, OpportunityInterestOverviewItem, OpportunityInterestedStudent,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
@@ -9,6 +10,11 @@ export const opportunitiesApi = {
   list: () => api.get<OpportunityView[]>(base),
   detail: (id: string) => api.get<OpportunityDetailView>(base + "/" + encodeURIComponent(id)),
   manage: () => api.get<OpportunityView[]>(base + "/manage"),
+  interest: (id: string) => api.get<OpportunityInterestSummary>(base + "/" + encodeURIComponent(id) + "/interest"),
+  joinInterest: (id: string) => api.post<OpportunityInterestSummary>(base + "/" + encodeURIComponent(id) + "/interest", {}),
+  withdrawInterest: (id: string) => api.post<OpportunityInterestSummary>(base + "/" + encodeURIComponent(id) + "/interest/withdraw", {}),
+  interestOverview: () => api.get<OpportunityInterestOverviewItem[]>(base + "/participation"),
+  interestStudents: (id: string) => api.get<OpportunityInterestedStudent[]>(base + "/" + encodeURIComponent(id) + "/interest/students"),
   create: (input: CreateOpportunityInput) => api.post<OpportunityView>(base + "/manage", input),
   update: (id: string, input: UpdateOpportunityInput) =>
     api.patch<OpportunityView>(base + "/manage/" + encodeURIComponent(id), input),

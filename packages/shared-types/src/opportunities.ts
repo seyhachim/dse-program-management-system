@@ -36,7 +36,7 @@ export const CreateOpportunityInput = z.object({
   sourceUrl: httpsUrl,
   applicationUrl: httpsUrl.nullable().default(null),
   deadline: OpportunityDate.nullable().default(null),
-  deadlineTime: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/, "Use a valid Cambodia local HH:mm time").nullable().optional(),
+  deadlineTime: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "Use a valid Cambodia local HH:mm time").nullable().optional(),
 }).strict();
 export type CreateOpportunityInput = z.infer<typeof CreateOpportunityInput>;
 

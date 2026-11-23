@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowUpRight, Award, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Award, ShieldCheck, Users } from "lucide-react";
 import { OpportunityOutcome } from "@dse-pms/shared-types";
 import { useMe } from "@/lib/auth";
 import { opportunitiesApi } from "@/lib/opportunities";
@@ -20,14 +20,24 @@ export function OpportunityDetailClient() {
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [interestBusy, setInterestBusy] = useState(false);
+  const [interestMessage, setInterestMessage] = useState<string | null>(null);
+  const [interestError, setInterestError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isStudent = Boolean(me?.roles.includes("student"));
+  const canViewRoster = Boolean(me?.roles.some((role) => ["lecturer", "admin", "program_coordinator"].includes(role)));
   const detail = useQuery({
     queryKey: protectedQueryKey({ userId: me?.id ?? "pending" }, "opportunities", id),
     queryFn: () => opportunitiesApi.detail(id),
     enabled: Boolean(me?.id && id),
     staleTime: 30_000,
+  });
+  const interest = useQuery({
+    queryKey: protectedQueryKey({ userId: me?.id ?? "pending" }, "opportunities", id, "interest"),
+    queryFn: () => opportunitiesApi.interest(id),
+    enabled: Boolean(me?.id && id && detail.data),
+    staleTime: 15_000,
   });
   const evidence = useQuery({
     queryKey: protectedQueryKey({ userId: me?.id ?? "pending" }, "portfolio", "evidence"),
@@ -40,6 +50,26 @@ export function OpportunityDetailClient() {
     enabled: Boolean(me?.id && id && isStudent),
     staleTime: 15_000,
   });
+  async function toggleInterest() {
+    if (!interest.data || interestBusy) return;
+    setInterestBusy(true); setInterestError(null); setInterestMessage(null);
+    try {
+      if (interest.data.joined) {
+        await opportunitiesApi.withdrawInterest(id);
+        setInterestMessage("Your interest was withdrawn.");
+      } else {
+        await opportunitiesApi.joinInterest(id);
+        setInterestMessage("Your plan to join has been recorded.");
+      }
+      await interest.refetch();
+    } catch (cause) {
+      setInterestError(cause instanceof Error ? cause.message : "Could not update your interest");
+      await interest.refetch();
+    } finally {
+      setInterestBusy(false);
+    }
+  }
+
   const eligibleEvidence = (evidence.data ?? []).filter((item) =>
     item.visibility === "public" && (item.origin === "competition" || item.origin === "achievement"));
 
@@ -86,13 +116,33 @@ export function OpportunityDetailClient() {
             <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">{item.summary}</p>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl bg-muted/60 p-4"><h2 className="text-xs font-semibold uppercase text-muted-foreground">Eligibility</h2><p className="mt-2 whitespace-pre-wrap break-words text-sm">{item.eligibility}</p></div>
-              <div className="rounded-xl bg-muted/60 p-4"><h2 className="text-xs font-semibold uppercase text-muted-foreground">Deadline</h2><p className="mt-2 text-sm">{item.deadline ?? "Not specified — check official source"}</p></div>
+              <div className="rounded-xl bg-muted/60 p-4"><h2 className="text-xs font-semibold uppercase text-muted-foreground">Deadline</h2><p className="mt-2 text-sm">{item.deadline ?? "Not specified — check official source"}{item.deadline && item.deadlineTime ? " at " + item.deadlineTime + " (Cambodia time)" : ""}</p></div>
             </div>
             <div className="mt-5 flex flex-wrap gap-3 text-sm">
               <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 font-medium hover:bg-muted">Official source <ArrowUpRight className="h-4 w-4" /></a>
               {item.applicationUrl ? <a href={item.applicationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 font-semibold text-primary-foreground">Apply on organizer website <ArrowUpRight className="h-4 w-4" /></a> : null}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">PMS provides a staff-reviewed summary, not an eligibility guarantee or an application service.</p>
+          </section>
+          <section className="rounded-2xl border bg-card p-5 md:p-7">
+            <div className="flex items-center gap-3"><Users className="h-6 w-6 text-primary" /><h2 className="text-lg font-semibold">Planning to join</h2></div>
+            <p className="mt-2 text-sm text-muted-foreground">This is an indication of interest, not official registration or confirmed attendance.</p>
+            {interest.isLoading ? <p role="status" className="mt-4 text-sm text-muted-foreground">Loading interest count…</p>
+              : interest.isError ? <p role="alert" className="mt-4 text-sm text-destructive">Could not load interest count.</p>
+              : interest.data ? <div className="mt-4 space-y-4">
+                  <p className="text-lg font-semibold" data-testid="anonymous-interest-count">{interest.data.count} {interest.data.count === 1 ? "student" : "students"} planning to join</p>
+                  {isStudent ? <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">Only authorized DSE lecturers and programme staff can see your name, student ID and recorded year group. Other students see only the total. You can withdraw your interest.</p>
+                    {interest.data.joined || interest.data.canJoin
+                      ? <button type="button" disabled={interestBusy} onClick={() => void toggleInterest()} className="min-h-11 rounded-lg bg-primary px-4 font-semibold text-primary-foreground disabled:opacity-50">
+                          {interestBusy ? "Updating…" : interest.data.joined ? "Withdraw my interest" : "I'm planning to join"}
+                        </button>
+                      : <p className="text-sm text-muted-foreground">Interest is closed or the organizer deadline is not confirmed.</p>}
+                    {interestMessage ? <p role="status" className="text-sm text-emerald-700">{interestMessage}</p> : null}
+                    {interestError ? <p role="alert" className="text-sm text-destructive">{interestError}</p> : null}
+                  </div> : null}
+                  {canViewRoster ? <Link href="/opportunities/participation" className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline">View lecturer participation dashboard</Link> : null}
+                </div> : null}
           </section>
           <section className="rounded-2xl border bg-card p-5 md:p-7">
             <div className="flex items-center gap-3"><Award className="h-6 w-6 text-primary" /><h2 className="text-lg font-semibold">DSE Student Experiences</h2></div>
