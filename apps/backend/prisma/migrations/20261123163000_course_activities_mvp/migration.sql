@@ -51,3 +51,21 @@ CREATE TABLE "OfferingActivityAuditEvent" (
   CONSTRAINT "OfferingActivityAuditEvent_action_check" CHECK ("action" IN ('created','updated','archived'))
 );
 CREATE INDEX "OfferingActivityAuditEvent_activityId_createdAt_idx" ON "OfferingActivityAuditEvent"("activityId","createdAt");
+
+-- Backend-only records, including evidence links and reviewer provenance.
+-- Deny direct PostgREST/Data API access even to Supabase service_role.
+ALTER TABLE "OfferingActivity" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "OfferingActivityAuditEvent" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE "OfferingActivity" FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE "OfferingActivityAuditEvent" FROM PUBLIC;
+DO $$
+DECLARE api_role text;
+DECLARE tbl text;
+BEGIN
+  FOR api_role IN SELECT rolname FROM pg_roles WHERE rolname = ANY(ARRAY['anon','authenticated','service_role']) LOOP
+    FOREACH tbl IN ARRAY ARRAY['OfferingActivity','OfferingActivityAuditEvent'] LOOP
+      EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE %I FROM %I', tbl, api_role);
+    END LOOP;
+  END LOOP;
+END
+$$;
