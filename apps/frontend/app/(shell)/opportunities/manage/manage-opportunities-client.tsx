@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { OpportunityKind, type OpportunityView } from "@dse-pms/shared-types";
 import { useMe } from "@/lib/auth";
 import { opportunitiesApi } from "@/lib/opportunities";
+import { preparePosterUpload, posterFileSize, validatePosterSource, type PreparedPoster } from "@/lib/opportunity-poster-compression";
 import { protectedQueryKey } from "@/lib/query-client";
 
 const control = "mt-1 min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm";
@@ -20,6 +21,10 @@ export function ManageOpportunitiesClient() {
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [posterStats, setPosterStats] = useState<PreparedPoster | null>(null);
+  const [posterProcessing, setPosterProcessing] = useState(false);
+  // Ignore results from an earlier file selection when the user chooses another.
+  const posterSelection = useRef(0);
   const [posterPreview, setPosterPreview] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   useEffect(() => {
@@ -57,12 +62,38 @@ export function ManageOpportunitiesClient() {
       summary: item.summary, eligibility: item.eligibility, sourceUrl: item.sourceUrl,
       applicationUrl: item.applicationUrl ?? "", deadline: item.deadline ?? "",
     });
+    posterSelection.current += 1;
     setPosterFile(null);
+    setPosterStats(null);
+    setPosterProcessing(false);
     document.getElementById("opportunity-editor")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function choosePoster(file: File | null) {
+    const selection = ++posterSelection.current;
+    setPosterFile(null);
+    setPosterStats(null);
+    setPosterProcessing(Boolean(file));
+    setError("");
+    if (!file) return;
+    try {
+      validatePosterSource(file);
+      const prepared = await preparePosterUpload(file);
+      if (selection !== posterSelection.current) return;
+      setPosterFile(prepared.file);
+      setPosterStats(prepared);
+    } catch (cause) {
+      if (selection === posterSelection.current) {
+        setError(cause instanceof Error ? cause.message : "Poster optimization failed");
+      }
+    } finally {
+      if (selection === posterSelection.current) setPosterProcessing(false);
+    }
   }
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (posterProcessing) return;
     setBusy(true); setError(""); setMessage("");
     try {
       const input = {
@@ -79,7 +110,8 @@ export function ManageOpportunitiesClient() {
         try { await opportunitiesApi.uploadPoster(saved.id, posterFile); }
         catch { posterFailed = true; }
       }
-      setForm(initialForm); setEditingId(null); setPosterFile(null);
+      posterSelection.current += 1;
+      setForm(initialForm); setEditingId(null); setPosterFile(null); setPosterStats(null);
       await queryClient.invalidateQueries({ queryKey: key });
       setMessage(posterFailed
         ? "Draft saved, but the poster upload failed. Edit this draft to try the image again."
@@ -126,20 +158,19 @@ export function ManageOpportunitiesClient() {
             <span className="mt-1 block text-xs text-muted-foreground">Cambodia local calendar day; blank means unconfirmed</span>
           </label>
           <label className="text-sm font-medium md:col-span-2">Poster / thumbnail (optional)
-            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              if (file && (file.size > 5 * 1024 * 1024 || !["image/png", "image/jpeg", "image/webp"].includes(file.type))) {
-                setError("Choose a JPG, PNG or WebP poster no larger than 5 MB.");
-                setPosterFile(null);
-                event.target.value = "";
-              } else { setError(""); setPosterFile(file); }
+            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(event) => {
+              void choosePoster(event.target.files?.[0] ?? null);
             }} className="mt-1 block w-full rounded-lg border border-input bg-background p-3 text-sm" />
-            <span className="mt-1 block text-xs text-muted-foreground">Uploaded after the draft is saved; images are promotional posters, not private student records.</span>
+            <span className="mt-1 block text-xs text-muted-foreground">Automatically resized to fit 1200 × 1800 px and converted to WebP at 80% quality when smaller. Source images up to 20 MB; uploads remain limited to 5 MB. Promotional posters only, not private student records.</span>
+            {posterProcessing ? <p role="status" className="mt-2 text-xs text-muted-foreground">Optimizing poster…</p> : null}
+            {posterStats ? <p role="status" className="mt-2 text-xs text-muted-foreground">
+              {posterStats.optimized ? "Optimized" : "Original retained"}: {posterFileSize(posterStats.originalBytes)} → {posterFileSize(posterStats.uploadBytes)}
+            </p> : null}
             {posterPreview ? <img src={posterPreview} alt="Selected poster preview" className="mt-3 max-h-44 rounded-lg border object-contain" /> : null}
           </label>
           <div className="flex flex-wrap items-end gap-2">
-            <button type="submit" disabled={busy} className="min-h-11 rounded-lg bg-primary px-5 font-medium text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : editingId ? "Save changes" : "Save draft"}</button>
-            {editingId ? <button type="button" disabled={busy} onClick={() => { setEditingId(null); setForm(initialForm); setPosterFile(null); }} className="min-h-11 rounded-lg border px-4 text-sm">Cancel edit</button> : null}
+            <button type="submit" disabled={busy || posterProcessing} className="min-h-11 rounded-lg bg-primary px-5 font-medium text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : posterProcessing ? "Optimizing…" : editingId ? "Save changes" : "Save draft"}</button>
+            {editingId ? <button type="button" disabled={busy} onClick={() => { posterSelection.current += 1; setEditingId(null); setForm(initialForm); setPosterFile(null); setPosterStats(null); setPosterProcessing(false); }} className="min-h-11 rounded-lg border px-4 text-sm">Cancel edit</button> : null}
           </div>
         </form>
       </section>

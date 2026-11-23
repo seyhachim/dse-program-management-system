@@ -2,7 +2,7 @@
 
 ## Staff workflow
 
-- Create a verified opportunity (title, source, eligibility, registration deadline). Upload an optional JPG/PNG/WebP poster (5 MB max).
+- Create a verified opportunity (title, source, eligibility, registration deadline). Select an optional JPG/PNG/WebP poster (source up to 20 MB). The browser decodes and resizes to fit within 1200 × 1800 px, re-encodes to WebP quality 0.8, and sends the smaller of original and WebP. The final upload is still limited to 5 MB; unsupported/failed optimization is not silently uploaded.
 - The image is stored in the dedicated Supabase Storage `opportunity-posters` bucket and only its generated object path is kept in the PMS database.
 - Drafts are never shown in the student feed. Edit/review a draft, then select **Publish**. Only a programme administrator or coordinator can do this.
 - **Archive** hides an opportunity immediately from the feed and detail API.
