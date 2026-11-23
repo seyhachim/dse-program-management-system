@@ -90,8 +90,20 @@ dbDescribe("opportunity publication, authorization and consent database boundary
       expect((await opportunitiesService.archive(actor, created.id)).status).toBe("Archived");
       expect(await opportunitiesService.list(student, programmeId)).toHaveLength(0);
       await expect(opportunitiesService.detail(student, created.id)).rejects.toHaveProperty("status", 404);
+      await expect(opportunitiesService.restoreToDraft(wrongScope, created.id)).rejects.toHaveProperty("status", 403);
+      expect((await opportunitiesService.restoreToDraft(actor, created.id)).status).toBe("Draft");
+      expect(await opportunitiesService.list(student, programmeId)).toHaveLength(0);
+      await expect(opportunitiesService.restoreToDraft(actor, created.id)).rejects.toHaveProperty("status", 409);
+      expect((await opportunitiesService.updateDraft(actor, created.id, {
+        type: "competition", title: "DSE Student Competition (reviewed)",
+        organizer: "Official Event Organiser", summary: "Updated after archival review.",
+        eligibility: "Current university students may join.", sourceUrl: "https://example.org/event",
+        applicationUrl: null, deadline: null,
+      })).title).toContain("reviewed");
+      expect((await opportunitiesService.publish(actor, created.id)).status).toBe("Published");
+      expect(await opportunitiesService.list(student, programmeId)).toHaveLength(1);
       const actions = await prisma.opportunityAuditEvent.findMany({ where: { opportunityId: created.id } });
-      expect(actions.map((item) => item.action)).toEqual(expect.arrayContaining(["Created", "Published", "ExperienceConsented", "ExperienceApproved", "ExperienceWithdrawn", "ExperienceResubmitted", "ExperienceHidden", "Archived"]));
+      expect(actions.map((item) => item.action)).toEqual(expect.arrayContaining(["Created", "Published", "ExperienceConsented", "ExperienceApproved", "ExperienceWithdrawn", "ExperienceResubmitted", "ExperienceHidden", "Archived", "RestoredToDraft", "DraftUpdated"]));
       const expired = await opportunitiesService.create(actor, { ...input, deadline: "2026-11-05" });
       await expect(opportunitiesService.publish(actor, expired.id, new Date("2026-11-06T10:00:00.000Z"))).rejects.toHaveProperty("status", 409);
     } finally {

@@ -39,6 +39,10 @@ export const CreateOpportunityInput = z.object({
 }).strict();
 export type CreateOpportunityInput = z.infer<typeof CreateOpportunityInput>;
 
+// Editing an existing draft cannot transfer it to another programme.
+export const UpdateOpportunityInput = CreateOpportunityInput.omit({ programmeId: true });
+export type UpdateOpportunityInput = z.infer<typeof UpdateOpportunityInput>;
+
 /** Reviewer must document what official result/evidence was checked. */
 export const ReviewOpportunityExperienceInput = z.object({
   reason: z.string().trim().max(1000).default(""),
@@ -61,6 +65,7 @@ export interface OpportunityView {
   eligibility: string;
   sourceUrl: string;
   applicationUrl: string | null;
+  posterUrl: string | null;
   deadline: string | null;
   status: OpportunityStatus;
   publishedAt: string | null;
