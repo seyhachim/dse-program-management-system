@@ -470,6 +470,14 @@ export function OfferingsClient() {
                     <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"
+                        onClick={() => router.push("/offerings/" + offering.id + "/activities")}
+                        className="inline-flex items-center rounded-md border border-border bg-muted/40 px-2 py-1 text-xs font-medium hover:bg-muted"
+                      >
+                        <BookOpen className="mr-1 h-3.5 w-3.5" />
+                        Activities
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleManage(offering)}
                         className="inline-flex items-center rounded-md border border-border bg-muted/40 px-2 py-1 text-xs font-medium hover:bg-muted"
                       >

@@ -13,6 +13,7 @@ import { portfolioTeachingEvidenceService } from "./portfolio-evidence-service.t
 import { createRosterSyncRouter } from "./roster-sync-router.ts";
 import { rosterSyncService } from "./roster-sync-service.ts";
 import { createOfferingRouter } from "./router.ts";
+import { createOfferingActivitiesRouter } from "./offering-activities-router.ts";
 import { offeringService } from "./service.ts";
 import { studentAttendanceHistoryService } from "./student-attendance-history-service.ts";
 import { studentScheduleImpactService } from "./student-schedule-impact-service.ts";
@@ -53,6 +54,7 @@ router.use(createTeachingSessionDeliveryRouter());
 router.use(createCurriculumBoundOfferingRouter());
 router.use(createAttendanceRecheckRouter());
 router.use(createRosterSyncRouter());
+router.use(createOfferingActivitiesRouter());
 router.use(createOfferingRouter());
 
 export const offeringsPlugin: BackendPlugin<OfferingsService> = {
