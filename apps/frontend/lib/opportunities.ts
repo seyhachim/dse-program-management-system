@@ -1,5 +1,5 @@
 import type {
-  CreateOpportunityInput, OpportunityDetailView, OpportunityExperienceReviewView,
+  CreateOpportunityInput, UpdateOpportunityInput, OpportunityDetailView, OpportunityExperienceReviewView,
   OpportunityView, OwnOpportunityExperienceView, SubmitOpportunityExperienceInput,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
@@ -10,6 +10,12 @@ export const opportunitiesApi = {
   detail: (id: string) => api.get<OpportunityDetailView>(base + "/" + encodeURIComponent(id)),
   manage: () => api.get<OpportunityView[]>(base + "/manage"),
   create: (input: CreateOpportunityInput) => api.post<OpportunityView>(base + "/manage", input),
+  update: (id: string, input: UpdateOpportunityInput) =>
+    api.patch<OpportunityView>(base + "/manage/" + encodeURIComponent(id), input),
+  restore: (id: string) =>
+    api.post<OpportunityView>(base + "/manage/" + encodeURIComponent(id) + "/restore", {}),
+  uploadPoster: (id: string, file: File) =>
+    api.uploadFile<OpportunityView>(base + "/manage/" + encodeURIComponent(id) + "/poster", file),
   publish: (id: string) => api.post<OpportunityView>(base + "/manage/" + encodeURIComponent(id) + "/publish", {}),
   archive: (id: string) => api.post<OpportunityView>(base + "/manage/" + encodeURIComponent(id) + "/archive", {}),
   myExperiences: (id: string) =>
