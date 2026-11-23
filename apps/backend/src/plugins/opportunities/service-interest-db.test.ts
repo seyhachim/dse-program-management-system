@@ -43,7 +43,7 @@ dbDescribe("Student opportunity interest: student anonymity and lecturer-only pr
       sourceUrl: "https://example.org/hackathon", applicationUrl: null,
       deadline: "2099-12-31", deadlineTime: "17:00",
     });
-    expect(await opportunityInterestService.summary(studentActor, fixture.id)).rejects.toMatchObject({ status: 404 });
+    await expect(opportunityInterestService.summary(studentActor, fixture.id)).rejects.toMatchObject({ status: 404 });
     await opportunitiesService.publish(coordinatorActor, fixture.id);
     expect(await opportunityInterestService.summary(studentActor, fixture.id)).toEqual({
       count: 0, joined: false, canJoin: true,

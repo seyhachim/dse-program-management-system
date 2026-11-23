@@ -132,3 +132,66 @@ test("coordinator poster selection runs real browser-side WebP compression befor
     await staff.close();
   }
 });
+
+test("student join is anonymous to peers and lecturer sees the private roster", async ({ browser }) => {
+  const title = "CI Anonymous Participation " + Date.now();
+  const staffApi = await apiFor("BROWSER_SMOKE_COORDINATOR_TOKEN");
+  const studentApi = await apiFor("BROWSER_SMOKE_STUDENT_TOKEN");
+  const secretaryApi = await apiFor("BROWSER_SMOKE_READONLY_TOKEN");
+  const lecturerApi = await apiFor("BROWSER_SMOKE_LECTURER_TOKEN");
+  const student = await newRoleContext(browser, "student");
+  const lecturer = await newRoleContext(browser, "lecturer");
+  const studentPage = await student.newPage({ viewport: { width: 390, height: 844 } });
+  const lecturerPage = await lecturer.newPage();
+  let id = "";
+  try {
+    const draft = await staffApi.post("/api/opportunities/manage", { data: {
+      programmeId: "dse", type: "hackathon", title,
+      organizer: "Official Example Organizer", summary: "Test verified registration interest.",
+      eligibility: "DSE students can indicate their intention to join.",
+      sourceUrl: "https://example.org/interest", applicationUrl: null,
+      deadline: "2099-12-31", deadlineTime: "17:00",
+    } });
+    expect(draft.status(), await draft.text()).toBe(201);
+    id = ((await draft.json()) as { id: string }).id;
+    const published = await staffApi.post("/api/opportunities/manage/" + id + "/publish", { data: {} });
+    expect(published.ok(), await published.text()).toBe(true);
+    await studentPage.goto("/opportunities/" + id);
+    await expect(studentPage.getByRole("heading", { name: title })).toBeVisible();
+    await expect(studentPage.getByTestId("anonymous-interest-count")).toHaveText("0 students planning to join");
+    await expect(studentPage.getByText(/Other students see only the total/)).toBeVisible();
+    const forbidden = await studentApi.get("/api/opportunities/" + id + "/interest/students");
+    expect(forbidden.status()).toBe(403);
+    const secretaryForbidden = await secretaryApi.get("/api/opportunities/" + id + "/interest/students");
+    expect(secretaryForbidden.status()).toBe(403);
+    await studentPage.getByRole("button", { name: "I'm planning to join" }).click();
+    await expect(studentPage.getByTestId("anonymous-interest-count")).toHaveText("1 student planning to join");
+    const peerSafe = await studentApi.get("/api/opportunities/" + id + "/interest");
+    expect(peerSafe.ok(), await peerSafe.text()).toBe(true);
+    const peerPayload = await peerSafe.json();
+    expect(peerPayload).toEqual({ count: 1, joined: true, canJoin: true });
+    expect(JSON.stringify(peerPayload)).not.toMatch(/studentId|studentName|email/);
+    const privileged = await lecturerApi.get("/api/opportunities/" + id + "/interest/students");
+    expect(privileged.ok(), await privileged.text()).toBe(true);
+    expect(((await privileged.json()) as unknown[]).length).toBe(1);
+    await lecturerPage.goto("/opportunities/participation");
+    await expect(lecturerPage.getByRole("heading", { name: "Interested students" })).toBeVisible();
+    const current = lecturerPage.getByRole("article").filter({ hasText: title });
+    await expect(current).toBeVisible();
+    await expect(current.getByText("1 planning to join")).toBeVisible();
+    await current.getByRole("button", { name: "View names" }).click();
+    await expect(lecturerPage.getByRole("heading", { name: "Student participation list" })).toBeVisible();
+    await expect(lecturerPage.getByRole("table").locator("tbody tr")).toHaveCount(1);
+    await studentPage.getByRole("button", { name: "Withdraw my interest" }).click();
+    await expect(studentPage.getByTestId("anonymous-interest-count")).toHaveText("0 students planning to join");
+    expect((await (await lecturerApi.get("/api/opportunities/" + id + "/interest/students")).json()) as unknown[]).toHaveLength(0);
+  } finally {
+    if (id) await staffApi.post("/api/opportunities/manage/" + id + "/archive", { data: {} });
+    await staffApi.dispose();
+    await studentApi.dispose();
+    await secretaryApi.dispose();
+    await lecturerApi.dispose();
+    await student.close();
+    await lecturer.close();
+  }
+});
