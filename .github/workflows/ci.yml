@@ -301,6 +301,9 @@ jobs:
       - name: Verify opportunity publication and consent database boundary
         run: OPPORTUNITIES_DB_TESTS=1 bun test apps/backend/src/plugins/opportunities/service-db.test.ts
 
+      - name: Verify opportunity interest privacy and staff roster boundary
+        run: OPPORTUNITIES_DB_TESTS=1 bun test apps/backend/src/plugins/opportunities/service-interest-db.test.ts
+
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
 
