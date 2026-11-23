@@ -117,3 +117,7 @@ A rollback should **not** restore broad `PUBLIC` or Supabase Data API grants mer
 ## Production verification
 
 CI proves the migration sequence on plain PostgreSQL. After deployment to Supabase, run the same verifier using the production migration/backend database role (or an equivalent privileged read-only inspection path) to confirm that Supabase-specific roles also have no forbidden grants. Do not rely on dashboard state as the source of truth; migrations and the verifier are authoritative.
+
+### Course Activities (#1328)
+
+`OfferingActivity` and `OfferingActivityAuditEvent` are backend-only, offering-scoped teaching evidence records. The dedicated additive migration enables RLS and revokes direct `PUBLIC`, `anon`, `authenticated`, and `service_role` table access. Authorized lecturer/programme routes are the sole data boundary. Student Portfolio and AUN-QA reference these records in a future phase instead of duplicating them.
