@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Play, Save, Search } from "lucide-react";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AttendanceRecordView, AttendanceSessionSummary, AttendanceSessionView, AttendanceStatus, OfferingView, StudentSemesterNoteView } from "@dse-pms/shared-types";
 import { ATTENDANCE_STATUSES } from "@dse-pms/shared-types";
@@ -13,7 +14,8 @@ import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
 import { attendanceRecheckState, isLateArrivalCandidate, recheckStateLabel, type AttendanceRecheckState } from "./attendance-recheck-state";
 import { attendanceDraftKey, clearAttendanceDraft, readAttendanceDraft, writeAttendanceDraft } from "./attendance-draft";
-import { offeringsScheduledOnDate } from "./attendance-schedule";
+import { attendanceOfferingsOnDate } from "./attendance-make-up";
+import { makeUpClassApi } from "@/lib/make-up-class";
 import { attendanceWeekOverview, selectableAttendanceWeeks } from "./attendance-week-progress";
 import { AttendanceWeekProgress } from "./attendance-week-progress-view";
 import { AttendanceSummary } from "./attendance-summary";
@@ -97,9 +99,16 @@ export function AttendanceClient() {
     staleTime: QUERY_STALE_MS.operational,
   });
   const offerings = offeringsQuery.data ?? [];
+  const approvedMakeUpsQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "offerings", "make-up", "approved", date),
+    queryFn: () => makeUpClassApi.approvedForDate(date),
+    enabled: Boolean(me?.id && date),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const approvedMakeUps = approvedMakeUpsQuery.data ?? [];
   const scheduledOfferings = useMemo(
-    () => offeringsScheduledOnDate(offerings, date),
-    [date, offerings],
+    () => attendanceOfferingsOnDate(offerings, date, approvedMakeUps),
+    [date, offerings, approvedMakeUps],
   );
 
   useEffect(() => {
@@ -205,6 +214,7 @@ export function AttendanceClient() {
   }, [attendanceContext, date, draftKey, offeringId, records, session]);
 
   const selectedOffering = scheduledOfferings.find((offering) => offering.id === offeringId) ?? null;
+  const selectedMakeUp = approvedMakeUps.find((entry) => entry.offeringId === offeringId && entry.replacementDate === date);
   const teachingWeek = getTeachingWeek(selectedOffering?.startDate, selectedOffering?.endDate, date);
   const weekOverview = selectedOffering
     ? attendanceWeekOverview(selectedOffering, history, localDateValue())
@@ -444,7 +454,7 @@ export function AttendanceClient() {
   }
 
   const sessionContext = selectedOffering
-    ? `${selectedOffering.course?.title ?? selectedOffering.course?.code ?? "Course"} · Class ${selectedOffering.sectionCode} · ${teachingWeek ? `Week ${teachingWeek}` : "Week not scheduled"} · ${formatSessionDate(date)}`
+    ? `${selectedOffering.course?.title ?? selectedOffering.course?.code ?? "Course"} · Class ${selectedOffering.sectionCode} · ${selectedMakeUp ? `Approved make-up for ${formatSessionDate(selectedMakeUp.originalDate)}` : teachingWeek ? `Week ${teachingWeek}` : "Week not scheduled"} · ${formatSessionDate(date)}`
     : `No classes scheduled for ${formatSessionDate(date)}. Choose another attendance date.`;
 
   return (
@@ -488,6 +498,7 @@ export function AttendanceClient() {
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attendance date</label>
                 <input type="date" value={date} onChange={(event) => { if (confirmContextChange()) setDate(event.target.value); }} className={MOBILE_ATTENDANCE_LAYOUT.control} />
                 <p className="hidden text-xs text-muted-foreground md:block">One register per section and date.</p>
+                <Link href="/teaching-schedule/make-up" className="inline-block text-xs text-primary underline">Schedule or review a make-up class</Link>
               </div>
               <div className="space-y-2 sm:col-span-2 lg:col-span-1">
                 <label htmlFor="attendance-search" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Student search</label>
@@ -500,6 +511,18 @@ export function AttendanceClient() {
             </div>
           </section>
 
+          {selectedMakeUp ? (
+            <div role="status" className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
+              Approved make-up: {selectedMakeUp.startTime}–{selectedMakeUp.endTime}
+              {selectedMakeUp.room ? ` · ${selectedMakeUp.room}` : ""}.
+              Take attendance on this actual date; the original missed class remains a separate historical session.
+            </div>
+          ) : null}
+          {approvedMakeUpsQuery.isError ? (
+            <div role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">
+              Make-up schedule could not be loaded. Refresh before recording attendance for a replacement class.
+            </div>
+          ) : null}
           {selectedOffering ? (
             <AttendanceWeekProgress
               overview={weekOverview}
