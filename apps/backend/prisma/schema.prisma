@@ -390,6 +390,9 @@ model User {
   coLecturerOf                       OfferingCoLecturer[]                      @relation("OfferingCoLecturer")
   offeringMeetingAssignments             OfferingMeetingLecturer[]                 @relation("OfferingMeetingLecturerUser")
   roleAssignments                    UserRoleAssignment[]
+  headAppointments                   ProgrammeHeadAppointment[] @relation("ProgrammeHeadLecturer")
+  headAppointmentsMade               ProgrammeHeadAppointment[] @relation("ProgrammeHeadAppointer")
+  headAppointmentsEnded              ProgrammeHeadAppointment[] @relation("ProgrammeHeadEnder")
   courseSpecSubmissions              CourseSpec[]                              @relation("CourseSpecSubmittedBy")
   courseSpecReviewActions            CourseSpecReviewAction[]                  @relation("CourseSpecReviewActor")
   courseSpecRevisionRequests         CourseSpecRevisionRequest[]               @relation("CourseSpecRevisionRequestedBy")
@@ -498,6 +501,7 @@ model Programme {
 
   opportunities            Opportunity[]
   roleAssignments          UserRoleAssignment[]
+  headAppointments         ProgrammeHeadAppointment[]
   courses                  Course[]
   curricula                ProgrammeCurriculum[]
   competencyFrameworks     ProgrammeCompetencyFramework[]
@@ -1557,6 +1561,31 @@ model UserRoleAssignment {
   @@id([userId, roleId])
   @@index([roleId])
   @@index([programmeId])
+}
+
+/// Historical, programme-scoped appointment of a Head of Program. This is an
+/// academic position, NOT a new login role; coordinator access is granted through
+/// UserRoleAssignment while the lecturer's role and teaching links are preserved.
+/// PostgreSQL enforces exactly one or zero active Heads per programme via a
+/// partial unique index on (programmeId) WHERE endedAt IS NULL.
+model ProgrammeHeadAppointment {
+  id                 String    @id @default(uuid())
+  programmeId        String
+  lecturerId         String
+  appointedById      String
+  endedById          String?
+  appointedAt        DateTime  @default(now())
+  endedAt            DateTime?
+  reference          String?
+  coordinatorGranted Boolean   @default(false)
+
+  programme          Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  lecturer           User      @relation("ProgrammeHeadLecturer", fields: [lecturerId], references: [id], onDelete: Restrict)
+  appointedBy        User      @relation("ProgrammeHeadAppointer", fields: [appointedById], references: [id], onDelete: Restrict)
+  endedBy            User?     @relation("ProgrammeHeadEnder", fields: [endedById], references: [id], onDelete: Restrict)
+
+  @@index([programmeId, appointedAt(sort: Desc)])
+  @@index([lecturerId])
 }
 
 /// Students plugin domain model. `studentId` is the stable institutional identity.
