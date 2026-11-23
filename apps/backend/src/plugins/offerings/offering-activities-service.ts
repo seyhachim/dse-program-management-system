@@ -104,7 +104,7 @@ export const offeringActivitiesService = {
       if (!validActivityTimeRange(startTime, endTime)) {
         throw new OfferingActivityConflictError("End time must be after start time");
       }
-      const data: Prisma.OfferingActivityUpdateManyMutationInput = {
+      const data: Prisma.OfferingActivityUncheckedUpdateManyInput = {
         ...(changes.type !== undefined ? { type: changes.type } : {}),
         ...(changes.title !== undefined ? { title: changes.title } : {}),
         ...(changes.date !== undefined ? { date: new Date(changes.date + "T00:00:00.000Z") } : {}),
