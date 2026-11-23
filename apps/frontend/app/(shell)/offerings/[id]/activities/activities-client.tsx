@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import type {
   CreateOfferingActivityInput,
-  OfferingActivityStatus,
   OfferingActivityType,
   OfferingActivityView,
 } from "@dse-pms/shared-types";
