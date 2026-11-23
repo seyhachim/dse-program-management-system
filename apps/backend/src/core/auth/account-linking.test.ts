@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
   AccountLinkingError,
+  assertCurrentSupabaseIdentity,
   assertEmailOnlySupabaseIdentity,
   assertLegacyEmailClaim,
   type ConfirmedAuthUser,
@@ -40,7 +41,13 @@ describe("PMS Supabase account-linking boundary", () => {
     }
   });
 
-  test("denies a current Google/GitHub identity, including after upstream auto-linking", () => {
+  test("generic current identity verification permits provider review but email-only access still denies social identities", () => {
+    const googleLinked = { ...verified, identities: [{ id: "email-id", provider: "email" }, { id: "google-id", provider: "google" }] };
+    expect(() => assertCurrentSupabaseIdentity(identity, googleLinked)).not.toThrow();
+    expect(() => assertEmailOnlySupabaseIdentity(identity, googleLinked)).toThrow(AccountLinkingError);
+  });
+
+  test("denies a current Google/GitHub identity from the password-only path, including after upstream auto-linking", () => {
     for (const identities of [
       [{ provider: "github" }],
       [{ provider: "google" }],
@@ -54,7 +61,7 @@ describe("PMS Supabase account-linking boundary", () => {
 
   test("middleware verifies live Admin identities before resolving a PMS UID or email", () => {
     const source = readFileSync(new URL("./middleware.ts", import.meta.url), "utf8");
-    const verifiedAt = source.indexOf("assertEmailOnlySupabaseIdentity({ authId, email }, verifiedAuthUser)");
+    const verifiedAt = source.indexOf("assertCurrentSupabaseIdentity({ authId, email }, verifiedAuthUser)");
     const resolvedAt = source.indexOf("prisma.user.findUnique({ where: { authId }");
     expect(verifiedAt).toBeGreaterThan(0);
     expect(resolvedAt).toBeGreaterThan(verifiedAt);
