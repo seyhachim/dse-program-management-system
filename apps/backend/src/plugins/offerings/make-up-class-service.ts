@@ -159,6 +159,18 @@ async function activeDateConflict(
 }
 
 async function confirmOriginalNeedsRecovery(occurrenceId: string, offeringId: string, originalDate: string): Promise<void> {
+  // Future classes are not missed teaching unless a leave request is already
+  // approved for that exact original occurrence.
+  const original = await prisma.$queryRaw<Array<{ approvedLeaveRequestId: string | null; scheduledEndTime: string }>>`
+    SELECT "approvedLeaveRequestId", "scheduledEndTime"
+    FROM "pms_attendance"."TeachingSessionOccurrence"
+    WHERE "id" = ${occurrenceId} AND "offeringId" = ${offeringId} LIMIT 1
+  `;
+  if (!original[0]) throw new MakeUpClassNotFoundError("Original teaching occurrence no longer exists");
+  if (!original[0].approvedLeaveRequestId &&
+      new Date(`${originalDate}T${original[0].scheduledEndTime}:00+07:00`).getTime() > Date.now()) {
+    throw new MakeUpClassConflictError("The original class has not ended and has no approved teaching leave");
+  }
   const attendance = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT "id" FROM "pms_attendance"."AttendanceSession"
     WHERE "offeringId" = ${offeringId} AND "sessionDate" = ${originalDate}::date LIMIT 1
@@ -201,7 +213,7 @@ export const makeUpClassService = {
     });
     const coIds = new Set(coTeachers.map((row) => row.offeringId));
     return rows
-      .filter((row) => row.proposedById === user.id || row.lecturerId === user.id ||
+      .filter((row) => row.lecturerId === user.id ||
         coIds.has(row.offeringId) || manager(user, row.programmeId))
       .map((row) => ({
         id: row.id, offeringId: row.offeringId,

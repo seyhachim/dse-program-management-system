@@ -35,10 +35,10 @@ async function fixture(label: string) {
   const offering = await prisma.offering.create({
     data: {
       courseId: course.id, lecturerId: lecturer.id,
-      term: `2099-MK-${crypto.randomUUID().slice(0, 5)}`, sectionCode: "M1",
+      term: `2026-MK-${crypto.randomUUID().slice(0, 5)}`, sectionCode: "M1",
       status: "Active",
-      startDate: new Date("2099-01-01T00:00:00.000Z"),
-      endDate: new Date("2099-02-28T00:00:00.000Z"),
+      startDate: new Date("2026-09-01T00:00:00.000Z"),
+      endDate: new Date("2026-12-31T00:00:00.000Z"),
       meetings: { create: { dayOfWeek: "Monday", startTime: "08:00", endTime: "12:00", room: `R-${label}` } },
     },
     include: { meetings: true },
@@ -75,13 +75,13 @@ describeDb("make-up class requests and approved attendance dates", () => {
     const f = await fixture("approve");
     const input = {
       offeringId: f.offering.id, offeringMeetingId: f.meetingId,
-      originalDate: "2099-01-05", replacementDate: "2099-01-10",
+      originalDate: "2026-11-16", replacementDate: "2026-11-21",
       startTime: "08:00", endTime: "12:00", room: "R-A", note: "Recover missed Monday session",
     };
     await expect(makeUpClassService.propose(f.stranger, input)).rejects.toThrow(MakeUpClassForbiddenError);
     const proposed = await makeUpClassService.propose(f.lecturer, input);
     expect(proposed.status).toBe("PENDING");
-    expect(await makeUpClassService.approvedForDate(f.lecturer, "2099-01-10")).toEqual([]);
+    expect(await makeUpClassService.approvedForDate(f.lecturer, "2026-11-21")).toEqual([]);
 
     await expect(makeUpClassService.review(f.lecturer, proposed.id, {
       decision: "APPROVE", confirmedMissed: true,
@@ -96,12 +96,12 @@ describeDb("make-up class requests and approved attendance dates", () => {
     });
     expect(approved.status).toBe("APPROVED");
     expect(approved.originalOccurrenceId).toBe(proposed.originalOccurrenceId);
-    expect(await makeUpClassService.approvedForDate(f.lecturer, "2099-01-10")).toEqual([{
+    expect(await makeUpClassService.approvedForDate(f.lecturer, "2026-11-21")).toEqual([{
       id: approved.id, offeringId: f.offering.id,
-      originalDate: "2099-01-05", replacementDate: "2099-01-10",
+      originalDate: "2026-11-16", replacementDate: "2026-11-21",
       startTime: "08:00", endTime: "12:00", room: "R-A",
     }]);
-    expect(await makeUpClassService.approvedForDate(f.stranger, "2099-01-10")).toEqual([]);
+    expect(await makeUpClassService.approvedForDate(f.stranger, "2026-11-21")).toEqual([]);
     await expect(makeUpClassService.review(f.reviewer, proposed.id, {
       decision: "APPROVE", confirmedMissed: true,
     })).rejects.toThrow(MakeUpClassConflictError);
@@ -111,13 +111,13 @@ describeDb("make-up class requests and approved attendance dates", () => {
     const f = await fixture("conflict");
     const input = {
       offeringId: f.offering.id, offeringMeetingId: f.meetingId,
-      originalDate: "2099-01-05", replacementDate: "2099-01-10",
+      originalDate: "2026-11-16", replacementDate: "2026-11-21",
       startTime: "08:00", endTime: "12:00", note: "Recover missed class",
     };
     await makeUpClassService.propose(f.lecturer, input);
     await expect(makeUpClassService.propose(f.lecturer, input)).rejects.toThrow(MakeUpClassConflictError);
     await expect(makeUpClassService.propose(f.lecturer, {
-      ...input, replacementDate: "2099-01-12",
+      ...input, replacementDate: "2026-11-23",
     })).rejects.toThrow(MakeUpClassConflictError);
   });
 
@@ -125,12 +125,12 @@ describeDb("make-up class requests and approved attendance dates", () => {
     const f = await fixture("attendance");
     const proposed = await makeUpClassService.propose(f.lecturer, {
       offeringId: f.offering.id, offeringMeetingId: f.meetingId,
-      originalDate: "2099-01-05", replacementDate: "2099-01-10",
+      originalDate: "2026-11-16", replacementDate: "2026-11-21",
       startTime: "08:00", endTime: "12:00", note: "Needs review",
     });
     await prisma.$executeRaw`
       INSERT INTO "pms_attendance"."AttendanceSession" ("id","offeringId","sessionDate")
-      VALUES (${crypto.randomUUID()},${f.offering.id},'2099-01-05'::date)
+      VALUES (${crypto.randomUUID()},${f.offering.id},'2026-11-16'::date)
     `;
     await expect(makeUpClassService.review(f.reviewer, proposed.id, {
       decision: "APPROVE", confirmedMissed: true,

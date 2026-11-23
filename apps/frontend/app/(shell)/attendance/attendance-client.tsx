@@ -98,14 +98,14 @@ export function AttendanceClient() {
     enabled: Boolean(me?.id),
     staleTime: QUERY_STALE_MS.operational,
   });
-  const offerings = offeringsQuery.data ?? [];
+  const offerings = useMemo(() => offeringsQuery.data ?? [], [offeringsQuery.data]);
   const approvedMakeUpsQuery = useQuery({
     queryKey: protectedQueryKey(queryScope, "offerings", "make-up", "approved", date),
     queryFn: () => makeUpClassApi.approvedForDate(date),
     enabled: Boolean(me?.id && date),
     staleTime: QUERY_STALE_MS.operational,
   });
-  const approvedMakeUps = approvedMakeUpsQuery.data ?? [];
+  const approvedMakeUps = useMemo(() => approvedMakeUpsQuery.data ?? [], [approvedMakeUpsQuery.data]);
   const scheduledOfferings = useMemo(
     () => attendanceOfferingsOnDate(offerings, date, approvedMakeUps),
     [date, offerings, approvedMakeUps],
