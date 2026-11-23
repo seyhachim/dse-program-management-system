@@ -16,6 +16,7 @@ import type {
   UpdateOfferingInput,
 } from "@dse-pms/shared-types";
 import { ApiError, api } from "./api";
+import type { PermissionDocumentView } from "./student-portal";
 
 export const ATTENDANCE_SAVE_TIMEOUT_MS = 65_000;
 
@@ -99,6 +100,12 @@ export const offeringsApi = {
       studentId,
       role,
     });
+  },
+  permissionLetters(id: string, date: string): Promise<PermissionDocumentView[]> {
+    return api.get<PermissionDocumentView[]>(`/api/offerings/${id}/attendance/${encodeURIComponent(date)}/permission-letters`);
+  },
+  permissionLetterDownload(id: string, date: string, studentId: string): Promise<{ url: string; expiresInSeconds: number }> {
+    return api.get<{ url: string; expiresInSeconds: number }>(`/api/offerings/${id}/attendance/${encodeURIComponent(date)}/permission-letters/${studentId}/download`);
   },
   attendanceSessions(id: string): Promise<AttendanceSessionSummary[]> {
     return api.get<AttendanceSessionSummary[]>(`/api/offerings/${id}/attendance`);
