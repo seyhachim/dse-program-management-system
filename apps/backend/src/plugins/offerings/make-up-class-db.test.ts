@@ -77,7 +77,7 @@ describeDb("make-up class requests and approved attendance dates", () => {
     const input = {
       offeringId: f.offering.id, offeringMeetingId: f.meetingId,
       originalDate: "2026-11-16", replacementDate: "2026-11-21",
-      startTime: "08:00", endTime: "12:00", room: "R-A", note: "Recover missed Monday session",
+      startTime: "08:00", endTime: "12:00", room: f.offering.meetings[0]!.room!, note: "Recover missed Monday session",
     };
     await expect(makeUpClassService.propose(f.stranger, input)).rejects.toThrow(MakeUpClassForbiddenError);
     const proposed = await makeUpClassService.propose(f.lecturer, input);
@@ -103,7 +103,7 @@ describeDb("make-up class requests and approved attendance dates", () => {
     expect(await makeUpClassService.approvedForDate(f.lecturer, "2026-11-21")).toEqual([{
       id: approved.id, offeringId: f.offering.id,
       originalDate: "2026-11-16", replacementDate: "2026-11-21",
-      startTime: "08:00", endTime: "12:00", room: "R-A",
+      startTime: "08:00", endTime: "12:00", room: f.offering.meetings[0]!.room!,
     }]);
     expect(await makeUpClassService.approvedForDate(f.stranger, "2026-11-21")).toEqual([]);
     await expect(makeUpClassService.review(f.reviewer, proposed.id, {
