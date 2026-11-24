@@ -40,7 +40,7 @@ test("admin can discover and preview published DSE News without student enrollme
     await expect(page).toHaveURL(/\/dse-news\/view\/synthetic-news-preview$/);
     await expect(page.getByRole("heading", { name: "Synthetic Sindora Garden Field Visit" })).toBeVisible();
     await expect(page.getByText("DSE Year 4 students explored sustainable pepper farming", { exact: false })).toBeVisible();
-    await expect(page.getByText("Staff preview", { exact: false })).toBeVisible();
+    await expect(page.getByText("Staff preview · Only the published article", { exact: false })).toBeVisible();
     await page.getByRole("link", { name: "DSE News" }).last().click();
     await expect(page).toHaveURL(/\/dse-news$/);
   } finally {
