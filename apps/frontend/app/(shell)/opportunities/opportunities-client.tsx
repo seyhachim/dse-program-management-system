@@ -36,6 +36,7 @@ export function OpportunitiesClient() {
     && (row.title + " " + row.organizer + " " + row.summary).toLowerCase().includes(search.trim().toLowerCase())
   ), [query.data, category, search]);
   const staff = me?.roles.some((role) => role === "admin" || role === "program_coordinator");
+  const canViewRoster = me?.roles.some((role) => role === "lecturer" || role === "admin" || role === "program_coordinator");
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 pb-12">
@@ -44,7 +45,10 @@ export function OpportunitiesClient() {
           <h1 className="text-xl font-semibold">Discover your next opportunity</h1>
           <p className="text-sm text-muted-foreground">Official application pages remain the source of truth. Check eligibility before applying.</p>
         </div>
-        {staff ? <Link href="/opportunities/manage" className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted">Manage opportunities</Link> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {canViewRoster ? <Link href="/opportunities/participation" className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted">Interested students</Link> : null}
+          {staff ? <Link href="/opportunities/manage" className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted">Manage opportunities</Link> : null}
+        </div>
       </div>
       <div className="rounded-2xl border bg-card p-4">
         <label className="relative block">

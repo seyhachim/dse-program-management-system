@@ -265,6 +265,7 @@ export function ActivitiesClient({ offeringId, backHref = "/offerings", backLabe
               </div>
             ) : null}
             <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+              <Link href={"/course-delivery/activities/" + offeringId + "/participants?activityId=" + encodeURIComponent(item.id)} className={actionClass}>Participants</Link>
               {item.status !== "Archived" ? (
                 <>
                   <button type="button" className={actionClass} onClick={() => beginEdit(item)}>Edit</button>

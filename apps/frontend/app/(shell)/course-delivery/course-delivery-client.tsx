@@ -91,6 +91,7 @@ export function CourseDeliveryClient() {
               >
                 Course Activities · Field visits and workshops
               </Link>
+              <Link href="/dse-news" className="inline-flex min-h-10 items-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted">DSE News · Draft and publish articles</Link>
               {notice ? (
                 <div className="flex items-center gap-2 rounded-xl border border-success/30 bg-success-bg px-4 py-3 text-sm text-success">
                   <CheckCircle2 className="h-4 w-4" />{notice}

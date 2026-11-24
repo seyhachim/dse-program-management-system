@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import {
+  AppointProgrammeHeadInput,
+  EndProgrammeHeadInput,
   ChangePasswordInput,
   CreateAccountInput,
   LecturerAccessStatusRequest,
@@ -28,6 +30,7 @@ import {
   resendStudentInvitation,
 } from "./resend-invitation.ts";
 import { getStudentPortalAccessStatuses } from "./student-portal-access-status.ts";
+import { programmeHeadService, ProgrammeHeadError } from "./programme-head-service.ts";
 
 const ProgrammeRoleListQuery = z.object({
   programmeId: z.string().trim().min(1),
@@ -59,6 +62,70 @@ export function createAuthRouter(): Router {
     res.json(await authService.me(req.user!.id, req.user!.roles));
   });
 
+  // Programme leadership is distinct from the additive QA Contributor role flow.
+  // Read access is programme-scoped; appointment changes require an Admin grant.
+  router.get("/programme-head", requirePermission("programme:read"), async (req, res) => {
+    const parsed = ProgrammeRoleListQuery.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid programme query" });
+      return;
+    }
+    if (!hasAnyRoleInProgramme(req.user!, req.user!.roles, parsed.data.programmeId)) {
+      res.status(403).json({ error: "No access to this programme" });
+      return;
+    }
+    try {
+      res.set("Cache-Control", "no-store");
+      res.json(await programmeHeadService.overview(parsed.data.programmeId));
+    } catch {
+      res.status(500).json({ error: "Could not load programme leadership" });
+    }
+  });
+
+  router.post("/programme-head", requirePermission("accounts:create"), async (req, res) => {
+    const parsed = AppointProgrammeHeadInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid Head of Program appointment", details: parsed.error.flatten() });
+      return;
+    }
+    if (!hasAnyRoleInProgramme(req.user!, ["admin"], parsed.data.programmeId)) {
+      res.status(403).json({ error: "Only a programme administrator can appoint the Head" });
+      return;
+    }
+    try {
+      res.set("Cache-Control", "no-store");
+      res.status(201).json(await programmeHeadService.appoint(parsed.data, req.user!.id));
+    } catch (err) {
+      if (err instanceof ProgrammeHeadError || ["P2002", "P2034"].includes((err as { code?: string }).code ?? "")) {
+        res.status(409).json({ error: err instanceof ProgrammeHeadError ? err.message : "Appointment conflict: refresh and retry" });
+        return;
+      }
+      res.status(500).json({ error: "Could not appoint Head of Program" });
+    }
+  });
+
+  router.delete("/programme-head", requirePermission("accounts:create"), async (req, res) => {
+    const parsed = EndProgrammeHeadInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid Head of Program removal", details: parsed.error.flatten() });
+      return;
+    }
+    if (!hasAnyRoleInProgramme(req.user!, ["admin"], parsed.data.programmeId)) {
+      res.status(403).json({ error: "Only a programme administrator can end the appointment" });
+      return;
+    }
+    try {
+      res.set("Cache-Control", "no-store");
+      res.json(await programmeHeadService.end(parsed.data, req.user!.id));
+    } catch (err) {
+      if (err instanceof ProgrammeHeadError || (err as { code?: string }).code === "P2034") {
+        res.status(409).json({ error: err instanceof ProgrammeHeadError ? err.message : "Appointment conflict: refresh and retry" });
+        return;
+      }
+      res.status(500).json({ error: "Could not end Head of Program appointment" });
+    }
+  });
+
   router.post("/accounts", requirePermission("accounts:create"), async (req, res) => {
     const parsed = CreateAccountInput.safeParse(req.body);
     if (!parsed.success) {
@@ -68,6 +135,10 @@ export function createAuthRouter(): Router {
     try {
       res.status(201).json(await authService.createAccount(parsed.data));
     } catch (err) {
+      if (err instanceof ProgrammeRoleAssignmentError) {
+        res.status(409).json({ error: err.message });
+        return;
+      }
       if (err instanceof ProvisioningError) {
         res.status(502).json({ error: err.message });
         return;

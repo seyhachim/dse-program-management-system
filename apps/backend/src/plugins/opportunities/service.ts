@@ -98,6 +98,7 @@ function dto(row: Opportunity): OpportunityView {
     applicationUrl: row.applicationUrl,
     posterUrl: publicPosterUrl(row.posterPath),
     deadline: row.deadline ? row.deadline.toISOString().slice(0, 10) : null,
+    deadlineTime: row.deadlineTime,
     status: row.status as OpportunityStatus,
     publishedAt: row.publishedAt?.toISOString() ?? null,
   };
@@ -164,11 +165,13 @@ export const opportunitiesService = {
     requireRole(actor, input.programmeId, STAFF_ROLES);
     const programme = await prisma.programme.findUnique({ where: { id: input.programmeId }, select: { id: true } });
     if (!programme) throw new OpportunityError(404, "Programme not found");
+    if (input.deadlineTime && !input.deadline) throw new OpportunityError(400, "A deadline date is required when providing a time");
     const row = await prisma.$transaction(async (tx) => {
       const opportunity = await tx.opportunity.create({
         data: {
           ...input,
           deadline: input.deadline ? new Date(input.deadline + "T00:00:00.000Z") : null,
+          deadlineTime: input.deadlineTime ?? null,
           createdById: actor.id,
           status: "Draft",
         },
@@ -184,11 +187,13 @@ export const opportunitiesService = {
     if (!row) throw new OpportunityError(404, "Opportunity not found");
     requireRole(actor, row.programmeId, STAFF_ROLES);
     if (row.status !== "Draft") throw new OpportunityError(409, "Only drafts can be edited; archive and restore first");
+    if (input.deadlineTime && !input.deadline) throw new OpportunityError(400, "A deadline date is required when providing a time");
     return dto(await prisma.$transaction(async (tx) => {
       const result = await tx.opportunity.updateMany({
         where: { id, status: "Draft" },
         data: {
           ...input, deadline: input.deadline ? new Date(input.deadline + "T00:00:00.000Z") : null,
+          deadlineTime: input.deadlineTime ?? null,
         },
       });
       if (!result.count) throw new OpportunityError(409, "Opportunity changed during review");
@@ -246,7 +251,9 @@ export const opportunitiesService = {
     if (!row) throw new OpportunityError(404, "Opportunity not found");
     requireRole(actor, row.programmeId, STAFF_ROLES);
     if (row.status !== "Draft") throw new OpportunityError(409, "Only draft opportunities may be published");
-    if (!deadlineStillOpen(row.deadline?.toISOString().slice(0, 10) ?? null, cambodiaToday(now))) {
+    if (!deadlineStillOpen(row.deadline?.toISOString().slice(0, 10) ?? null, cambodiaToday(now)) ||
+        (row.deadline && row.deadlineTime &&
+        now >= new Date(row.deadline.toISOString().slice(0, 10) + "T" + row.deadlineTime + ":00+07:00"))) {
       throw new OpportunityError(409, "The deadline has passed; verify or replace this draft");
     }
     return dto(await prisma.$transaction(async (tx) => {
