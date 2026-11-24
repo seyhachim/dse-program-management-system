@@ -23,14 +23,14 @@ export function NewsArticleClient({ id }: { id: string }) {
           <h1 className="text-2xl font-semibold md:text-3xl">{article.title}</h1>
           <p className="text-sm text-muted-foreground">{article.summary}</p>
           <p className="text-xs text-muted-foreground">{article.authorName} · {article.publishedAt ? new Date(article.publishedAt).toLocaleDateString() : ""}</p>
-          {(article.uploadedMedia.find(media=>media.kind==="cover")||article.coverImageUrl)&&(()=>{
-            const uploaded=article.uploadedMedia.find(media=>media.kind==="cover");
+          {(article.uploadedMedia?.find(media=>media.kind==="cover")||article.coverImageUrl)&&(()=>{
+            const uploaded=article.uploadedMedia?.find(media=>media.kind==="cover");
             return <img src={uploaded?.url??article.coverImageUrl??""} alt={uploaded?.alt??article.coverAlt}
               loading="lazy" referrerPolicy="no-referrer" className="max-h-[420px] w-full rounded-xl object-cover"/>;
           })()}
           <div className="whitespace-pre-wrap break-words text-sm leading-7">{article.body}</div>
-          {(article.gallery.length > 0 || article.uploadedMedia.some(media=>media.kind==="gallery")) && <div className="grid gap-3 sm:grid-cols-2">
-            {article.uploadedMedia.filter(media=>media.kind==="gallery").map(img=><figure key={img.id}>
+          {(article.gallery.length > 0 || article.uploadedMedia?.some(media=>media.kind==="gallery")) && <div className="grid gap-3 sm:grid-cols-2">
+            {(article.uploadedMedia??[]).filter(media=>media.kind==="gallery").map(img=><figure key={img.id}>
               <img src={img.url} alt={img.alt} loading="lazy" referrerPolicy="no-referrer" className="aspect-video w-full rounded-xl object-cover"/>
               <figcaption className="mt-1 text-xs text-muted-foreground">{img.alt}</figcaption>
             </figure>)}

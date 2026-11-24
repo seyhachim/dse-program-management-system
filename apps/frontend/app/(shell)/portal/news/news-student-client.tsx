@@ -14,8 +14,8 @@ export function NewsStudentClient() {
     <div className="mx-auto grid max-w-5xl gap-5 md:grid-cols-2">
       {data.map(item => (
         <article key={item.id} className="overflow-hidden rounded-2xl border border-border bg-card">
-          {(item.uploadedMedia.find(media=>media.kind==="cover")||item.coverImageUrl) && (() => {
-            const uploaded=item.uploadedMedia.find(media=>media.kind==="cover");
+          {(item.uploadedMedia?.find(media=>media.kind==="cover")||item.coverImageUrl) && (() => {
+            const uploaded=item.uploadedMedia?.find(media=>media.kind==="cover");
             return <img src={uploaded?.thumbnailUrl??item.coverImageUrl??""} alt={uploaded?.alt??item.coverAlt}
               loading="lazy" referrerPolicy="no-referrer" className="aspect-video w-full object-cover"/>;
           })()}
