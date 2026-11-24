@@ -6,6 +6,8 @@ import {
   instructionalWeeklyPlan,
   isAssessmentOnlyWeek,
   mergeInstructionalWeeklyPlan,
+  toWeeklyPlanPayload,
+  toWeeklyPlanForm,
   type WeekForm,
 } from "./weekly-plan-model";
 
@@ -65,4 +67,13 @@ describe("instructional Weekly Plan", () => {
     const next = emptyWeek([week(1, "Intro"), week(3, "EDA")]);
     expect(next.week).toBe("2");
   });
+});
+
+test("explicit session classification survives payload round-trip and controls instructional totals", () => {
+  const exam = { ...week(8, "Practical demonstration"), sessionType: "assessment" as const };
+  const teaching = { ...week(9, "Final Exam preparation"), sessionType: "teaching" as const };
+  const rows = toWeeklyPlanForm(toWeeklyPlanPayload([exam, teaching]));
+  expect(rows.map((row) => row.sessionType)).toEqual(["assessment", "teaching"]);
+  expect(instructionalWeeklyPlan(rows).map((row) => row.id)).toEqual([teaching.id]);
+  expect(emptyWeek([week(1, "Intro"), exam]).sessionType).toBe("teaching");
 });

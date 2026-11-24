@@ -5,6 +5,7 @@ import type { Method } from "@dse-pms/shared-types";
 import { Progress } from "@dse-pms/ui";
 import type { WeekForm } from "../weekly-plan-model";
 import { weekSltForm } from "../weekly-plan-model";
+import { courseSpecSessionType, COURSE_SPEC_SESSION_TYPE_LABELS, courseSpecWeeklyPlanWeekAttention } from "@dse-pms/shared-types";
 import { teachingResourceLabel, weekFormErrors } from "./week-form-fields";
 
 const STEP_TIPS: Record<number, string[]> = {
@@ -19,12 +20,13 @@ export function WeekWizardSidebar({ draft, step, teachingMethods, assessmentMeth
   draft: WeekForm; step: number; teachingMethods: Method[]; assessmentMethods: Method[]; lloRequired: boolean;
 }) {
   const errors = weekFormErrors(draft, lloRequired);
+  const type = courseSpecSessionType(draft);
   const stepDone = [
-    Boolean(draft.topic.trim() && draft.cloCodes.length),
+    !errors.topic && !errors.clos,
     !errors.llos,
-    Boolean(draft.teachingMethodIds.length && (draft.studentLearningActivities.length || draft.activities.length)),
-    Boolean(weekSltForm(draft) > 0 && draft.assessmentMethodIds.length),
-    !errors.topic && !errors.clos && !errors.llos && !errors.activities && draft.teachingMethodIds.length > 0 && weekSltForm(draft) > 0 && draft.assessmentMethodIds.length > 0,
+    !errors.teaching && !errors.activities,
+    !errors.time && !errors.assessment,
+    courseSpecWeeklyPlanWeekAttention(draft).length === 0 && !errors.llos,
   ];
   const doneCount = stepDone.filter(Boolean).length;
   const percent = Math.round((doneCount / stepDone.length) * 100);
@@ -38,12 +40,13 @@ export function WeekWizardSidebar({ draft, step, teachingMethods, assessmentMeth
         <span className="text-xs text-muted-foreground">Draft</span>
       </div>
       <p className="mt-2 text-sm font-medium text-foreground">{draft.topic.trim() || <span className="font-normal text-muted-foreground">No topic yet…</span>}</p>
+      <PreviewLine label="Session type" value={COURSE_SPEC_SESSION_TYPE_LABELS[type]} />
       <PreviewLine label="CLOs" value={draft.cloCodes.join(" · ") || "Not linked yet"} />
       <PreviewLine label="LLOs" value={draft.lessonLearningOutcomes.length ? `${draft.lessonLearningOutcomes.length} defined` : "Not added yet"} />
       <PreviewLine label="Teaching" value={teachingNames.join(", ") || "Not selected yet"} />
       <PreviewLine label="Activities" value={draft.studentLearningActivities.length ? `${draft.studentLearningActivities.length} defined` : "Not added yet"} />
       <PreviewLine label="SLT" value={`${weekSltForm(draft)} hours`} />
-      <PreviewLine label="Assessment" value={assessmentNames.join(", ") || "Not selected yet"} />
+      <PreviewLine label="Assessment" value={assessmentNames.join(", ") || draft.assessment || (type === "teaching" ? "None scheduled" : "Not selected yet")} />
       <PreviewLine label="Resources" value={draft.teachingResourceTypes.map(teachingResourceLabel).join(", ") || "None selected"} />
     </SidebarCard>
 
