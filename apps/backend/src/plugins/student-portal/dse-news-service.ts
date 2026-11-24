@@ -131,7 +131,7 @@ export const dseNewsService = {
     if (!mayPublishNews(user) && !hasAnyRoleInProgramme(user, ["lecturer"], DEFAULT_PROGRAMME_ID)) {
       throw new NewsAccessError("DSE teaching staff only");
     }
-    return (await prisma.dseNewsArticle.findMany({
+    return Promise.all((await prisma.dseNewsArticle.findMany({
       where: { programmeId: DEFAULT_PROGRAMME_ID, ...(mayPublishNews(user) ? {} : { authorId: user.id }) },
       include: { author: { select: { name: true } } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 100,
