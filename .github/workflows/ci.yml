@@ -510,6 +510,9 @@ jobs:
       - name: Seed isolated integration database
         run: bun run seed
 
+      - name: Run Sindora participant/news isolation tests
+        run: bun test apps/backend/src/integration/sindora-news-participants.integration.test.ts
+
       - name: Run Sindora Course Activities isolated API/database pilot
         run: bun test apps/backend/src/integration/course-activities.integration.test.ts
 

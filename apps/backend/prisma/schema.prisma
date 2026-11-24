@@ -386,6 +386,12 @@ model User {
   offeringActivitiesCreated OfferingActivity[] @relation("OfferingActivityCreatedBy")
   offeringActivitiesUpdated OfferingActivity[] @relation("OfferingActivityUpdatedBy")
   offeringActivityAudits OfferingActivityAuditEvent[] @relation("OfferingActivityAuditActor")
+  activityParticipantsCreated OfferingActivityParticipant[] @relation("VisitParticipantCreatedBy")
+  activityParticipantsUpdated OfferingActivityParticipant[] @relation("VisitParticipantUpdatedBy")
+  activityParticipantAudits OfferingActivityParticipantAudit[] @relation("VisitParticipantAuditActor")
+  dseNewsAuthored DseNewsArticle[] @relation("DseNewsAuthor")
+  dseNewsUpdated DseNewsArticle[] @relation("DseNewsEditor")
+  dseNewsAudits DseNewsAuditEvent[] @relation("DseNewsAuditActor")
   rubricsOwned                       Rubric[]                                  @relation("RubricOwner")
   coLecturerOf                       OfferingCoLecturer[]                      @relation("OfferingCoLecturer")
   offeringMeetingAssignments             OfferingMeetingLecturer[]                 @relation("OfferingMeetingLecturerUser")
@@ -493,6 +499,7 @@ model Role {
 /// ProgrammeProfile/ProgramPolicy/PLOs in this phase — see issue #143.
 model Programme {
   id        String   @id
+  dseNewsArticles DseNewsArticle[]
   code      String   @unique
   name      String
   status    String   @default("active")
@@ -1593,6 +1600,7 @@ model ProgrammeHeadAppointment {
 /// portal-account provisioning; User/auth linkage remains separate through `userId`.
 model Student {
   id                               String                                   @id @default(uuid())
+  activityParticipants OfferingActivityParticipant[]
   name                             String
   email                            String?                                  @unique
   studentId                        String?                                   @unique
@@ -3533,6 +3541,8 @@ model OfferingActivity {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   auditEvents      OfferingActivityAuditEvent[]
+  participants OfferingActivityParticipant[]
+  dseNewsArticles DseNewsArticle[]
 
   @@index([offeringId, date])
   @@index([status])
@@ -3550,4 +3560,90 @@ model OfferingActivityAuditEvent {
   createdAt  DateTime @default(now())
 
   @@index([activityId, createdAt])
+}
+
+
+//// Staff-only field-trip participation evidence. Not a course attendance event.
+model OfferingActivityParticipant {
+  id           String           @id @default(uuid())
+  activityId   String
+  activity     OfferingActivity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  studentId    String?
+  student      Student?         @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  externalName String?          @db.VarChar(160)
+  externalRole String?          @db.VarChar(32)
+  goStatus     String           @default("Unknown")
+  returnStatus String           @default("Unknown")
+  farmStatus   String           @default("Unverified")
+  source       String           @default("Manual")
+  note         String           @default("") @db.VarChar(500)
+  version      Int              @default(1)
+  createdById  String
+  updatedById  String
+  createdBy    User             @relation("VisitParticipantCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User             @relation("VisitParticipantUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  audits       OfferingActivityParticipantAudit[]
+
+  @@unique([activityId, studentId])
+  @@index([activityId])
+}
+
+model OfferingActivityParticipantAudit {
+  id            String                      @id @default(uuid())
+  participantId String
+  participant   OfferingActivityParticipant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  actorId       String
+  actor         User                        @relation("VisitParticipantAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action        String
+  before        Json?
+  after         Json
+  createdAt     DateTime @default(now())
+
+  @@index([participantId, createdAt])
+}
+
+//// Programme-wide articles are separate from private activity participation.
+model DseNewsArticle {
+  id             String            @id @default(uuid())
+  programmeId    String
+  programme      Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  activityId     String?
+  activity       OfferingActivity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  authorId       String
+  author         User              @relation("DseNewsAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  updatedById    String
+  updatedBy      User              @relation("DseNewsEditor", fields: [updatedById], references: [id], onDelete: Restrict)
+  title          String            @db.VarChar(180)
+  summary        String            @default("") @db.VarChar(350)
+  body           String            @default("") @db.Text
+  coverImageUrl  String?
+  coverAlt       String            @default("") @db.VarChar(250)
+  gallery        Json              @default("[]")
+  tags           Json              @default("[]")
+  mediaApproved  Boolean           @default(false)
+  status         String            @default("Draft")
+  version        Int               @default(1)
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  audits         DseNewsAuditEvent[]
+
+  @@index([programmeId, status, publishedAt])
+  @@index([activityId])
+}
+
+model DseNewsAuditEvent {
+  id        String         @id @default(uuid())
+  articleId String
+  article   DseNewsArticle @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  actorId   String
+  actor     User           @relation("DseNewsAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action    String
+  before    Json?
+  after     Json
+  createdAt DateTime       @default(now())
+
+  @@index([articleId, createdAt])
 }
