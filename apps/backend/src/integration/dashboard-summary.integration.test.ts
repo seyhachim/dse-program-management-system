@@ -148,6 +148,20 @@ integrationDescribe("Dashboard compact summary", () => {
         },
       },
     });
+    const plannedOffering = await prisma.offering.create({
+      data: {
+        courseId: course.id,
+        term: "weekly-monitor-fixture",
+        sectionCode: "M2",
+        programmeYear: 1,
+        status: "Planned",
+        startDate: new Date("2026-11-16T00:00:00.000Z"),
+        endDate: new Date("2026-11-30T00:00:00.000Z"),
+        meetings: {
+          create: [{ dayOfWeek: "Monday", startTime: "09:00", endTime: "11:00" }],
+        },
+      },
+    });
     try {
       const response = await request(
         "/api/dashboard/weekly-teaching?weekStart=2026-11-23",
@@ -162,6 +176,11 @@ integrationDescribe("Dashboard compact summary", () => {
       expect(session?.occurrenceId).toBeNull();
       expect(session?.scheduledMinutes).toBe(120);
       expect(session?.deliveredMinutes).toBe(0);
+      const planned = report.sessions.find((row) => row.offeringId === plannedOffering.id);
+      expect(planned?.status).toBe("planned_only");
+      expect(planned?.offeringStatus).toBe("Planned");
+      expect(planned?.occurrenceId).toBeNull();
+      expect(report.summary.notActivated).toBeGreaterThanOrEqual(1);
       const materialized = await prisma.$queryRaw<Array<{ count: bigint }>>`
         SELECT COUNT(*)::bigint AS count
         FROM "pms_attendance"."TeachingSessionOccurrence"
@@ -169,6 +188,7 @@ integrationDescribe("Dashboard compact summary", () => {
       `;
       expect(Number(materialized[0]?.count ?? 0n)).toBe(0);
     } finally {
+      await prisma.offering.delete({ where: { id: plannedOffering.id } });
       await prisma.offering.delete({ where: { id: offering.id } });
       await prisma.course.delete({ where: { id: course.id } });
     }

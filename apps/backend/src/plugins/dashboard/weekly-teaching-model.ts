@@ -11,6 +11,7 @@ export interface WeeklyTeachingEvidence {
   explicitSessionStatus: string | null;
   officialHoliday: boolean;
   approvedLeave: boolean;
+  offeringActivated: boolean;
   ended: boolean;
 }
 
@@ -25,6 +26,7 @@ export function deriveWeeklyTeachingStatus(e: WeeklyTeachingEvidence): WeeklyTea
   if (e.explicitSessionStatus === "Rescheduled") return "rescheduled";
   if (e.approvedLeave) return "approved_leave";
   if (e.classOccurred === false) return "not_held";
+  if (!e.offeringActivated) return "planned_only";
   return e.ended ? "missing_evidence" : "upcoming";
 }
 
@@ -40,12 +42,18 @@ export function summarizeWeeklyTeaching(
     scheduledMinutes: 0, deliveredMinutes: 0,
     heldAsPlanned: 0, heldWithChanges: 0,
     cancelled: 0, notHeld: 0, approvedLeave: 0, rescheduled: 0,
-    holidays: 0, missingEvidence: 0, upcoming: 0, reviewMinutes: 0,
+    holidays: 0, missingEvidence: 0, upcoming: 0, notActivated: 0, reviewMinutes: 0,
   };
   for (const session of sessions) {
     const status = session.status;
     if (status === "holiday") {
       sum.holidays += 1;
+      continue;
+    }
+    // A Planned offering is not yet an activated teaching obligation.
+    // Show it transparently without inflating delivered/missed denominators.
+    if (status === "planned_only") {
+      sum.notActivated += 1;
       continue;
     }
     sum.scheduledSessions += 1;

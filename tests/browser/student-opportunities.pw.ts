@@ -175,7 +175,7 @@ test("student join is anonymous to peers and lecturer sees the private roster", 
     expect(privileged.ok(), await privileged.text()).toBe(true);
     expect(((await privileged.json()) as unknown[]).length).toBe(1);
     await lecturerPage.goto("/opportunities/participation");
-    await expect(lecturerPage.getByRole("heading", { name: "Interested students" })).toBeVisible();
+    await expect(lecturerPage.locator("section").getByRole("heading", { name: "Interested students" })).toBeVisible();
     const current = lecturerPage.getByRole("article").filter({ hasText: title });
     await expect(current).toBeVisible();
     await expect(current.getByText("1 planning to join")).toBeVisible();
