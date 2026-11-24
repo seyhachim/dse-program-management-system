@@ -375,7 +375,8 @@ dbDescribe("marking scheme lifecycle integration", () => {
     await expect(resultsLifecycleService.correctFinalized(actor.id, false, correction)).rejects.toBeInstanceOf(PortalConflictError);
     const history = await resultCorrectionsService.history(actor.id, false, result.id);
     expect(history.corrections[0]?.questionChanges).toEqual([expect.objectContaining({ criterionId: questions[3]!.id, beforeScore: 2, afterScore: 4, maxScore: 5 })]);
-    expect(history.finalizedAt).toBe(official.finalizedAt?.toISOString());
+    expect(official.finalizedAt).not.toBeNull();
+    expect(history.finalizedAt).toBe(official.finalizedAt!.toISOString());
     const correctedReview = await resultsLifecycleService.review(actor.id, false, offering.id);
     expect(correctedReview.rows[0]?.achievements.map((clo) => clo.percentage)).toEqual([75, 88, 80]);
     const revisedSnapshots = await generateCloAttainmentSnapshots({ programmeId: "dse", offeringId: offering.id, thresholdPercentage: 70 });
