@@ -537,7 +537,15 @@ export function StudentsClient() {
         {hasSelectedCohort ? (
           <div className="flex flex-wrap items-center gap-2">
             <Select value={sectionId} onValueChange={(id) => { setSectionId(id ?? "all"); resetRosterPage(); }}>
-              <SelectTrigger className="w-full sm:w-[14rem]" aria-label="Filter by class"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[14rem]" aria-label="Filter by class">
+                <SelectValue>
+                  {sectionId === "all"
+                    ? "All classes"
+                    : (sectionsQuery.data ?? [])
+                        .filter((section) => section.id === sectionId)
+                        .map((section) => `${section.code} — ${section.name}`)[0] ?? "Selected class"}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All classes</SelectItem>
                 {(sectionsQuery.data ?? []).map((section) => (
