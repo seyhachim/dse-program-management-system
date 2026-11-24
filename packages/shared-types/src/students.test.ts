@@ -84,6 +84,16 @@ describe("student roster contracts", () => {
     expect(parsed.currentClassCode).toBe("M1");
   });
 
+  test("validates cohort and class filters", () => {
+    const cohortId = "11111111-1111-4111-8111-111111111111";
+    const sectionId = "22222222-2222-4222-8222-222222222222";
+    expect(ListStudentsPageQuery.parse({ cohortId, sectionId }).sectionId).toBe(sectionId);
+    expect(ListStudentsPageQuery.parse({ cohortId: "unassigned" }).cohortId).toBe("unassigned");
+    expect(() => ListStudentsPageQuery.parse({ sectionId })).toThrow();
+    expect(() => ListStudentsPageQuery.parse({ cohortId: "unassigned", sectionId })).toThrow();
+    expect(() => ListStudentsPageQuery.parse({ cohortId: "G6" })).toThrow();
+  });
+
   test("bounds cursor page size and coerces query-string values", () => {
     expect(
       ListStudentsPageQuery.parse({
