@@ -19,6 +19,7 @@ export const WeeklyTeachingStatusSchema = z.enum([
   "holiday",
   "missing_evidence",
   "upcoming",
+  "planned_only",
 ]);
 export type WeeklyTeachingStatus = z.infer<typeof WeeklyTeachingStatusSchema>;
 
@@ -34,6 +35,7 @@ export const WeeklyTeachingSessionSchema = z.object({
   courseCode: z.string(),
   courseTitle: z.string(),
   sectionCode: z.string(),
+  offeringStatus: z.enum(["Planned", "Active", "Completed"]),
   programmeYear: z.number().int().nullable(),
   term: z.string(),
   lecturerIds: z.array(z.string()),
@@ -69,6 +71,7 @@ export const WeeklyTeachingSummarySchema = z.object({
   holidays: z.number().int().nonnegative(),
   missingEvidence: z.number().int().nonnegative(),
   upcoming: z.number().int().nonnegative(),
+  notActivated: z.number().int().nonnegative(),
   reviewMinutes: z.number().int().nonnegative(),
 }).strict();
 export type WeeklyTeachingSummary = z.infer<typeof WeeklyTeachingSummarySchema>;

@@ -30,6 +30,7 @@ const STATUS_LABELS: Record<WeeklyTeachingStatus, string> = {
   holiday: "Holiday / break",
   missing_evidence: "Missing evidence",
   upcoming: "Upcoming",
+  planned_only: "Not activated",
 };
 
 const STATUS_STYLES: Record<WeeklyTeachingStatus, string> = {
@@ -42,6 +43,7 @@ const STATUS_STYLES: Record<WeeklyTeachingStatus, string> = {
   holiday: "border-border bg-muted text-muted-foreground",
   missing_evidence: "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300",
   upcoming: "border-border bg-muted/40 text-muted-foreground",
+  planned_only: "border-violet-500/30 bg-violet-500/10 text-violet-900 dark:text-violet-300",
 };
 
 function hours(minutes: number): string {
@@ -117,7 +119,7 @@ export function WeeklyTeachingMonitorClient() {
   useEffect(() => { setPage(0); }, [weekStart, year, course, section, lecturer, status]);
 
   const summary = useMemo(() => {
-    const planned = filtered.filter((row) => row.status !== "holiday");
+    const planned = filtered.filter((row) => row.status !== "holiday" && row.status !== "planned_only");
     const delivered = filtered.filter((row) => row.status === "held_as_planned" || row.status === "held_with_changes");
     const attention = filtered.filter((row) => ["not_held", "cancelled", "rescheduled", "approved_leave", "missing_evidence"].includes(row.status));
     return {
@@ -129,6 +131,7 @@ export function WeeklyTeachingMonitorClient() {
       leave: filtered.filter((row) => row.status === "approved_leave").length,
       cancelled: filtered.filter((row) => row.status === "cancelled" || row.status === "not_held").length,
       upcoming: filtered.filter((row) => row.status === "upcoming").length,
+      notActivated: filtered.filter((row) => row.status === "planned_only").length,
       attention: attention.length,
     };
   }, [filtered]);
@@ -175,6 +178,14 @@ export function WeeklyTeachingMonitorClient() {
 
       {!loading && report ? (
         <>
+          {report.summary.notActivated > 0 ? (
+            <p className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-3 text-sm">
+              {report.summary.notActivated} class meeting(s) belong to offerings still marked Planned.
+              They are shown for planning visibility, but are excluded from active scheduled,
+              delivered and missed-evidence totals until the offering is officially activated.
+              Review offering status in Course Offerings—do not infer that a lecturer was absent.
+            </p>
+          ) : null}
           {report.unboundedActiveOfferings > 0 ? (
             <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               {report.unboundedActiveOfferings} active offering(s) lack complete teaching dates and cannot be placed accurately in the weekly report. Review their academic calendar assignment.
@@ -220,11 +231,12 @@ export function WeeklyTeachingMonitorClient() {
           </section>
 
           <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6" aria-label="Weekly teaching summary for selected filters">
-            <SummaryItem title="Scheduled classes" value={String(summary.planned)} hint={hours(summary.hoursPlanned) + " planned"} />
+            <SummaryItem title="Scheduled active classes" value={String(summary.planned)} hint={hours(summary.hoursPlanned) + " planned"} />
             <SummaryItem title="Delivered classes" value={String(summary.delivered)} hint={hours(summary.hoursDelivered) + " delivered"} />
             <SummaryItem title="Missing evidence" value={String(summary.missing)} hint="Not an absence finding" />
             <SummaryItem title="Canceled / not held" value={String(summary.cancelled)} />
             <SummaryItem title="Approved leave" value={String(summary.leave)} hint="No private reason shown" />
+            <SummaryItem title="Not activated" value={String(summary.notActivated)} hint="Planned offering sessions" />
             <SummaryItem title="Need review" value={String(summary.attention)} hint={summary.upcoming + " upcoming; recovery not counted"} />
           </section>
 
@@ -283,6 +295,7 @@ function SessionRow({ row }: { row: WeeklyTeachingSession }) {
         <div className="font-semibold">{row.courseCode}</div>
         <div className="max-w-44 text-xs text-muted-foreground">{row.courseTitle}</div>
         <div className="mt-1 text-xs">Year {row.programmeYear ?? "—"} • {row.sectionCode}</div>
+        {row.offeringStatus === "Planned" ? <div className="mt-1 text-xs text-violet-700 dark:text-violet-300">Offering not activated</div> : null}
       </td>
       <td className="max-w-44 px-3 py-3">
         {row.lecturerNames.length ? row.lecturerNames.join(", ") : <span className="text-muted-foreground">No assigned lecturer</span>}

@@ -4,7 +4,7 @@ import { deriveWeeklyTeachingStatus, summarizeWeeklyTeaching } from "./weekly-te
 
 const evidence = {
   classOccurred: null, coverage: null, explicitSessionStatus: null,
-  officialHoliday: false, approvedLeave: false, ended: true,
+  officialHoliday: false, approvedLeave: false, offeringActivated: true, ended: true,
 } as const;
 
 function session(status: WeeklyTeachingSession["status"], minutes = 120): WeeklyTeachingSession {
@@ -15,7 +15,7 @@ function session(status: WeeklyTeachingSession["status"], minutes = 120): Weekly
     date: "2026-11-23", dayOfWeek: "Monday",
     startTime: "07:00", endTime: "09:00", room: null,
     courseCode: "DSE101", courseTitle: "Example", sectionCode: "M1",
-    programmeYear: 1, term: "2026-27",
+    programmeYear: 1, term: "2026-27", offeringStatus: "Active",
     lecturerIds: [], lecturerNames: [],
     plannedWeek: null, plannedTopic: null, actualTopic: null, coverage: null,
     status, scheduledMinutes: 120, deliveredMinutes: minutes,
@@ -34,6 +34,7 @@ describe("programme weekly teaching derived evidence", () => {
   test("missing monitor evidence never becomes lecturer absence or cancellation", () => {
     expect(deriveWeeklyTeachingStatus(evidence)).toBe("missing_evidence");
     expect(deriveWeeklyTeachingStatus({ ...evidence, ended: false })).toBe("upcoming");
+    expect(deriveWeeklyTeachingStatus({ ...evidence, offeringActivated: false })).toBe("planned_only");
     expect(deriveWeeklyTeachingStatus({ ...evidence, classOccurred: false })).toBe("not_held");
   });
 
@@ -49,7 +50,7 @@ describe("programme weekly teaching derived evidence", () => {
     const rows = [
       session("held_as_planned", 110), session("held_with_changes", 75),
       session("holiday"), session("approved_leave"), session("missing_evidence"),
-      session("upcoming"),
+      session("upcoming"), session("planned_only"),
     ];
     const actual = summarizeWeeklyTeaching(rows);
     expect(actual.scheduledSessions).toBe(5);
@@ -59,6 +60,7 @@ describe("programme weekly teaching derived evidence", () => {
     expect(actual.reviewMinutes).toBe(240);
     expect(actual.holidays).toBe(1);
     expect(actual.missingEvidence).toBe(1);
+    expect(actual.notActivated).toBe(1);
     expect(WeeklyTeachingReportSchema.safeParse({
       programmeId: "dse", weekStart: "2026-11-23", weekEnd: "2026-11-29",
       generatedAt: new Date().toISOString(),

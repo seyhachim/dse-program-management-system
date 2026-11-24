@@ -63,7 +63,7 @@ export const weeklyTeachingService = {
       prisma.offering.findMany({
         where: {
           course: { programmeId: DEFAULT_PROGRAMME_ID },
-          status: { in: ["Active", "Completed"] },
+          status: { in: ["Active", "Completed", "Planned"] },
           meetings: { some: {} },
           OR: [
             { academicCalendarPeriod: { is: {
@@ -220,6 +220,7 @@ export const weeklyTeachingService = {
             explicitSessionStatus: record?.classSessionStatus ?? null,
             officialHoliday: Boolean(holidayName),
             approvedLeave,
+            offeringActivated: offering.status !== "Planned",
             ended: teachingEndInstant(day.date, meeting.endTime) <= now,
           });
           sessions.push({
@@ -234,6 +235,7 @@ export const weeklyTeachingService = {
             courseCode: offering.course.code,
             courseTitle: offering.course.title,
             sectionCode: offering.sectionCode,
+            offeringStatus: offering.status,
             programmeYear: offering.programmeYear,
             term: offering.term,
             lecturerIds: lecturerTeam.map((lecturer) => lecturer.id),
