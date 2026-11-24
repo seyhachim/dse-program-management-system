@@ -319,13 +319,15 @@ describe("DSE PMS PWA", () => {
     expect(source).not.toContain("accessToken");
   });
 
-  test("Next proxies only the five public programme projections used by the browser loader", async () => {
+  test("Next proxies only seven explicit public programme routes (news must not be service-worker cached)", async () => {
     const rewrites = await nextConfig.rewrites();
     const sources = rewrites.map((rewrite) => rewrite.source);
 
     expect(sources).toEqual([
       "/api/programme/public/programmes/:programmeId",
       "/api/programme/public/programmes/:programmeId/faqs",
+      "/api/programme/public/programmes/:programmeId/news",
+      "/api/programme/public/programmes/:programmeId/news/:articleId",
       "/api/programme/public/programmes/:programmeId/important-dates",
       "/api/programme/public/programmes/:programmeId/curriculum/courses",
       "/api/programme/public/programmes/:programmeId/curriculum/totals",
