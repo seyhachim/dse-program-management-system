@@ -536,7 +536,7 @@ export function StudentsClient() {
         ) : null}
         {hasSelectedCohort ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={sectionId} onValueChange={(id) => { setSectionId(id); resetRosterPage(); }}>
+            <Select value={sectionId} onValueChange={(id) => { setSectionId(id ?? "all"); resetRosterPage(); }}>
               <SelectTrigger className="w-full sm:w-[14rem]" aria-label="Filter by class"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All classes</SelectItem>
