@@ -937,3 +937,18 @@
     transition: none !important;
   }
 }
+
+/* Read-only public programme news. */
+.newsSection {padding-block:64px 70px;}
+.newsHeading {display:flex;align-items:end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:22px;}
+.newsHeading h2 {font-size:clamp(1.6rem,3vw,2.35rem);margin:8px 0;}
+.newsHeading p {color:var(--muted);line-height:1.7;}
+.newsMore {font-weight:700;color:var(--accent);text-decoration:none;}
+.newsGrid {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:20px;}
+.newsCard {background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow);}
+.newsImage,.newsPlaceholder {width:100%;aspect-ratio:16/9;object-fit:cover;display:block;}
+.newsPlaceholder {background:linear-gradient(135deg,var(--accent-soft),var(--surface-strong));}
+.newsBody {padding:18px 20px;}
+.newsBody time {display:block;font-size:.78rem;color:var(--muted);margin-bottom:7px;}
+.newsTitle {display:block;font-size:1.09rem;line-height:1.4;font-weight:750;color:var(--ink);text-decoration:none;}
+.newsBody p {font-size:.9rem;color:var(--muted);line-height:1.6;margin-top:9px;}
