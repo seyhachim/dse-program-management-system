@@ -137,12 +137,33 @@ export const ListStudentsQuery = z.object({
 export type ListStudentsQuery = z.infer<typeof ListStudentsQuery>;
 
 export const ListStudentsPageQuery = ListStudentsQuery.extend({
+  cohortId: z.union([z.string().uuid(), z.literal("unassigned")]).optional(),
+  sectionId: z.string().uuid().optional(),
   cursor: z.string().trim().min(1).max(512).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+}).refine((query) => !query.sectionId || (query.cohortId && query.cohortId !== "unassigned"), {
+  message: "Select a cohort before filtering by class",
+  path: ["sectionId"],
 });
 export type ListStudentsPageQuery = z.infer<typeof ListStudentsPageQuery>;
 
 export interface StudentPage {
   items: Student[];
   nextCursor: string | null;
+}
+
+/** Distinct students with open canonical cohort membership, not registration requests. */
+export interface StudentRosterCohortSummary {
+  id: string;
+  code: string;
+  name: string;
+  intakeYear: number;
+  status: string;
+  memberCount: number;
+  activeCount: number;
+  pendingCount: number;
+}
+export interface StudentRosterCohortOverview {
+  cohorts: StudentRosterCohortSummary[];
+  unassignedCount: number;
 }
