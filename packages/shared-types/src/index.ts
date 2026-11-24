@@ -46,6 +46,7 @@ export * from "./course-spec-periodic-review.ts";
 export * from "./course-spec-version-history.ts";
 export * from "./methods.ts";
 export * from "./rubrics.ts";
+export * from "./assessment-instruments.ts";
 export * from "./student-portal.ts";
 export * from "./portal-student-attendance.ts";
 export * from "./portal-weekly-notes.ts";
