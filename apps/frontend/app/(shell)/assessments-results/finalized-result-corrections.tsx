@@ -32,6 +32,7 @@ import {
   percentage,
   validateResultCorrection,
   type ResultCorrectionDraft,
+  type ResultCorrectionValidation,
 } from "@/lib/result-correction";
 
 export function FinalizedResultCorrections({
@@ -221,11 +222,14 @@ function CorrectionDialog({
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
 
-  const validation = useMemo(
+  const validation = useMemo<ResultCorrectionValidation>(
     () => {
-      const checked = validateResultCorrection(target, scheme ? { ...draft, score: String(computedTotal), maxScore: String(target.maxScore) } : draft);
+      const checked = validateResultCorrection(
+        target,
+        scheme ? { ...draft, score: String(computedTotal), maxScore: String(target.maxScore) } : draft,
+        { questionMarksChanged: changedQuestions },
+      );
       if (scheme && !validQuestions) return { ...checked, valid: false, errors: { ...checked.errors, score: "Enter every question mark within its maximum." } };
-      if (changedQuestions && checked.errors.noChange) { const { noChange: _noChange, ...errors } = checked.errors; return { ...checked, changed: true, valid: Object.keys(errors).length === 0, errors }; }
       return checked;
     },
     [draft, target, scheme, computedTotal, validQuestions, changedQuestions],
