@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { CreateDseNewsInput, DseNewsView } from "@dse-pms/shared-types";
 import { dseNewsApi } from "@/lib/activity-publications";
 import { useMe } from "@/lib/auth";
+import { DseNewsMediaEditor } from "./dse-news-media-editor";
 
 const FIELD = "min-h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm";
 type Draft = {
@@ -127,6 +128,16 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
           <label className="block space-y-1 text-sm">Tags, separated by commas
             <input className={FIELD} value={draft.tagsText} onChange={e => change("tagsText", e.target.value)} placeholder="Field Visit, Smart Agriculture" />
           </label>
+          <DseNewsMediaEditor article={editing} onChange={(updated) => {
+            setEditing(updated);
+            setDraft(current => ({ ...current, mediaApproved: false }));
+            setNotice("Photo changes saved. Review photo permissions before publishing.");
+            void load();
+          }} />
+          <details className="rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-sm font-medium">Advanced: external image URLs</summary>
+            <p className="mt-2 text-xs text-muted-foreground">Use direct photo upload above for new photos. Existing HTTPS image links remain supported.</p>
+            <div className="mt-3 space-y-3">
           <label className="block space-y-1 text-sm">Approved HTTPS cover image URL (optional)
             <input className={FIELD} value={draft.coverImageUrl} onChange={e => change("coverImageUrl", e.target.value)} placeholder="https://..." />
           </label>
@@ -136,6 +147,8 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
           <label className="block space-y-1 text-sm">Gallery (one line: HTTPS URL | image description)
             <textarea className={FIELD} rows={3} value={draft.galleryText} onChange={e => change("galleryText", e.target.value)} />
           </label>
+            </div>
+          </details>
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={draft.mediaApproved} onChange={e => change("mediaApproved", e.target.checked)} />
             I verified consent or permission for identifiable people in all included images.
