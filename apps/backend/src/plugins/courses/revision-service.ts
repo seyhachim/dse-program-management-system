@@ -298,6 +298,7 @@ async function cloneNormalizedContent(
         order: row.order,
         week: row.week,
         topic: row.topic,
+        sessionType: row.sessionType,
         cloCodes: row.cloCodes,
         lloItems: row.lloItems,
         lessonLearningOutcomes:

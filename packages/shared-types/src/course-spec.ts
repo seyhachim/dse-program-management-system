@@ -632,7 +632,12 @@ export const LessonLearningOutcome = z.object({
 
 export type LessonLearningOutcome = z.infer<typeof LessonLearningOutcome>;
 
+export const CourseSpecSessionType = z.enum(["teaching", "assessment", "teaching_and_assessment"]);
+export type CourseSpecSessionType = z.infer<typeof CourseSpecSessionType>;
+
 export const WeeklyPlanRow = z.object({
+  // Null/absent means legacy classification, not a new academic decision.
+  sessionType: CourseSpecSessionType.nullish(),
   id: z.string().min(1),
   week: z.coerce.number().int().min(1).max(52),
   topic: z.string().default(""),
