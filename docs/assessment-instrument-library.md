@@ -14,6 +14,6 @@ WEF201 example: Q1 6, Q2 6, Q3 8, Q4 5; scores 5/4/7/2 = 18/25. Mapping Q1/Q2 to
 
 ## Remaining release gates
 - Full CI on the latest commit, including new database lifecycle integration tests; verify legacy rubric workflows, student visibility, QA traces and authorization in staging.
-- Implement audited question-level corrections before opening the scheme workflow to official finalized grading; generic whole-result correction is deliberately blocked for schemes to avoid changing totals without corresponding evidence.
+- Audited question-level corrections implemented in the existing finalized-results workspace. The same transaction records changed question marks, updates the total, preserves original publication/finalization metadata, and verifies consistency at database commit. Generic total-only corrections remain blocked. Current CLO views recalculate; regenerate QA snapshots to append new evidence while preserving historical snapshots. Verify the new lifecycle test and staging workflow before release.
 - Spreadsheet/CSV question-mark import preview and private scoring guidance are not implemented. Confirm pilot scope or implement before broad rollout.
 - Verify course-spec exports and student display in staging, including owner/co-lecturer boundaries. Check deployment capacity; run a coordinated migration and deployment only after release approval.

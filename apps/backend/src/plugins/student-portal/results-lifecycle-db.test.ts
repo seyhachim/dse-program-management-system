@@ -364,5 +364,24 @@ dbDescribe("marking scheme lifecycle integration", () => {
     const snapshots = await generateCloAttainmentSnapshots({ programmeId: "dse", offeringId: offering.id, thresholdPercentage: 70 });
     expect(snapshots.map((snapshot) => snapshot.achievedRate)).toEqual([100, 100, 0]);
     expect(snapshots.every((snapshot) => snapshot.calculationVersion === MARKING_SCHEME_ATTAINMENT_VERSION)).toBe(true);
+    const official = await prisma.assessmentResult.findUniqueOrThrow({ where: { id: result.id }, include: { criterionScores: true } });
+    const correction = { assessmentResultId: result.id, score: 20, maxScore: 25, feedback: "Corrected Q4", reason: "Second marking verified two more points", expectedUpdatedAt: official.updatedAt.toISOString(), questionScores: questions.map((q, i) => ({ criterionId: q.id, score: [5, 4, 7, 4][i]! })) };
+    await expect(resultsLifecycleService.correctFinalized(other.id, false, correction)).rejects.toBeInstanceOf(PortalAccessError);
+    await expect(resultsLifecycleService.correctFinalized(actor.id, false, { ...correction, questionScores: undefined })).rejects.toBeInstanceOf(PortalConflictError);
+    await expect(resultsLifecycleService.correctFinalized(actor.id, false, { ...correction, score: 21 })).rejects.toBeInstanceOf(PortalConflictError);
+    await expectDatabaseRejection(() => prisma.assessmentCriterionScore.update({ where: { id: official.criterionScores[0]!.id }, data: { score: 0 } }));
+    const corrected = await resultsLifecycleService.correctFinalized(actor.id, false, correction);
+    expect(corrected.score).toBe(20);
+    await expect(resultsLifecycleService.correctFinalized(actor.id, false, correction)).rejects.toBeInstanceOf(PortalConflictError);
+    const history = await resultCorrectionsService.history(actor.id, false, result.id);
+    expect(history.corrections[0]?.questionChanges).toEqual([expect.objectContaining({ criterionId: questions[3]!.id, beforeScore: 2, afterScore: 4, maxScore: 5 })]);
+    expect(history.finalizedAt).toBe(official.finalizedAt?.toISOString());
+    const correctedReview = await resultsLifecycleService.review(actor.id, false, offering.id);
+    expect(correctedReview.rows[0]?.achievements.map((clo) => clo.percentage)).toEqual([75, 88, 80]);
+    const revisedSnapshots = await generateCloAttainmentSnapshots({ programmeId: "dse", offeringId: offering.id, thresholdPercentage: 70 });
+    expect(revisedSnapshots.map((snapshot) => snapshot.achievedRate)).toEqual([100, 100, 100]);
+    expect(revisedSnapshots[2]?.supersedesSnapshotId).toBe(snapshots[2]?.id);
+    expect((await prisma.qaCloAttainmentSnapshot.findUniqueOrThrow({ where: { id: snapshots[2]!.id } })).achievedRate).toBe(0);
+
   });
 });

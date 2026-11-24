@@ -728,6 +728,7 @@ export const resultsLifecycleService = {
       const result = await tx.assessmentResult.findUnique({
         where: { id: input.assessmentResultId },
         include: {
+          criterionScores: true,
           enrollment: {
             include: {
               offering: {
@@ -736,7 +737,7 @@ export const resultsLifecycleService = {
                   courseSpec: {
                     select: {
                       id: true,
-                      assessmentItems: { select: { id: true, mode: true, rubric: { select: { instrumentKind: true } } } },
+                      assessmentItems: { include: { criterionCloMappings: true, rubric: { include: { levelRows: true, criterionRows: true } } } },
                     },
                   },
                 },
@@ -772,7 +773,9 @@ export const resultsLifecycleService = {
         );
       }
       assertGenericFinalizedCorrectionMode(assessment.mode);
-      if (assessment.rubric?.instrumentKind === "marking_scheme") throw new PortalConflictError("Question-level audited correction is required for marking schemes; whole-exam correction is blocked");
+      const isScheme = assessment.rubric?.instrumentKind === "marking_scheme";
+      if (isScheme !== Boolean(input.questionScores)) throw new PortalConflictError(isScheme ? "Correct the actual question marks, not the exam total" : "Question corrections are only for marking schemes");
+      if (!input.reason.trim()) throw new PortalConflictError("A correction reason is required");
 
       const expectedUpdatedAt = new Date(input.expectedUpdatedAt).toISOString();
       if (result.updatedAt.toISOString() !== expectedUpdatedAt) {
@@ -780,9 +783,36 @@ export const resultsLifecycleService = {
           "This finalized result changed after you loaded it. Reload the result before applying a correction.",
         );
       }
+      let score = input.score;
+      let maxScore = input.maxScore;
+      const questionChanges: Array<{ scoreId: string; criterionId: string; criterionName: string; rubricId: string; rubricContentHash: string; beforeScore: number; afterScore: number; maxScore: number }> = [];
+      if (isScheme && assessment.rubric && input.questionScores) {
+        const hash = rubricContentHash(assessment.rubric);
+        const questions = assessment.rubric.criterionRows;
+        const existing = result.criterionScores;
+        const proposed = new Map(input.questionScores.map((row) => [row.criterionId, row.score]));
+        if (proposed.size !== input.questionScores.length || proposed.size !== questions.length || existing.length !== questions.length ||
+            !assessment.cloCodes.length || !assessment.cloCodes.every((code) => markingSchemeCloEvidence(code, assessment.criterionCloMappings, existing, result))) {
+          throw new PortalConflictError("The finalized question evidence or proposed marks are incomplete");
+        }
+        const next = questions.map((question) => {
+          const row = existing.find((item) => item.criterionId === question.id && item.rubricId === assessment.rubricId && item.rubricContentHash === hash);
+          const value = proposed.get(question.id);
+          if (!row || row.maxScore !== question.maxPoints || value === undefined || !Number.isFinite(value) || value < 0 || value > row.maxScore) throw new PortalConflictError("Invalid question mark or instrument version");
+          if (row.score !== value) questionChanges.push({ scoreId: row.id, criterionId: row.criterionId, criterionName: row.criterionName, rubricId: row.rubricId, rubricContentHash: row.rubricContentHash, beforeScore: row.score, afterScore: value, maxScore: row.maxScore });
+          return { ...row, score: value };
+        });
+        score = next.reduce((sum, row) => sum + row.score, 0);
+        maxScore = next.reduce((sum, row) => sum + row.maxScore, 0);
+        if (Math.abs(score - input.score) > 1e-9 || Math.abs(maxScore - input.maxScore) > 1e-9 || Math.abs(maxScore - result.maxScore) > 1e-9 ||
+            !assessment.cloCodes.every((code) => markingSchemeCloEvidence(code, assessment.criterionCloMappings, next, { score, maxScore }))) {
+          throw new PortalConflictError("The corrected exam total must match its question marks and fixed maximum");
+        }
+      }
       if (
-        result.score === input.score &&
-        result.maxScore === input.maxScore &&
+        questionChanges.length === 0 &&
+        result.score === score &&
+        result.maxScore === maxScore &&
         result.feedback === input.feedback
       ) {
         throw new PortalConflictError("The correction must change the score, maximum score, or feedback");
@@ -801,8 +831,9 @@ export const resultsLifecycleService = {
           beforeScore: result.score,
           beforeMaxScore: result.maxScore,
           beforeFeedback: result.feedback,
-          afterScore: input.score,
-          afterMaxScore: input.maxScore,
+          afterScore: score,
+          afterMaxScore: maxScore,
+          questionChanges,
           afterFeedback: input.feedback,
           reason: input.reason,
           correctedById: authorId,
@@ -810,9 +841,12 @@ export const resultsLifecycleService = {
         },
       });
       await tx.$queryRaw`SELECT set_config('dse.result_correction_id', ${correction.id}, true)`;
+      for (const change of questionChanges) {
+        await tx.assessmentCriterionScore.update({ where: { id: change.scoreId }, data: { score: change.afterScore } });
+      }
       const updated = await tx.assessmentResult.update({
         where: { id: result.id },
-        data: { score: input.score, maxScore: input.maxScore, feedback: input.feedback },
+        data: { score, maxScore, feedback: input.feedback, updatedAt: new Date(Math.max(correctedAt.getTime(), result.updatedAt.getTime() + 1)) },
       });
 
       if (

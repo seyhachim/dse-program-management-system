@@ -333,6 +333,7 @@ export const CorrectFinalizedAssessmentResultInput = z.object({
   feedback: z.string().trim().max(5000).default(""),
   reason: z.string().trim().min(1, "A correction reason is required").max(2000),
   expectedUpdatedAt: z.string().datetime(),
+  questionScores: z.array(z.object({ criterionId: z.string().min(1), score: z.number().finite().nonnegative() })).min(1).optional(),
 }).refine((value) => value.score <= value.maxScore, {
   message: "Score cannot exceed maximum score",
   path: ["score"],

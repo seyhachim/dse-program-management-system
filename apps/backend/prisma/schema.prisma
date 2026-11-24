@@ -2934,6 +2934,7 @@ model AssessmentResultCorrection {
   afterScore         Float
   afterMaxScore      Float
   afterFeedback      String
+  questionChanges    Json @default("[]")
   reason             String
   correctedById      String
   correctedBy        User             @relation("AssessmentResultCorrectionActor", fields: [correctedById], references: [id], onDelete: Restrict)
