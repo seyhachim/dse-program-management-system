@@ -200,6 +200,11 @@ export const attendanceRecheckService = {
       if (!session) {
         throw new AttendanceRecheckConflictError("Save the first roll call before rechecking students");
       }
+      if (session.updatedAt.toISOString() !== input.expectedUpdatedAt) {
+        throw new AttendanceRecheckConflictError(
+          "Attendance changed after this recheck was opened. Reload the register before recording Check 2.",
+        );
+      }
 
       const checkpoints = await tx.$queryRaw<AttendanceCheckpointRow[]>`
         SELECT "id", "sessionId", "studentId", "studentNumber", "studentName",
