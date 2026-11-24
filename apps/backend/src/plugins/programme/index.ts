@@ -14,6 +14,7 @@ import { offeringCurriculumService } from "./offering-curriculum-service.ts";
 import { publicCurriculumReadService } from "./public-curriculum-read-service.ts";
 import { createPublicProgrammeInfoRouter } from "./public-programme-info-router.ts";
 import { createPublicProgrammeReadRouter } from "./public-programme-read-router.ts";
+import { createPublicDseNewsRouter } from "./public-dse-news-router.ts";
 import { publicProgrammeReadService } from "./public-programme-read-service.ts";
 import { createPublicQuestionAnalyticsRouter } from "./public-question-analytics-router.ts";
 import { publicQuestionAnalyticsService } from "./public-question-analytics-service.ts";
@@ -26,6 +27,7 @@ const programmeRouter = Router();
 // Public read routes must be mounted before the authenticated Programme router.
 // They expose only explicit published/public DTO projections and define no
 // mutation routes. The existing management surface remains fully authenticated.
+programmeRouter.use("/public/news", createPublicDseNewsRouter());
 programmeRouter.use("/public", createPublicProgrammeReadRouter());
 
 const authenticatedProgrammeRouter = createProgrammeRouter();
