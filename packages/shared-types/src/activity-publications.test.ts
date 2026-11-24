@@ -4,7 +4,7 @@ import { CreateVisitParticipantSchema, CreateDseNewsSchema, canPublishDseNews } 
 describe("field visit participant integrity", () => {
   test("the Kampot paper trip roster does not certify farm attendance", () => {
     const row = CreateVisitParticipantSchema.parse({
-      studentId: "065baca3-e3fc-4624-ad45-4696adc519bf", goStatus: "Marked",
+      studentId: "11111111-2222-4333-8444-555555555555", goStatus: "Marked",
       returnStatus: "Marked", source: "PaperTripSheet",
     });
     expect(row.farmStatus).toBe("Unverified");
@@ -12,7 +12,7 @@ describe("field visit participant integrity", () => {
   });
   test("rejects ambiguous identity or personal note overflow", () => {
     expect(CreateVisitParticipantSchema.safeParse({
-      studentId: "065baca3-e3fc-4624-ad45-4696adc519bf", externalName: "Other Person",
+      studentId: "11111111-2222-4333-8444-555555555555", externalName: "Other Person",
     }).success).toBe(false);
     expect(CreateVisitParticipantSchema.safeParse({ externalName: "Staff Member", note: "a".repeat(501) }).success).toBe(false);
   });

@@ -1,10 +1,13 @@
-import { Router } from "express";
+import { Router, raw } from "express";
+import { NewsMediaError } from "./dse-news-media-storage.ts";
+import { dseNewsMediaService } from "./dse-news-media-service.ts";
 import { CreateDseNewsSchema, EditDseNewsSchema, ChangeDseNewsStatusSchema } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { dseNewsService, NewsAccessError, NewsConflictError, NewsNotFoundError } from "./dse-news-service.ts";
 
 function fail(error: unknown, res: import("express").Response) {
+  if (error instanceof NewsMediaError) return void res.status(error.status).json({ error: error.message });
   if (error instanceof NewsNotFoundError) return void res.status(404).json({ error: error.message });
   if (error instanceof NewsAccessError) return void res.status(403).json({ error: error.message });
   if (error instanceof NewsConflictError) return void res.status(409).json({ error: error.message });
@@ -35,6 +38,23 @@ export function createDseNewsRouter() {
     if (!parsed.success) return void res.status(400).json({ error: "Invalid publication action", details: parsed.error.flatten() });
     try { res.json(await dseNewsService.changeStatus(req.user!, req.params.id!, parsed.data)); } catch (error) { fail(error, res); }
   });
+  // Uploads are staff-only raw WebP packages, never base64 JSON or public Storage URLs.
+  router.post("/manage/:id/media", requirePermission("offerings:write"),
+    raw({type:"application/octet-stream",limit:"4mb"}), async (req,res) => {
+      if (!(req.body instanceof Uint8Array)) {
+        return void res.status(400).json({error:"A compressed WebP photo is required"});
+      }
+      try {
+        res.status(201).json(await dseNewsMediaService.upload(
+          req.user!,req.params.id!,req.body,req.query.kind,req.query.alt,
+        ));
+      }catch(error){fail(error,res);}
+    });
+  router.delete("/manage/:id/media/:mediaId",requirePermission("offerings:write"),async(req,res)=>{
+    try{res.json(await dseNewsMediaService.remove(req.user!,req.params.id!,req.params.mediaId!));}
+    catch(error){fail(error,res);}
+  });
+
   // Student endpoints return published copy only, never draft or participant data.
   router.get("/", requirePermission("student-portal:read"), async (req, res) => {
     try { res.json(await dseNewsService.studentList(req.user!.id)); } catch (error) { fail(error, res); }

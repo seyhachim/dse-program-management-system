@@ -94,6 +94,16 @@ export const ChangeDseNewsStatusSchema = z.object({
 export type CreateDseNewsInput = z.infer<typeof CreateDseNewsSchema>;
 export type EditDseNewsInput = z.infer<typeof EditDseNewsSchema>;
 export type ChangeDseNewsStatusInput = z.infer<typeof ChangeDseNewsStatusSchema>;
+export interface DseNewsUploadedMedia {
+  id: string;
+  kind: "cover" | "gallery";
+  url: string;
+  thumbnailUrl: string;
+  alt: string;
+  width: number;
+  height: number;
+  bytes: number;
+}
 export interface DseNewsView {
   id: string;
   programmeId: string;
@@ -104,6 +114,7 @@ export interface DseNewsView {
   coverImageUrl: string | null;
   coverAlt: string;
   gallery: z.infer<typeof NewsMediaSchema>[];
+  uploadedMedia: DseNewsUploadedMedia[];
   tags: string[];
   mediaApproved: boolean;
   status: "Draft" | "Published" | "Archived";

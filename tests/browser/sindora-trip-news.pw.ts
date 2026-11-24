@@ -8,7 +8,7 @@ test.describe("Sindora participation and DSE News UI", () => {
       const page = await ctx.newPage();
       const offeringId = "synthetic-news-ui";
       const activityId = "synthetic-visit";
-      const studentId = "065baca3-e3fc-4624-ad45-4696adc519bf";
+      const studentId = "11111111-2222-4333-8444-555555555555";
       let recorded: any[] = [];
       await page.route("**/api/offerings/" + offeringId + "/activities/" + activityId + "/participants**", async route => {
         const req = route.request();
@@ -42,14 +42,14 @@ test.describe("Sindora participation and DSE News UI", () => {
       await expect(page.getByText("Not documented on this sheet")).toBeVisible();
       await page.getByLabel("Student from AIE401 roster").selectOption(studentId);
       await page.getByLabel("Departure / Go").selectOption("Marked");
-      await page.getByLabel("Return",{exact:true}).last().selectOption("Marked");
+      await page.getByRole("combobox", { name: "Return", exact: true }).selectOption("Marked", { timeout: 10000 });
       await page.getByRole("button",{name:"Save trip participant"}).click();
       await expect(page.getByText("Farm attendance remains unverified.",{exact:false})).toBeVisible();
       expect(recorded[0].farmStatus).toBe("Unverified");
       await page.setViewportSize({width:375,height:850});
       const width=await page.evaluate(()=>({content:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth}));
       expect(width.content).toBeLessThanOrEqual(width.viewport+1);
-    } finally { await ctx.close(); }
+    } finally { await ctx.close().catch(() => {}); }
   });
   test("coordinator publishes draft and student sees a programme article without private roster", async ({ browser }) => {
     const ctx = await newRoleContext(browser,"coordinator");
@@ -81,7 +81,7 @@ test.describe("Sindora participation and DSE News UI", () => {
       page.once("dialog",dialog=>dialog.accept());
       await page.getByRole("button",{name:"Publish to DSE students"}).click();
       await expect(page.getByText("Article status: Published")).toBeVisible();
-    } finally { await ctx.close(); }
+    } finally { await ctx.close().catch(() => {}); }
     const studentCtx=await newRoleContext(browser,"student");
     try {
       const page=await studentCtx.newPage();
