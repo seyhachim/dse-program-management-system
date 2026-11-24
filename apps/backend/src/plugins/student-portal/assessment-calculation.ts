@@ -1,8 +1,11 @@
+import { MARKING_SCHEME_HASH_PREFIX } from "../../core/academic/rubric-context.ts";
+
 export type GradeAssessment = {
   id: string;
   status: string;
   weight: number | null;
   cloCodes: string[];
+  criterionCloMappings?: Array<{ criterionId: string; rubricId: string; rubricContentHash: string; cloCode: string }>;
 };
 
 export type PublishedAssessmentResult = {
@@ -126,9 +129,27 @@ export function calculateCloEvidence(
   const resultByAssessment = new Map(
     results.map((result) => [result.assessmentItemId, result]),
   );
-  const criterionForClo = criterionEvidence.filter(
-    (item) => item.cloCodes.includes(cloCode) && item.maxScore > 0,
-  );
+  const schemeAssessments = new Map(assessments.filter((assessment) =>
+    assessment.criterionCloMappings?.some((mapping) => mapping.rubricContentHash.startsWith(MARKING_SCHEME_HASH_PREFIX))
+  ).map((assessment) => [assessment.id, assessment]));
+  const schemeTotals = new Map<string, number>();
+  const completeSchemeEvidence: CriterionCloEvidenceInput[] = [];
+  for (const assessment of schemeAssessments.values()) {
+    if (assessment.status !== "Active" || !assessment.cloCodes.includes(cloCode) || !resultByAssessment.has(assessment.id)) continue;
+    const expected = (assessment.criterionCloMappings ?? []).filter((mapping) => mapping.cloCode === cloCode);
+    const rows = criterionEvidence.filter((row) => row.assessmentItemId === assessment.id && row.cloCodes.includes(cloCode));
+    if (!expected.length || rows.length !== expected.length || !expected.every((mapping) => rows.some((row) =>
+      row.criterionId === mapping.criterionId && row.rubricId === mapping.rubricId && row.rubricContentHash === mapping.rubricContentHash &&
+      Number.isFinite(row.score) && Number.isFinite(row.maxScore) && row.maxScore > 0 && row.score >= 0 && row.score <= row.maxScore
+    ))) continue;
+    const maximum = rows.reduce((sum, row) => sum + row.maxScore, 0);
+    schemeTotals.set(assessment.id, Math.round(rows.reduce((sum, row) => sum + row.score, 0) / maximum * 10000) / 100);
+    completeSchemeEvidence.push(...rows);
+  }
+  const criterionForClo = [
+    ...criterionEvidence.filter((item) => !schemeAssessments.has(item.assessmentItemId) && !item.rubricContentHash.startsWith(MARKING_SCHEME_HASH_PREFIX) && item.cloCodes.includes(cloCode) && item.maxScore > 0),
+    ...completeSchemeEvidence,
+  ];
   const criterionAssessmentIds = new Set(
     criterionForClo.map((item) => item.assessmentItemId),
   );
@@ -148,7 +169,7 @@ export function calculateCloEvidence(
       (assessment) =>
         assessment.status === "Active" &&
         assessment.cloCodes.includes(cloCode) &&
-        !criterionAssessmentIds.has(assessment.id),
+        !criterionAssessmentIds.has(assessment.id) && !schemeAssessments.has(assessment.id),
     )
     .flatMap((assessment) => {
       const result = resultByAssessment.get(assessment.id);
@@ -160,11 +181,12 @@ export function calculateCloEvidence(
       }];
     });
   const evidence = [...criterionTraces, ...assessmentTraces];
+  const aggregationItems = [...evidence.filter((item) => !schemeAssessments.has(item.assessmentItemId)).map((item) => item.rawPercentage), ...schemeTotals.values()];
   return {
-    percentage: evidence.length
+    percentage: aggregationItems.length
       ? Math.round(
-          evidence.reduce((sum, item) => sum + item.rawPercentage, 0) /
-            evidence.length,
+          aggregationItems.reduce((sum, item) => sum + item, 0) /
+            aggregationItems.length,
         )
       : null,
     evidence,
