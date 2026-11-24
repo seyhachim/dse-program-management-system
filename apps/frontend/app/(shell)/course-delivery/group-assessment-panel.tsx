@@ -11,6 +11,7 @@ import { Button, Input } from "@dse-pms/ui";
 import { CheckCircle2, LockKeyhole, Plus, RefreshCcw, Trash2, UsersRound } from "lucide-react";
 import { ApiError } from "@/lib/api";
 import { courseDeliveryApi } from "@/lib/course-delivery";
+import { LecturerProjectGroupRegistration } from "@/components/course-project-group-registration";
 
 type Props = {
   offeringId: string;
@@ -28,6 +29,7 @@ export function GroupAssessmentPanel({ offeringId, assessment, onChanged }: Prop
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState(false);
   const [groups, setGroups] = useState<GroupDraft[]>([]);
   const [assignment, setAssignment] = useState<Record<string, string>>(Object.create(null));
 
@@ -64,7 +66,7 @@ export function GroupAssessmentPanel({ offeringId, assessment, onChanged }: Prop
   const allFinalized = Boolean(workspace?.groups.length) && workspace!.groups.every((group) => group.finalizedAt);
 
   const saveGroups = async () => {
-    if (!workspace || membershipLocked || groups.some((group) => !group.name.trim())) return;
+    if (!workspace || membershipLocked || registrationEnabled || groups.some((group) => !group.name.trim())) return;
     setBusy(true);
     setError(null);
     try {
@@ -161,13 +163,16 @@ export function GroupAssessmentPanel({ offeringId, assessment, onChanged }: Prop
         {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
       </Card>
 
+      <LecturerProjectGroupRegistration key={`${offeringId}-${assessment.id}`} offeringId={offeringId} assessmentItemId={assessment.id} onEnabledChange={setRegistrationEnabled} onAcademicChanged={async () => { await load(); await onChanged("Student project group approved."); }} />
+
       <Card
         title="Group membership snapshot"
         description={membershipLocked
           ? "Membership is locked because scoring has started. This snapshot is the historical membership used by published results."
           : "Create groups and assign each enrolled student. Scoring locks this membership snapshot."}
       >
-        {membershipLocked ? (
+        {registrationEnabled && !membershipLocked ? <p className="text-sm text-muted-foreground mb-3">Student registration is enabled. Close it in the registration panel before editing membership manually.</p> : null}
+        {membershipLocked || registrationEnabled ? (
           <div className="grid gap-3 lg:grid-cols-2">
             {workspace.groups.map((group) => (
               <div key={group.id} className="rounded-xl border border-border p-4">

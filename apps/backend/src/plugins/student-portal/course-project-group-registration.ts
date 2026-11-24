@@ -65,12 +65,14 @@ function view(c: Context, manager: boolean): CourseProjectGroupRegistrationView 
     return [{ ...p, members: p.members.filter((m) => m.enrollmentId === actor || m.enrollmentId === p.leaderEnrollmentId) }];
   });
   const relevant = new Set(proposals.flatMap((p) => p.members.map((m) => m.enrollmentId)));
-  const classmates = c.roster.filter((e) => manager || relevant.has(e.id) || (registrationOpen && !ownGroup && !c.academicEnrollmentIds.has(e.id))).map((e) => ({ enrollmentId: e.id, name: e.student.name }));
+  const leadingDraft = proposals.some((p) => p.status === "draft" && p.leaderEnrollmentId === actor);
+  const proposedMembers = new Set(c.proposals.filter(active).flatMap((p) => p.members.filter((m) => m.status === "accepted").map((m) => m.enrollmentId)));
+  const classmates = c.roster.filter((e) => manager || relevant.has(e.id) || (registrationOpen && leadingDraft && !ownGroup && !c.academicEnrollmentIds.has(e.id) && !proposedMembers.has(e.id) && Boolean(e.student.userId && e.student.email))).map((e) => ({ enrollmentId: e.id, name: e.student.name }));
   return {
     policy: c.policy, registrationOpen, membershipLocked: c.scoringStarted, actorEnrollmentId: actor,
     classmates, proposals,
     officialGroup: ownGroup ? { id: ownGroup.id, name: ownGroup.name, members: ownGroup.members.map((m) => ({ enrollmentId: m.enrollmentId, name: m.studentNameSnapshot })) } : null,
-    unassignedCount: c.roster.filter((e) => !c.academicEnrollmentIds.has(e.id)).length, officialGroupCount: c.groups.length,
+    unassignedCount: c.roster.filter((e) => !c.academicEnrollmentIds.has(e.id)).length, unassignedEnrollmentIds: manager ? c.roster.filter((e) => !c.academicEnrollmentIds.has(e.id)).map((e) => e.id) : [], officialGroupCount: c.groups.length,
   };
 }
 
@@ -117,9 +119,9 @@ export const courseProjectGroupRegistrationService = {
     return prisma.$transaction(async (tx) => {
       await lockOffering(tx, offeringId);
       const c = await context(tx, offeringId, assessmentItemId, userId, true);
-      if (!c.registration || !c.policy || !c.policy.enabled || c.scoringStarted) throw new PortalConflictError("Registration must be enabled and academic membership unlocked");
+      if (!c.registration || !c.policy || c.scoringStarted || (input.action !== "cancel" && !c.policy.enabled)) throw new PortalConflictError("Registration must be enabled and academic membership unlocked");
       const proposal = c.proposals.find((p) => p.id === input.proposalId);
-      if (!proposal || proposal.status !== "submitted") throw new PortalConflictError("This proposal is not awaiting review");
+      if (!proposal || (input.action === "cancel" ? !active(proposal) : proposal.status !== "submitted")) throw new PortalConflictError("This proposal is not awaiting review");
       if (input.action === "approve") {
         const ids = assertProjectGroupMembers(proposal, rules(c, c.policy));
         if (c.groups.length >= c.policy.maxGroups || c.groups.some((g) => keyName(g.name) === keyName(proposal.name))) throw new PortalConflictError("Group limit or name conflict");
@@ -128,7 +130,7 @@ export const courseProjectGroupRegistrationService = {
         proposal.status = "approved";
         for (const other of c.proposals) if (active(other)) for (const member of other.members) if (ids.includes(member.enrollmentId) && member.status === "pending") member.status = "declined";
       } else {
-        proposal.status = "draft";
+        proposal.status = input.action === "cancel" ? "cancelled" : "draft";
         proposal.reviewReason = input.reason;
       }
       await tx.courseProjectGroupRegistration.update({ where: { id: c.registration.id }, data: { proposals: json(c.proposals) } });

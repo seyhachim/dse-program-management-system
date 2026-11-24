@@ -26,6 +26,7 @@ export type CourseProjectGroupActionInput = z.infer<typeof CourseProjectGroupAct
 
 export const CourseProjectGroupReviewInput = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve"), proposalId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal("cancel"), proposalId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }).strict(),
   z.object({ action: z.literal("return"), proposalId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }).strict(),
 ]);
 export type CourseProjectGroupReviewInput = z.infer<typeof CourseProjectGroupReviewInput>;
@@ -58,5 +59,6 @@ export interface CourseProjectGroupRegistrationView {
   proposals: CourseProjectGroupProposal[];
   officialGroup: { id: string; name: string; members: Array<{ enrollmentId: string; name: string }> } | null;
   unassignedCount: number;
+  unassignedEnrollmentIds: string[];
   officialGroupCount: number;
 }
