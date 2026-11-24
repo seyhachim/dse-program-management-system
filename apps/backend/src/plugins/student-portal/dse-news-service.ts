@@ -1,4 +1,5 @@
 import { Prisma, type DseNewsArticle } from "@prisma/client";
+import { signedNewsMediaUrl } from "./dse-news-media-storage.ts";
 import { z } from "zod";
 import {
   CreateDseNewsSchema, NewsMediaSchema, canPublishDseNews,
@@ -63,12 +64,19 @@ async function ensureStudentInProgramme(userId: string): Promise<void> {
   if (!cohort && !enrollment) throw new NewsAccessError("No DSE programme membership");
 }
 type WithAuthor = DseNewsArticle & { author: { name: string } };
-function view(row: WithAuthor): DseNewsView {
+async function view(row: WithAuthor): Promise<DseNewsView> {
+  const rows=await prisma.dseNewsMedia.findMany({where:{articleId:row.id},orderBy:[{createdAt:"asc"},{id:"asc"}]});
+  const uploadedMedia=await Promise.all(rows.map(async media=>({
+    id:media.id,kind:media.kind as "cover"|"gallery",alt:media.alt,
+    width:media.width,height:media.height,bytes:media.bytes,
+    url:await signedNewsMediaUrl(media.storagePath),
+    thumbnailUrl:await signedNewsMediaUrl(media.thumbnailPath),
+  })));
   return {
     id: row.id, programmeId: row.programmeId, activityId: row.activityId,
     title: row.title, summary: row.summary, body: row.body,
     coverImageUrl: row.coverImageUrl, coverAlt: row.coverAlt,
-    gallery: NewsMediaSchema.array().parse(row.gallery),
+    gallery: NewsMediaSchema.array().parse(row.gallery), uploadedMedia,
     tags: z.array(z.string()).parse(row.tags), mediaApproved: row.mediaApproved,
     status: row.status as DseNewsView["status"], version: row.version,
     authorName: row.author.name,
@@ -99,11 +107,11 @@ async function editable(user: AuthUser, id: string) {
 export const dseNewsService = {
   async studentList(userId: string) {
     await ensureStudentInProgramme(userId);
-    return (await prisma.dseNewsArticle.findMany({
+    return Promise.all((await prisma.dseNewsArticle.findMany({
       where: { programmeId: DEFAULT_PROGRAMME_ID, status: "Published" },
       include: { author: { select: { name: true } } },
       orderBy: [{ publishedAt: "desc" }, { id: "desc" }], take: 100,
-    })).map(view);
+    })).map(view));
   },
   async studentGet(userId: string, id: string) {
     await ensureStudentInProgramme(userId);
@@ -114,6 +122,11 @@ export const dseNewsService = {
     if (!article) throw new NewsNotFoundError("Published article not found");
     return view(article);
   },
+  async assertMediaEditable(user: AuthUser, id: string) {
+    const article=await editable(user,id);
+    if (article.status!=="Draft") throw new NewsConflictError("Unpublish the article before changing photos");
+    return article;
+  },
   async staffList(user: AuthUser) {
     if (!mayPublishNews(user) && !hasAnyRoleInProgramme(user, ["lecturer"], DEFAULT_PROGRAMME_ID)) {
       throw new NewsAccessError("DSE teaching staff only");
@@ -122,7 +135,7 @@ export const dseNewsService = {
       where: { programmeId: DEFAULT_PROGRAMME_ID, ...(mayPublishNews(user) ? {} : { authorId: user.id }) },
       include: { author: { select: { name: true } } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 100,
-    })).map(view);
+    })).map(view));
   },
   async staffGet(user: AuthUser, id: string) {
     const article = await prisma.dseNewsArticle.findFirst({
