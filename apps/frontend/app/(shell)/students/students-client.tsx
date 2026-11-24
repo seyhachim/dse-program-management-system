@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { MailPlus, UserPlus } from "lucide-react";
 import type { Student } from "@dse-pms/shared-types";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@dse-pms/ui";
 import { QueryRefreshStatus } from "@/components/query-refresh-status";
 import { statusTone, studentsApi } from "@/lib/students";
+import { studentCohortSectionsApi } from "@/lib/student-cohort-sections";
 import { ApiError } from "@/lib/api";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { StudentForm, type StudentFormValues } from "./student-form";
@@ -41,6 +42,8 @@ export function StudentsClient() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
+  const [cohortId, setCohortId] = useState("all");
+  const [sectionId, setSectionId] = useState("all");
   const [portalAccessFilter, setPortalAccessFilter] = useState<PortalAccessFilter>("all");
   const [pageCursor, setPageCursor] = useState<string | undefined>(undefined);
   const [previousCursors, setPreviousCursors] = useState<Array<string | undefined>>([]);
@@ -65,6 +68,29 @@ export function StudentsClient() {
   }, [search]);
 
   const queryScope = { userId: me?.id ?? "pending" };
+  const cohortsQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "students", "roster-cohorts"),
+    queryFn: () => studentsApi.rosterCohorts(),
+    enabled: Boolean(me?.id),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const hasSelectedCohort = cohortId !== "all" && cohortId !== "unassigned";
+  const sectionsQuery = useQuery({
+    queryKey: protectedQueryKey(queryScope, "students", "roster-sections", cohortId),
+    queryFn: () => studentCohortSectionsApi.list(cohortId, true),
+    enabled: Boolean(me?.id && hasSelectedCohort),
+    staleTime: QUERY_STALE_MS.operational,
+  });
+  const resetRosterPage = () => {
+    setSelectedIds([]);
+    setPageCursor(undefined);
+    setPreviousCursors([]);
+  };
+  const changeCohort = (id: string) => {
+    setCohortId(id);
+    setSectionId("all");
+    resetRosterPage();
+  };
   const studentsQuery = useQuery({
     queryKey: protectedQueryKey(
       queryScope,
@@ -72,6 +98,8 @@ export function StudentsClient() {
       "page",
       debouncedSearch,
       activeOnly,
+      cohortId,
+      sectionId,
       pageCursor ?? "first",
       PAGE_SIZE,
     ),
@@ -79,12 +107,13 @@ export function StudentsClient() {
       studentsApi.listPage({
         search: debouncedSearch,
         activeOnly,
+        cohortId: cohortId === "all" ? undefined : cohortId,
+        sectionId: sectionId === "all" ? undefined : sectionId,
         cursor: pageCursor,
         limit: PAGE_SIZE,
       }),
     enabled: Boolean(me?.id),
     staleTime: QUERY_STALE_MS.operational,
-    placeholderData: keepPreviousData,
   });
   const rows = studentsQuery.data?.items ?? [];
   const hasData = studentsQuery.data !== undefined;
@@ -476,6 +505,51 @@ export function StudentsClient() {
 
   return (
     <div className="space-y-4">
+      <section aria-label="Browse by cohort" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">Browse by cohort</h2>
+          <Button type="button" variant="outline" onClick={() => changeCohort("all")}
+            aria-pressed={cohortId === "all"}>All students</Button>
+        </div>
+        <QueryRefreshStatus hasData={Boolean(cohortsQuery.data)} isPending={cohortsQuery.isPending}
+          isFetching={cohortsQuery.isFetching} isError={cohortsQuery.isError} label="Cohorts" />
+        {cohortsQuery.data ? (
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {cohortsQuery.data.cohorts.map((cohort) => (
+              <button key={cohort.id} type="button" aria-pressed={cohortId === cohort.id}
+                onClick={() => changeCohort(cohort.id)}
+                className={`rounded-xl border bg-card p-3 text-left transition-colors hover:border-primary focus-visible:outline focus-visible:outline-2 ${cohortId === cohort.id ? "border-primary ring-1 ring-primary" : "border-border"}`}>
+                <p className="text-xs text-muted-foreground">Intake {cohort.intakeYear} · {cohort.status}</p>
+                <p className="font-semibold">{cohort.code} — {cohort.name}</p>
+                <p className="mt-2 text-xl font-semibold">{cohort.memberCount} <span className="text-xs font-normal text-muted-foreground">current members</span></p>
+                <p className="text-xs text-muted-foreground">{cohort.activeCount} active · {cohort.pendingCount} pending student records</p>
+              </button>
+            ))}
+            <button type="button" aria-pressed={cohortId === "unassigned"}
+              onClick={() => changeCohort("unassigned")}
+              className={`rounded-xl border bg-card p-3 text-left hover:border-primary ${cohortId === "unassigned" ? "border-primary ring-1 ring-primary" : "border-border"}`}>
+              <p className="font-semibold">No current cohort</p>
+              <p className="mt-2 text-xl font-semibold">{cohortsQuery.data.unassignedCount}</p>
+              <p className="text-xs text-muted-foreground">No open membership; may include historical students</p>
+            </button>
+          </div>
+        ) : null}
+        {hasSelectedCohort ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={sectionId} onValueChange={(id) => { setSectionId(id); resetRosterPage(); }}>
+              <SelectTrigger className="w-full sm:w-[14rem]" aria-label="Filter by class"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All classes</SelectItem>
+                {(sectionsQuery.data ?? []).map((section) => (
+                  <SelectItem key={section.id} value={section.id}>{section.code} — {section.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {sectionsQuery.isPending ? <p className="text-xs text-muted-foreground">Loading classes…</p> : null}
+            {sectionsQuery.isError ? <p className="text-xs text-muted-foreground">Classes unavailable. All classes is still available.</p> : null}
+          </div>
+        ) : null}
+      </section>
       <TableToolbar
         search={search}
         onSearchChange={(value) => {
@@ -639,7 +713,9 @@ export function StudentsClient() {
             emptyMessage={
               portalFilterActive
                 ? "No students on this page match the selected Portal Access filter."
-                : "No students yet. Add your first student."
+                : cohortId !== "all" || search || activeOnly
+                  ? "No students match the selected filters."
+                  : "No students yet. Add your first student."
             }
           />
           {hasData ? (
