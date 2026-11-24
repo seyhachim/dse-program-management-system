@@ -109,7 +109,7 @@ export function RubricDetailPage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Button variant="outline" render={<Link href={libraryHref}><ArrowLeft className="h-4 w-4" />Back to Assessment Instrument Library</Link>} />
             {editable && rubric ? (
-              <Button render={<Link href={rubric.instrumentKind === "marking_scheme" ? "/rubric-bank" : `${libraryHref}/${rubric.id}/edit`}><Pencil className="h-4 w-4" />Edit Rubric</Link>} />
+              <Button render={<Link href={`${libraryHref}/${rubric.id}/edit`}><Pencil className="h-4 w-4" />Edit Rubric</Link>} />
             ) : null}
           </div>
 

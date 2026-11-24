@@ -59,6 +59,7 @@ export function RubricFormPage({
   const [type, setType] = useState<RubricType>(RUBRIC_TYPES[0]);
   const [status, setStatus] = useState<RubricStatus>("Draft");
   const [description, setDescription] = useState("");
+  const [kind, setKind] = useState<"rubric" | "marking_scheme">("rubric");
   const [levels, setLevels] = useState<RubricLevel[]>(() => DEFAULT_RUBRIC_LEVELS.map((l) => ({ ...l })));
   const [criteria, setCriteria] = useState<RubricCriterion[]>(() => [newCriterion(DEFAULT_RUBRIC_LEVELS.length)]);
 
@@ -83,7 +84,7 @@ export function RubricFormPage({
       try {
         const r = await rubricsApi.get(rubricId);
         if (cancelled) return;
-        if (r.instrumentKind === "marking_scheme") { router.replace("/rubric-bank"); return; }
+        setKind(r.instrumentKind ?? "rubric");
         setName(r.name);
         setType(r.type);
         setStatus(r.status);
@@ -132,7 +133,7 @@ export function RubricFormPage({
       ),
     );
 
-  const addCriterion = () => setCriteria((cs) => [...cs, newCriterion(levels.length)]);
+  const addCriterion = () => setCriteria((cs) => [...cs, { ...newCriterion(levels.length), ...(kind === "marking_scheme" ? { maxPoints: 1 } : {}) }]);
   const removeCriterion = (id: string) =>
     setCriteria((cs) => (cs.length <= 1 ? cs : cs.filter((c) => c.id !== id)));
 
@@ -141,6 +142,7 @@ export function RubricFormPage({
     setError(null);
     const payload = {
       name,
+      instrumentKind: kind,
       type,
       description,
       status,
@@ -165,7 +167,7 @@ export function RubricFormPage({
   };
 
   const breadcrumbLabel = course ? `${course.code} – ${course.title}` : "Course Specification";
-  const pageTitle = editing ? "Edit rubric" : "Create rubric";
+  const pageTitle = editing ? "Edit assessment instrument" : "Create assessment instrument";
 
   return (
     <>
@@ -219,9 +221,10 @@ export function RubricFormPage({
             <form onSubmit={onSubmit} className="space-y-6">
               {/* Details */}
               <section className="space-y-4 rounded-xl border border-border bg-card p-6">
+                {!editing ? <label className="block space-y-1.5"><FormFieldLabel required>Instrument kind</FormFieldLabel><select value={kind} onChange={(event) => { const next = event.target.value === "marking_scheme" ? "marking_scheme" : "rubric"; setKind(next); if (next === "marking_scheme") { setType("Exam"); setLevels([]); setCriteria([{ ...newCriterion(0), maxPoints: 1 }]); } else { setLevels(DEFAULT_RUBRIC_LEVELS.map((level) => ({ ...level }))); setCriteria([newCriterion(DEFAULT_RUBRIC_LEVELS.length)]); } }} className="h-10 rounded-md border border-border bg-background px-3"><option value="rubric">Rubric</option><option value="marking_scheme">Marking scheme</option></select></label> : <p className="text-sm font-medium">{kind === "marking_scheme" ? "Marking scheme" : "Rubric"}</p>}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block space-y-1.5 sm:col-span-2">
-                    <FormFieldLabel required>Rubric name</FormFieldLabel>
+                    <FormFieldLabel required>Instrument name</FormFieldLabel>
                     <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Assignment Rubric – Written Report" />
                   </label>
                   <label className="block space-y-1.5">
@@ -267,6 +270,11 @@ export function RubricFormPage({
                 </div>
               </section>
 
+              {kind === "marking_scheme" ? <section className="space-y-3 rounded-xl border border-border bg-card p-6">
+                <div className="flex flex-wrap justify-between gap-2"><div><h2 className="font-semibold">Questions and maximum marks</h2><p className="text-xs text-muted-foreground">Use neutral labels only. Store exam papers and solutions separately in secure lecturer-only documents.</p></div><Button type="button" variant="outline" size="sm" onClick={addCriterion}><Plus className="h-4 w-4" />Add question</Button></div>
+                {criteria.map((question, index) => <div key={question.id} className="flex items-end gap-2"><label className="flex-1 space-y-1"><FormFieldLabel required>Question / section</FormFieldLabel><Input required value={question.name} onChange={(event) => updateCriterion(question.id, { name: event.target.value })} placeholder={`Q${index + 1}`} /></label><label className="w-28 space-y-1"><FormFieldLabel required>Max points</FormFieldLabel><Input required type="number" min="0.01" step="any" value={question.maxPoints ?? ""} onChange={(event) => updateCriterion(question.id, { maxPoints: Number(event.target.value) })} /></label><Button type="button" variant="ghost" size="sm" disabled={criteria.length <= 1} onClick={() => removeCriterion(question.id)} aria-label={`Remove question ${index + 1}`}><Trash2 className="h-4 w-4" /></Button></div>)}
+                <p className="text-sm font-medium">Total maximum: {criteria.reduce((sum, question) => sum + (question.maxPoints ?? 0), 0)} points</p>
+              </section> : <>
               {/* Rating scale */}
               <section className="space-y-3 rounded-xl border border-border bg-card p-6">
                 <div className="flex items-center justify-between">
@@ -391,10 +399,11 @@ export function RubricFormPage({
                 </div>
               </section>
 
+              </>}
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
                 <Button type="button" variant="outline" render={<Link href={backHref}>Cancel</Link>} />
                 <Button type="submit" disabled={saving}>
-                  {saving ? "Saving…" : editing ? "Save changes" : "Create rubric"}
+                  {saving ? "Saving…" : editing ? "Save changes" : "Create instrument"}
                 </Button>
               </div>
             </form>

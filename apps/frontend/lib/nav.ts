@@ -49,12 +49,12 @@ import {
 const rubricBankManifest: PluginManifest = {
   ...(pluginManifests.find((manifest) => manifest.id === "rubrics") ?? {
     id: "rubrics",
-    name: "Rubric Library",
+    name: "Assessment Instrument Library",
     version: "0.1.0",
   }),
   routes: [
     {
-      label: "Rubric Bank",
+      label: "Assessment Instrument Library",
       path: "/rubric-bank",
       icon: "library",
       roles: ["admin", "program_coordinator"],

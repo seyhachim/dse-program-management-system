@@ -137,7 +137,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
               />
             </div>
             {canCreate ? (
-              <div className="flex flex-wrap gap-2"><Button variant="outline" render={<Link href="/rubric-bank">Manage marking schemes</Link>} /><Button render={<Link href={`${base}/new`}><Plus className="h-4 w-4" />Create Rubric</Link>} /></div>
+              <Button render={<Link href={`${base}/new`}><Plus className="h-4 w-4" />Create instrument</Link>} />
             ) : null}
           </div>
 
@@ -258,7 +258,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
                             ) : null}
                             {editable ? (
                               <Link
-                                href={rubric.instrumentKind === "marking_scheme" ? "/rubric-bank" : `${base}/${rubric.id}/edit`}
+                                href={`${base}/${rubric.id}/edit`}
                                 aria-label={`Edit ${rubric.name}`}
                                 title="Edit rubric"
                                 className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"

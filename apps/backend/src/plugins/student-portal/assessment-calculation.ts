@@ -1,3 +1,4 @@
+import { hasMarkingSchemeMappings, markingSchemeCloEvidence } from "../../core/academic/marking-scheme-evidence.ts";
 import { MARKING_SCHEME_HASH_PREFIX } from "../../core/academic/rubric-context.ts";
 
 export type GradeAssessment = {
@@ -130,21 +131,17 @@ export function calculateCloEvidence(
     results.map((result) => [result.assessmentItemId, result]),
   );
   const schemeAssessments = new Map(assessments.filter((assessment) =>
-    assessment.criterionCloMappings?.some((mapping) => mapping.rubricContentHash.startsWith(MARKING_SCHEME_HASH_PREFIX))
+    hasMarkingSchemeMappings(assessment.criterionCloMappings ?? [])
   ).map((assessment) => [assessment.id, assessment]));
   const schemeTotals = new Map<string, number>();
   const completeSchemeEvidence: CriterionCloEvidenceInput[] = [];
   for (const assessment of schemeAssessments.values()) {
     if (assessment.status !== "Active" || !assessment.cloCodes.includes(cloCode) || !resultByAssessment.has(assessment.id)) continue;
-    const expected = (assessment.criterionCloMappings ?? []).filter((mapping) => mapping.cloCode === cloCode);
-    const rows = criterionEvidence.filter((row) => row.assessmentItemId === assessment.id && row.cloCodes.includes(cloCode));
-    if (!expected.length || rows.length !== expected.length || !expected.every((mapping) => rows.some((row) =>
-      row.criterionId === mapping.criterionId && row.rubricId === mapping.rubricId && row.rubricContentHash === mapping.rubricContentHash &&
-      Number.isFinite(row.score) && Number.isFinite(row.maxScore) && row.maxScore > 0 && row.score >= 0 && row.score <= row.maxScore
-    ))) continue;
-    const maximum = rows.reduce((sum, row) => sum + row.maxScore, 0);
-    schemeTotals.set(assessment.id, Math.round(rows.reduce((sum, row) => sum + row.score, 0) / maximum * 10000) / 100);
-    completeSchemeEvidence.push(...rows);
+    const rows = criterionEvidence.filter((row) => row.assessmentItemId === assessment.id);
+    const aggregate = markingSchemeCloEvidence(cloCode, assessment.criterionCloMappings ?? [], rows, resultByAssessment.get(assessment.id)!);
+    if (!aggregate) continue;
+    schemeTotals.set(assessment.id, aggregate.percentage);
+    completeSchemeEvidence.push(...aggregate.rows);
   }
   const criterionForClo = [
     ...criterionEvidence.filter((item) => !schemeAssessments.has(item.assessmentItemId) && !item.rubricContentHash.startsWith(MARKING_SCHEME_HASH_PREFIX) && item.cloCodes.includes(cloCode) && item.maxScore > 0),
