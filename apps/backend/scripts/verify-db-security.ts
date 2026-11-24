@@ -87,6 +87,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "OfferingActivityParticipantAudit",
   "DseNewsArticle",
   "DseNewsAuditEvent",
+  "DseNewsMedia",
   "OfferingStudentSemesterNote",
   "OfferingStudentSemesterNoteRevision",
   "OfferingResultAccessPolicy",
