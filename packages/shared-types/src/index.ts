@@ -92,3 +92,5 @@ export * from "./community.ts";
 export * from "./community-plugin.ts";
 export * from "./student-handbook.ts";
 export * from "./offering-activities.ts";
+
+export * from "./activity-publications.ts";
