@@ -393,6 +393,7 @@ model User {
   dseNewsAuthored DseNewsArticle[] @relation("DseNewsAuthor")
   dseNewsUpdated DseNewsArticle[] @relation("DseNewsEditor")
   dseNewsAudits DseNewsAuditEvent[] @relation("DseNewsAuditActor")
+  dseNewsMediaUploaded DseNewsMedia[] @relation("DseNewsMediaUploader")
   rubricsOwned                       Rubric[]                                  @relation("RubricOwner")
   coLecturerOf                       OfferingCoLecturer[]                      @relation("OfferingCoLecturer")
   offeringMeetingAssignments             OfferingMeetingLecturer[]                 @relation("OfferingMeetingLecturerUser")
@@ -3632,6 +3633,7 @@ model DseNewsArticle {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   audits         DseNewsAuditEvent[]
+  media          DseNewsMedia[]
 
   @@index([programmeId, status, publishedAt])
   @@index([activityId])
@@ -3649,6 +3651,26 @@ model DseNewsAuditEvent {
   createdAt DateTime       @default(now())
 
   @@index([articleId, createdAt])
+}
+
+//// Private uploaded photos attached to an existing news draft.
+//// Source bytes and private object paths are never served to API clients.
+model DseNewsMedia {
+  id            String         @id @default(uuid())
+  articleId     String
+  article       DseNewsArticle @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  kind          String
+  storagePath   String         @unique @db.VarChar(240)
+  thumbnailPath String         @unique @db.VarChar(240)
+  alt           String         @db.VarChar(250)
+  width         Int
+  height        Int
+  bytes         Int
+  uploadedById  String
+  uploadedBy    User           @relation("DseNewsMediaUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt     DateTime       @default(now())
+
+  @@index([articleId, kind])
 }
 
 /// Student proposals and consent, never a source of academic membership or grades.

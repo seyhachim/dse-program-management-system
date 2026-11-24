@@ -26,6 +26,10 @@ export const dseNewsApi = {
   getManaged: (id: string) => api.get<DseNewsView>(newsBase + "/manage/" + encodeURIComponent(id)),
   create: (data: CreateDseNewsInput) => api.post<DseNewsView>(newsBase + "/manage", data),
   edit: (id: string, data: EditDseNewsInput) => api.patch<DseNewsView>(newsBase + "/manage/" + encodeURIComponent(id), data),
+  uploadMedia: (id: string, kind: "cover" | "gallery", alt: string, file: File) =>
+    api.uploadFile<DseNewsView>(newsBase + "/manage/" + encodeURIComponent(id) + "/media?kind=" + kind + "&alt=" + encodeURIComponent(alt), file),
+  removeMedia: (id: string, mediaId: string) =>
+    api.delete<DseNewsView>(newsBase + "/manage/" + encodeURIComponent(id) + "/media/" + encodeURIComponent(mediaId)),
   changeStatus: (id: string, data: ChangeDseNewsStatusInput) =>
     api.post<DseNewsView>(newsBase + "/manage/" + encodeURIComponent(id) + "/status", data),
 };
