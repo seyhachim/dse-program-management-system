@@ -69,7 +69,7 @@ describe("instructional Weekly Plan", () => {
   });
 });
 
-test("explicit session classification survives payload round-trip and controls instructional totals", () => {
+it("explicit session classification survives payload round-trip and controls instructional totals", () => {
   const exam = { ...week(8, "Practical demonstration"), sessionType: "assessment" as const };
   const teaching = { ...week(9, "Final Exam preparation"), sessionType: "teaching" as const };
   const rows = toWeeklyPlanForm(toWeeklyPlanPayload([exam, teaching]));
