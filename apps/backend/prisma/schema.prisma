@@ -3630,12 +3630,14 @@ model DseNewsArticle {
   status         String            @default("Draft")
   version        Int               @default(1)
   publishedAt    DateTime?
+  publicPublishedAt DateTime?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   audits         DseNewsAuditEvent[]
   media          DseNewsMedia[]
 
   @@index([programmeId, status, publishedAt])
+  @@index([programmeId, publicPublishedAt])
   @@index([activityId])
 }
 

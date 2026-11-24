@@ -121,6 +121,7 @@ export interface DseNewsView {
   version: number;
   authorName: string;
   publishedAt: string | null;
+  publicPublishedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -128,3 +129,22 @@ export function canPublishDseNews(input: { body: string; coverImageUrl: string |
   return input.body.trim().length >= 80 &&
     ((!input.coverImageUrl && input.gallery.length === 0) || input.mediaApproved);
 }
+
+/** Deliberately narrow, anonymous-safe article projection; no offering, roster or private object path. */
+export interface PublicDseNewsArticle {
+  id: string;
+  title: string;
+  summary: string;
+  body: string;
+  tags: string[];
+  publishedAt: string;
+  publicPublishedAt: string;
+  cover: { url: string; alt: string } | null;
+  gallery: { url: string; alt: string }[];
+}
+export const DseNewsPublicApprovalSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+  public: z.boolean(),
+  confirmPhotoRights: z.boolean().default(false),
+}).strict();
+export type DseNewsPublicApprovalInput = z.infer<typeof DseNewsPublicApprovalSchema>;
