@@ -1,7 +1,7 @@
 import { Router, raw } from "express";
 import { NewsMediaError } from "./dse-news-media-storage.ts";
 import { dseNewsMediaService } from "./dse-news-media-service.ts";
-import { CreateDseNewsSchema, EditDseNewsSchema, ChangeDseNewsStatusSchema } from "@dse-pms/shared-types";
+import { CreateDseNewsSchema, EditDseNewsSchema, ChangeDseNewsStatusSchema, ChangeDseNewsPublicStatusSchema } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { dseNewsService, NewsAccessError, NewsConflictError, NewsNotFoundError } from "./dse-news-service.ts";
@@ -37,6 +37,14 @@ export function createDseNewsRouter() {
     const parsed = ChangeDseNewsStatusSchema.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid publication action", details: parsed.error.flatten() });
     try { res.json(await dseNewsService.changeStatus(req.user!, req.params.id!, parsed.data)); } catch (error) { fail(error, res); }
+  });
+  router.post("/manage/:id/public-status", requirePermission("offerings:write"), async (req, res) => {
+    const parsed = ChangeDseNewsPublicStatusSchema.safeParse(req.body);
+    if (!parsed.success) return void res.status(400).json({
+      error: "Invalid public website approval", details: parsed.error.flatten(),
+    });
+    try { res.json(await dseNewsService.changePublicStatus(req.user!, req.params.id!, parsed.data)); }
+    catch (error) { fail(error, res); }
   });
   // Uploads are staff-only raw WebP packages, never base64 JSON or public Storage URLs.
   router.post("/manage/:id/media", requirePermission("offerings:write"),
