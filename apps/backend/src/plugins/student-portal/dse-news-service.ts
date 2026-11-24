@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   CreateDseNewsSchema, NewsMediaSchema, canPublishDseNews,
   type CreateDseNewsInput, type EditDseNewsInput, type ChangeDseNewsStatusInput,
-  type DseNewsView,
+  type DseNewsView, type DseNewsPublicApprovalInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
@@ -81,6 +81,7 @@ async function view(row: WithAuthor): Promise<DseNewsView> {
     status: row.status as DseNewsView["status"], version: row.version,
     authorName: row.author.name,
     publishedAt: row.publishedAt?.toISOString() ?? null,
+    publicPublishedAt: row.publicPublishedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -89,7 +90,7 @@ function snapshot(row: DseNewsArticle): Prisma.InputJsonValue {
     id: row.id, title: row.title, summary: row.summary, body: row.body,
     activityId: row.activityId, coverImageUrl: row.coverImageUrl,
     gallery: row.gallery, tags: row.tags, mediaApproved: row.mediaApproved,
-    status: row.status, version: row.version,
+    status: row.status, publicPublishedAt: row.publicPublishedAt, version: row.version,
   } as Prisma.InputJsonValue;
 }
 async function editable(user: AuthUser, id: string) {
@@ -193,7 +194,7 @@ export const dseNewsService = {
           activityId: merged.data.activityId, coverImageUrl: merged.data.coverImageUrl,
           coverAlt: merged.data.coverAlt, gallery: merged.data.gallery as Prisma.InputJsonValue,
           tags: merged.data.tags as Prisma.InputJsonValue, mediaApproved: merged.data.mediaApproved,
-          updatedById: user.id, version: { increment: 1 },
+          updatedById: user.id, publicPublishedAt: null, version: { increment: 1 },
         },
       });
       if (!written.count) throw new NewsConflictError("Article changed; reload");
@@ -203,6 +204,36 @@ export const dseNewsService = {
       });
     });
     return this.staffGet(user, id);
+  },
+  async approvePublic(user: AuthUser, id: string, input: DseNewsPublicApprovalInput) {
+    if (!mayPublishNews(user)) throw new NewsAccessError("Programme coordinator approval is required");
+    const before=await editable(user,id);
+    if (before.version!==input.expectedVersion) throw new NewsConflictError("Article changed; reload first");
+    if (input.public && (before.status!=="Published" || !before.publishedAt)) {
+      throw new NewsConflictError("Publish to DSE students before approving the public website");
+    }
+    const uploaded=await prisma.dseNewsMedia.count({where:{articleId:id}});
+    const legacy=z.array(NewsMediaSchema).parse(before.gallery);
+    const hasImages=uploaded>0 || Boolean(before.coverImageUrl) || legacy.length>0;
+    if(input.public && (
+      before.body.trim().length<80 ||
+      (hasImages && (!before.mediaApproved || !input.confirmPhotoRights))
+    )) throw new NewsConflictError("Public publication requires article and photo rights review");
+    await prisma.$transaction(async tx=>{
+      const result=await tx.dseNewsArticle.updateMany({
+        where:{id,version:input.expectedVersion,status:before.status},
+        data:{publicPublishedAt:input.public ? (before.publicPublishedAt??new Date()) : null,
+          updatedById:user.id,version:{increment:1}},
+      });
+      if(result.count!==1) throw new NewsConflictError("Article changed; reload first");
+      const after=await tx.dseNewsArticle.findUniqueOrThrow({where:{id}});
+      await tx.dseNewsAuditEvent.create({data:{
+        articleId:id,actorId:user.id,action:"updated",
+        before:{publicPublishedAt:before.publicPublishedAt?.toISOString()??null},
+        after:{publicPublishedAt:after.publicPublishedAt?.toISOString()??null},
+      }});
+    });
+    return this.staffGet(user,id);
   },
   async changeStatus(user: AuthUser, id: string, input: ChangeDseNewsStatusInput) {
     if (!mayPublishNews(user)) throw new NewsAccessError("Programme coordinator approval is required");
@@ -217,7 +248,7 @@ export const dseNewsService = {
       const changed = await tx.dseNewsArticle.updateMany({
         where: { id, version: input.expectedVersion },
         data: {
-          status: input.status, updatedById: user.id, version: { increment: 1 },
+          status: input.status, publicPublishedAt: null, updatedById: user.id, version: { increment: 1 },
           publishedAt: input.status === "Published" ? (before.publishedAt ?? new Date()) : null,
         },
       });
