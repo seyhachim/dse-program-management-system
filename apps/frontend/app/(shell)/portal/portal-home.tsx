@@ -192,6 +192,8 @@ export function PortalHome() {
         <p className="px-1 text-xs text-muted-foreground">Updating your portal…</p>
       ) : null}
 
+      <Link href="/portal/news" className="block rounded-xl border border-primary/20 bg-card px-4 py-3 text-sm font-semibold text-primary hover:bg-muted">DSE News & Activities · Read programme stories</Link>
+
       <section
         className={MOBILE_STUDENT_PORTAL_LAYOUT.hero}
         aria-label="Student identity"
