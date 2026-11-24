@@ -68,6 +68,29 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save article"); }
     finally { setSaving(false); }
   }
+  async function publicStatus(item: DseNewsView, action: "publish" | "unpublish") {
+    if (action === "publish" && !window.confirm(
+      "Make this article and its approved photos accessible to everyone without signing in? " +
+      "Confirm the text, names, and every identifiable photo have permission for public website use.",
+    )) return;
+    if (action === "unpublish" && !window.confirm(
+      "Remove this article from the public DSE website? DSE students can still see it.",
+    )) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const changed = await dseNewsApi.changePublicStatus(item.id, {
+        expectedVersion: item.version, action,
+        confirmPublicPermission: action === "publish",
+      });
+      if (editing?.id === item.id) setEditing(changed);
+      setNotice(action === "publish"
+        ? "Article approved for the public DSE programme website."
+        : "Article removed from the public website.");
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Public website approval failed");
+    } finally { setSaving(false); }
+  }
   async function status(item: DseNewsView, next: "Draft" | "Published" | "Archived") {
     if (next === "Published" && !window.confirm("Publish this article to all DSE students? Confirm photos and names have permission.")) return;
     if (next === "Archived" && !window.confirm("Archive this article?")) return;
@@ -82,7 +105,7 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
   }
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <p className="text-sm text-muted-foreground">Stories can link to a field visit, but private attendance records are never copied into articles. Only authorized programme staff can publish.</p>
+      <p className="text-sm text-muted-foreground">Published articles appear to signed-in DSE students. Public website publishing is a second, explicit approval for everyone on the internet. Private participant records never appear in either article view.</p>
       {error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{error}</p>}
       {notice && <p role="status" className="rounded-lg bg-muted p-3 text-sm">{notice}</p>}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -95,14 +118,34 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
           {news.map(item => (
             <div key={item.id} className="space-y-2 border-t border-border pt-3">
               <button type="button" onClick={() => select(item)} className="text-left text-sm font-semibold text-primary hover:underline">{item.title}</button>
-              <p className="text-xs text-muted-foreground">{item.status} · Revision {item.version} · {item.authorName}</p>
-              {item.status === "Published" && <Link href={"/portal/news/" + item.id} className="text-xs text-primary underline">Student article</Link>}
+              <p className="text-xs text-muted-foreground">
+                {item.status} · {item.publicPublishedAt ? "Public website: Live" : "Public website: Not approved"}
+                {" · "}Revision {item.version} · {item.authorName}
+              </p>
+              <Link href={"/dse-news/view/" + item.id}
+                className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 text-xs font-semibold text-primary hover:bg-muted">
+                {item.status === "Published" ? "View published article" : "Preview draft"}
+              </Link>
+              {item.publicPublishedAt && (
+                <Link href={"/program/news/" + item.id} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 text-xs font-semibold text-primary hover:bg-muted">
+                  Open public website article
+                </Link>
+              )}
               {canPublish && item.status !== "Archived" && (
                 <div className="flex flex-wrap gap-2">
                   {item.status !== "Published"
                     ? <button disabled={saving} className="rounded border px-2 py-1 text-xs" onClick={() => { void status(item, "Published"); }}>Publish to DSE students</button>
                     : <button disabled={saving} className="rounded border px-2 py-1 text-xs" onClick={() => { void status(item, "Draft"); }}>Unpublish</button>}
                   <button disabled={saving} className="rounded border px-2 py-1 text-xs" onClick={() => { void status(item, "Archived"); }}>Archive</button>
+                  {item.status === "Published" && (
+                    item.publicPublishedAt
+                      ? <button disabled={saving} className="rounded border px-2 py-1 text-xs"
+                          onClick={() => { void publicStatus(item, "unpublish"); }}>Remove from public website</button>
+                      : <button disabled={saving} className="rounded border border-primary/50 px-2 py-1 text-xs font-semibold text-primary"
+                          onClick={() => { void publicStatus(item, "publish"); }}>Approve for public website</button>
+                  )}
+
                 </div>
               )}
             </div>
@@ -153,7 +196,12 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
             <input type="checkbox" checked={draft.mediaApproved} onChange={e => change("mediaApproved", e.target.checked)} />
             I verified consent or permission for identifiable people in all included images.
           </label>
-          <button type="button" disabled={saving || Boolean(editing?.status === "Archived")} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50" onClick={() => { void save(); }}>
+          {editing?.publicPublishedAt && (
+            <p className="rounded-md border p-3 text-xs text-muted-foreground">
+              This article is live on the public website. Remove public website access before editing its content.
+            </p>
+          )}
+          <button type="button" disabled={saving || Boolean(editing?.status === "Archived") || Boolean(editing?.publicPublishedAt)} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50" onClick={() => { void save(); }}>
             {saving ? "Saving…" : editing ? "Save changes" : "Create draft"}
           </button>
         </section>

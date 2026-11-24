@@ -1,7 +1,7 @@
 import type {
   CreateVisitParticipantInput, UpdateVisitParticipantInput, VisitParticipantView,
   VisitParticipantsWorkspace,
-  CreateDseNewsInput, EditDseNewsInput, ChangeDseNewsStatusInput, DseNewsView,
+  CreateDseNewsInput, EditDseNewsInput, ChangeDseNewsStatusInput, ChangeDseNewsPublicStatusInput, DseNewsView,
 } from "@dse-pms/shared-types";
 import { api } from "./api";
 
@@ -30,6 +30,8 @@ export const dseNewsApi = {
     api.uploadFile<DseNewsView>(newsBase + "/manage/" + encodeURIComponent(id) + "/media?kind=" + kind + "&alt=" + encodeURIComponent(alt), file),
   removeMedia: (id: string, mediaId: string) =>
     api.delete<DseNewsView>(newsBase + "/manage/" + encodeURIComponent(id) + "/media/" + encodeURIComponent(mediaId)),
+  changePublicStatus: (id: string, data: ChangeDseNewsPublicStatusInput) =>
+    api.post<DseNewsView>(newsBase + "/manage/" + encodeURIComponent(id) + "/public-status", data),
   changeStatus: (id: string, data: ChangeDseNewsStatusInput) =>
     api.post<DseNewsView>(newsBase + "/manage/" + encodeURIComponent(id) + "/status", data),
 };

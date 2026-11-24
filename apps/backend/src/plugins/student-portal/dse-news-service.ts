@@ -3,6 +3,7 @@ import { signedNewsMediaUrl } from "./dse-news-media-storage.ts";
 import { z } from "zod";
 import {
   CreateDseNewsSchema, NewsMediaSchema, canPublishDseNews,
+  type ChangeDseNewsPublicStatusInput,
   type CreateDseNewsInput, type EditDseNewsInput, type ChangeDseNewsStatusInput,
   type DseNewsView,
 } from "@dse-pms/shared-types";
@@ -81,6 +82,7 @@ async function view(row: WithAuthor): Promise<DseNewsView> {
     status: row.status as DseNewsView["status"], version: row.version,
     authorName: row.author.name,
     publishedAt: row.publishedAt?.toISOString() ?? null,
+    publicPublishedAt: row.publicPublishedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -89,7 +91,7 @@ function snapshot(row: DseNewsArticle): Prisma.InputJsonValue {
     id: row.id, title: row.title, summary: row.summary, body: row.body,
     activityId: row.activityId, coverImageUrl: row.coverImageUrl,
     gallery: row.gallery, tags: row.tags, mediaApproved: row.mediaApproved,
-    status: row.status, version: row.version,
+    status: row.status, publicPublishedAt: row.publicPublishedAt?.toISOString() ?? null, version: row.version,
   } as Prisma.InputJsonValue;
 }
 async function editable(user: AuthUser, id: string) {
@@ -173,6 +175,7 @@ export const dseNewsService = {
   async edit(user: AuthUser, id: string, input: EditDseNewsInput) {
     const before = await editable(user, id);
     if (before.version !== input.expectedVersion) throw new NewsConflictError("Article changed in another session; reload");
+    if (before.publicPublishedAt) throw new NewsConflictError("Remove public website access before editing this article");
     const merged = CreateDseNewsSchema.safeParse({
       title: input.title ?? before.title, summary: input.summary ?? before.summary,
       body: input.body ?? before.body, activityId: input.activityId === undefined ? before.activityId : input.activityId,
@@ -204,6 +207,46 @@ export const dseNewsService = {
     });
     return this.staffGet(user, id);
   },
+  /**
+   * Separate from Student Portal publication. This is the sole entry point
+   * to anonymous /program/news visibility, recorded with a staff audit event.
+   */
+  async changePublicStatus(user: AuthUser, id: string, input: ChangeDseNewsPublicStatusInput) {
+    if (!mayPublishNews(user)) throw new NewsAccessError("Programme manager approval is required for public website");
+    const before = await editable(user, id);
+    if (before.version !== input.expectedVersion) throw new NewsConflictError("Article changed; reload before public approval");
+    if (input.action === "publish") {
+      if (before.status !== "Published" || before.body.trim().length < 80) {
+        throw new NewsConflictError("Publish to DSE students and review the article before making it public");
+      }
+      const uploadedCount = await prisma.dseNewsMedia.count({ where: { articleId: id } });
+      const legacyGallery = z.array(NewsMediaSchema).parse(before.gallery);
+      if ((uploadedCount > 0 || before.coverImageUrl || legacyGallery.length > 0) && !before.mediaApproved) {
+        throw new NewsConflictError("Review photo permissions for unrestricted public access before publishing");
+      }
+      if (input.confirmPublicPermission !== true) {
+        throw new NewsConflictError("Explicit public publication confirmation is required");
+      }
+    }
+    await prisma.$transaction(async tx => {
+      const changed = await tx.dseNewsArticle.updateMany({
+        where: { id, version: input.expectedVersion,
+          ...(input.action === "publish" ? { status: "Published" } : {}) },
+        data: {
+          publicPublishedAt: input.action === "publish" ? (before.publicPublishedAt ?? new Date()) : null,
+          updatedById: user.id, version: { increment: 1 },
+        },
+      });
+      if (!changed.count) throw new NewsConflictError("Article changed; reload");
+      const after = await tx.dseNewsArticle.findUniqueOrThrow({ where: { id } });
+      await tx.dseNewsAuditEvent.create({
+        data: { articleId: id, actorId: user.id,
+          action: input.action === "publish" ? "public_published" : "public_unpublished",
+          before: snapshot(before), after: snapshot(after) },
+      });
+    });
+    return this.staffGet(user, id);
+  },
   async changeStatus(user: AuthUser, id: string, input: ChangeDseNewsStatusInput) {
     if (!mayPublishNews(user)) throw new NewsAccessError("Programme coordinator approval is required");
     const before = await editable(user, id);
@@ -219,6 +262,7 @@ export const dseNewsService = {
         data: {
           status: input.status, updatedById: user.id, version: { increment: 1 },
           publishedAt: input.status === "Published" ? (before.publishedAt ?? new Date()) : null,
+          ...(input.status !== "Published" ? { publicPublishedAt: null } : {}),
         },
       });
       if (!changed.count) throw new NewsConflictError("Article changed; reload");

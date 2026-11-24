@@ -29,6 +29,16 @@ const config = {
         source: "/api/programme/public/programmes/:programmeId/faqs",
         destination: `${apiUrl}/api/programme/public/programmes/:programmeId/faqs`,
       },
+      // Public news is never cached by the service worker: public approval
+      // may be revoked and the response may contain 15-minute image links.
+      {
+        source: "/api/programme/public/programmes/:programmeId/news",
+        destination: `${apiUrl}/api/programme/public/programmes/:programmeId/news`,
+      },
+      {
+        source: "/api/programme/public/programmes/:programmeId/news/:articleId",
+        destination: `${apiUrl}/api/programme/public/programmes/:programmeId/news/:articleId`,
+      },
       {
         source: "/api/programme/public/programmes/:programmeId/important-dates",
         destination: `${apiUrl}/api/programme/public/programmes/:programmeId/important-dates`,

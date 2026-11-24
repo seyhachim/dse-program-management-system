@@ -3,7 +3,7 @@ import { newRoleContext } from "./auth.ts";
 
 // Tiny synthetic source image. No real Sindora visitor photographs or student PII in CI.
 const tinyPng=Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO/jRuUAAAAASUVORK5CYII=",
+  "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGO0rPFmgAEmBiSAmwMAMvIBCEh55VsAAAAASUVORK5CYII=",
   "base64",
 );
 test("private DSE News cover photo upload, preview and removal",async({browser})=>{

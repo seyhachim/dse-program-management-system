@@ -4,18 +4,20 @@ import { useEffect, useState } from "react";
 import type { DseNewsView } from "@dse-pms/shared-types";
 import { dseNewsApi } from "@/lib/activity-publications";
 
-export function NewsArticleClient({ id }: { id: string }) {
+export function NewsArticleClient({ id, staffPreview = false }: { id: string; staffPreview?: boolean }) {
   const [article, setArticle] = useState<DseNewsView | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
-    dseNewsApi.getPublished(id).then(value => { if (active) setArticle(value); })
+    (staffPreview ? dseNewsApi.getManaged(id) : dseNewsApi.getPublished(id))
+      .then(value => { if (active) setArticle(value); })
       .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : "Article unavailable"); });
     return () => { active = false; };
-  }, [id]);
+  }, [id, staffPreview]);
   return (
     <article className="mx-auto max-w-3xl space-y-5 rounded-2xl border border-border bg-card p-5 md:p-8">
-      <Link href="/portal/news" className="text-sm text-primary underline">← DSE News</Link>
+      <Link href={staffPreview ? "/dse-news" : "/portal/news"} className="text-sm text-primary underline">← DSE News</Link>
+      {staffPreview && <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">Staff preview · Only the published article is available to DSE students. Draft content and changes to the article are not public.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {!error && !article && <p className="text-sm text-muted-foreground">Loading article…</p>}
       {article && (
