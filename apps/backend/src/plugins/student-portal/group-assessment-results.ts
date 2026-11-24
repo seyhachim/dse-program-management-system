@@ -324,6 +324,29 @@ async function correctStudentResult(tx: Prisma.TransactionClient, resultId: stri
   await tx.assessmentResult.update({ where: { id: result.id }, data: derived });
 }
 
+/** Materialize an approved proposal under the caller's existing Offering row lock.
+ * The existing academic group service owns the authoritative membership snapshots and audit. */
+export async function appendRegisteredAssessmentGroup(tx: Prisma.TransactionClient, authorId: string, offeringId: string, assessmentItemId: string, input: { name: string; enrollmentIds: string[] }) {
+  const context = await contextFor(tx, offeringId, assessmentItemId, authorId, false);
+  assertGroupMode(context);
+  if (context.offering.status !== "Active" || context.spec.reviewStatus !== "Approved") throw new PortalConflictError("An active offering with an approved bound CourseSpec is required");
+  const existing = await groupsFor(tx, context);
+  if (existing.some((group) => group.membershipLockedAt || group.publishedAt || group.finalizedAt || group.score || group.individualComponents.length)) throw new PortalConflictError("Group membership is locked because scoring has started");
+  const legacyResults = await tx.assessmentResult.count({ where: { enrollmentId: { in: context.offering.enrollments.map((item) => item.id) }, courseSpecId: context.spec.id, assessmentItemId } });
+  if (legacyResults) throw new PortalConflictError("Existing assessment results must be preserved");
+  const assigned = new Set(existing.flatMap((group) => group.members.map((member) => member.enrollmentId)));
+  const roster = new Map(context.offering.enrollments.map((item) => [item.id, item]));
+  if (!input.enrollmentIds.length || new Set(input.enrollmentIds).size !== input.enrollmentIds.length || input.enrollmentIds.some((id) => assigned.has(id) || !roster.get(id)?.student.studentId)) throw new PortalConflictError("All members must be unassigned and have an official Student ID");
+  if (existing.some((group) => group.name.trim().toLocaleLowerCase() === input.name.trim().toLocaleLowerCase())) throw new PortalConflictError("Group name is already in use");
+  const row = await tx.assessmentGroup.create({ data: { offeringId, courseSpecId: context.spec.id, assessmentItemId, name: input.name, sortOrder: Math.max(-1, ...existing.map((group) => group.sortOrder)) + 1, createdById: authorId } });
+  await tx.assessmentGroupMember.createMany({ data: input.enrollmentIds.map((id) => {
+    const enrollment = roster.get(id)!;
+    return { groupId: row.id, offeringId, courseSpecId: context.spec.id, assessmentItemId, enrollmentId: id, studentIdSnapshot: enrollment.student.id, studentCodeSnapshot: enrollment.student.studentId!, studentNameSnapshot: enrollment.student.name };
+  }) });
+  await audit(tx, context, authorId, "GroupsConfigured", { source: "student-registration", groups: [...existing.map((g) => ({ id: g.id, name: g.name, enrollmentIds: g.members.map((m) => m.enrollmentId) })), { id: row.id, name: row.name, enrollmentIds: input.enrollmentIds }] }, { groupId: row.id });
+  return row.id;
+}
+
 export const groupAssessmentService = {
   async modeFor(authorId: string, programmeWide: boolean, input: PublishAssessmentResultsInput | FinalizeAssessmentResultsInput) {
     const context = await contextFor(prisma, input.offeringId, input.assessmentItemId, authorId, programmeWide);
@@ -341,6 +364,8 @@ export const groupAssessmentService = {
       await tx.$queryRaw`SELECT "id" FROM "Offering" WHERE "id" = ${offeringId} FOR UPDATE`;
       const context = await contextFor(tx, offeringId, assessmentItemId, authorId, programmeWide);
       assertGroupMode(context);
+      const registration = await tx.courseProjectGroupRegistration.findUnique({ where: { offeringId_courseSpecId_assessmentItemId: { offeringId, courseSpecId: context.spec.id, assessmentItemId } } });
+      if (registration?.enabled) throw new PortalConflictError("Close student group registration before manually changing academic groups");
       const existing = await groupsFor(tx, context);
       if (existing.some((group) => group.membershipLockedAt || group.publishedAt || group.finalizedAt || group.score || group.individualComponents.length)) throw new PortalConflictError("Group membership is locked because scoring has started");
       const legacyResults = await tx.assessmentResult.count({ where: { enrollmentId: { in: context.offering.enrollments.map((item) => item.id) }, courseSpecId: context.spec.id, assessmentItemId: context.assessment.id } });

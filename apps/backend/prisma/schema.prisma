@@ -370,6 +370,7 @@ enum UserSecurityAuditAction {
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
 /// "Course Details" instructor block.
 model User {
+  courseProjectGroupRegistrationEvents CourseProjectGroupRegistrationEvent[]
   id            String         @id @default(uuid())
   authId        String?        @unique
   email         String         @unique
@@ -2440,6 +2441,7 @@ model CourseSpecWeek {
 /// selection as a valid state, unlike CLO teaching/assessment method ids, which fail
 /// hard on a bad id by design.
 model CourseSpecAssessmentItem {
+  courseProjectGroupRegistrations CourseProjectGroupRegistration[]
   id                     String                          @default(uuid())
   courseSpecId           String
   courseSpec             CourseSpec                      @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
@@ -2630,6 +2632,7 @@ model CourseSpecStudentResponsibility {
 /// lecturer, a seat capacity, and enrolled students. The architectural proof point:
 /// it links Students <-> Courses <-> Lecturers through the registry.
 model Offering {
+  courseProjectGroupRegistrations CourseProjectGroupRegistration[]
   id                       String                  @id @default(uuid())
   courseId                 String
   course                   Course                  @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -3646,4 +3649,39 @@ model DseNewsAuditEvent {
   createdAt DateTime       @default(now())
 
   @@index([articleId, createdAt])
+}
+
+/// Student proposals and consent, never a source of academic membership or grades.
+model CourseProjectGroupRegistration {
+  id               String                   @id @default(uuid())
+  offeringId       String
+  offering         Offering                 @relation(fields: [offeringId], references: [id], onDelete: Restrict, map: "CourseProjectGroupRegistration_offering_fkey")
+  courseSpecId     String
+  assessmentItemId String
+  assessmentItem   CourseSpecAssessmentItem @relation(fields: [courseSpecId, assessmentItemId], references: [courseSpecId, id], onDelete: Restrict, map: "CourseProjectGroupRegistration_assessment_fkey")
+  enabled          Boolean                  @default(false)
+  maxGroups        Int
+  minMembers       Int
+  maxMembers       Int
+  deadlineAt       DateTime
+  proposals        Json
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  events           CourseProjectGroupRegistrationEvent[]
+
+  @@unique([offeringId, courseSpecId, assessmentItemId], map: "CourseProjectGroupRegistration_context_key")
+}
+
+model CourseProjectGroupRegistrationEvent {
+  id             String                         @id @default(uuid())
+  registrationId String
+  registration   CourseProjectGroupRegistration @relation(fields: [registrationId], references: [id], onDelete: Restrict, map: "CourseProjectGroupEvent_registration_fkey")
+  actorId        String
+  actor          User                           @relation(fields: [actorId], references: [id], onDelete: Restrict, map: "CourseProjectGroupEvent_actor_fkey")
+  action         String
+  details        Json
+  createdAt      DateTime                       @default(now())
+
+  @@index([registrationId, createdAt], map: "CourseProjectGroupEvent_registration_created_idx")
+  @@index([actorId], map: "CourseProjectGroupEvent_actor_idx")
 }

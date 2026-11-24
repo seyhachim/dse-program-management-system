@@ -15,6 +15,7 @@ export type CourseProjectGroupPolicyInput = z.infer<typeof CourseProjectGroupPol
 export const CourseProjectGroupActionInput = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create"), name: z.string().trim().min(1).max(100) }).strict(),
   z.object({ action: z.literal("invite"), proposalId: z.string().uuid(), enrollmentId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal("revoke"), proposalId: z.string().uuid(), enrollmentId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("accept"), proposalId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("decline"), proposalId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("withdraw"), proposalId: z.string().uuid() }).strict(),
@@ -38,3 +39,24 @@ export type CourseProjectGroupProposal = {
   reviewReason?: string;
   academicGroupId?: string;
 };
+
+export const CourseProjectGroupProposalSchema = z.object({
+  id: z.string().uuid(), name: z.string().min(1).max(100),
+  leaderEnrollmentId: z.string().uuid(),
+  status: z.enum(["draft", "submitted", "approved", "cancelled"]),
+  members: z.array(z.object({ enrollmentId: z.string().uuid(), status: z.enum(["pending", "accepted", "declined"]) }).strict()),
+  reviewReason: z.string().optional(),
+  academicGroupId: z.string().uuid().optional(),
+}).strict();
+
+export interface CourseProjectGroupRegistrationView {
+  policy: CourseProjectGroupPolicyInput | null;
+  registrationOpen: boolean;
+  membershipLocked: boolean;
+  actorEnrollmentId: string | null;
+  classmates: Array<{ enrollmentId: string; name: string }>;
+  proposals: CourseProjectGroupProposal[];
+  officialGroup: { id: string; name: string; members: Array<{ enrollmentId: string; name: string }> } | null;
+  unassignedCount: number;
+  officialGroupCount: number;
+}

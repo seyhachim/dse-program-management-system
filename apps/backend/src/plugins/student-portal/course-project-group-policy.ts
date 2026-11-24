@@ -47,6 +47,7 @@ export function applyProjectGroupAction(
     if (hasTeam(actor)) fail("You already belong to a team");
     if (context.academicGroupCount + proposals.filter(active).length >= context.policy.maxGroups) fail("Maximum number of groups reached");
     if (context.academicGroupNames.has(key(input.name)) || proposals.some((p) => active(p) && key(p.name) === key(input.name))) fail("Group name is already in use");
+    for (const other of proposals) if (active(other)) for (const member of other.members) if (member.enrollmentId === actor && member.status === "pending") member.status = "declined";
     proposals.push({ id: newProposalId, name: input.name, leaderEnrollmentId: actor, status: "draft", members: [{ enrollmentId: actor, status: "accepted" }] });
     return proposals;
   }
@@ -66,8 +67,15 @@ export function applyProjectGroupAction(
       else proposal.members.push({ enrollmentId: target, status: "pending" });
       break;
     }
+    case "revoke": {
+      if (!leader) fail("Only the leader can revoke an invitation");
+      const member = proposal.members.find((entry) => entry.enrollmentId === input.enrollmentId);
+      if (!member || member.status !== "pending") fail("No pending invitation");
+      member.status = "declined";
+      break;
+    }
     case "accept":
-      if (!ownMember || ownMember.status !== "pending" || hasTeam(actor)) fail("No eligible pending invitation");
+      if (!ownMember || ownMember.status !== "pending" || hasTeam(actor) || !context.eligibleEnrollmentIds.has(proposal.leaderEnrollmentId) || context.academicEnrollmentIds.has(proposal.leaderEnrollmentId)) fail("No eligible pending invitation");
       if (proposal.members.filter((member) => member.status === "accepted").length >= context.policy.maxMembers) fail("Group is full");
       ownMember.status = "accepted";
       for (const other of proposals) {
