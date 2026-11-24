@@ -60,6 +60,10 @@ export function createStudentRouter(): Router {
     }
   });
 
+  router.get("/roster-cohorts", requirePermission("students:read"), async (_req, res) => {
+    res.json(await studentService.rosterCohorts());
+  });
+
   // GET /api/students/:id
   router.get("/:id", requirePermission("students:read"), async (req, res) => {
     const student = await studentService.getById(req.params.id!);
