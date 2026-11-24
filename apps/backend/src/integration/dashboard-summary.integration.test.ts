@@ -92,6 +92,88 @@ integrationDescribe("Dashboard compact summary", () => {
     ).toBe(403);
   });
 
+  test("weekly monitor is restricted to Admin or current appointed Head", async () => {
+    const path = "/api/dashboard/weekly-teaching?weekStart=2026-11-23";
+    expect((await request(path)).status).toBe(401);
+    for (const user of [coordinator, secretary, qaReviewer, lecturer, student]) {
+      expect((await request(path, signToken(user))).status).toBe(403);
+    }
+    const adminResponse = await request(path, signToken(admin));
+    expect(adminResponse.status).toBe(200);
+    const { WeeklyTeachingReportSchema } = await import("@dse-pms/shared-types");
+    const parsed = WeeklyTeachingReportSchema.parse(adminResponse.body);
+    expect(parsed.weekStart).toBe("2026-11-23");
+    expect(parsed.weekEnd).toBe("2026-11-29");
+    expect(Array.isArray(parsed.sessions)).toBe(true);
+
+    expect((await request("/api/dashboard/weekly-teaching?weekStart=2026-11-24", signToken(admin))).status).toBe(400);
+
+    const appointment = await prisma.programmeHeadAppointment.create({
+      data: {
+        programmeId: "dse",
+        lecturerId: lecturer.id,
+        appointedById: admin.id,
+      },
+    });
+    try {
+      const appointedResponse = await request(path, signToken(lecturer));
+      expect(appointedResponse.status).toBe(200);
+      WeeklyTeachingReportSchema.parse(appointedResponse.body);
+      await prisma.programmeHeadAppointment.update({
+        where: { id: appointment.id },
+        data: { endedAt: new Date(), endedById: admin.id },
+      });
+      expect((await request(path, signToken(lecturer))).status).toBe(403);
+    } finally {
+      await prisma.programmeHeadAppointment.delete({ where: { id: appointment.id } });
+    }
+  });
+
+  test("generates a missing-evidence row from a recurring meeting without creating an occurrence", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8).toUpperCase();
+    const course = await prisma.course.create({
+      data: { programmeId: "dse", code: "WK" + suffix, title: "Weekly monitor fixture" },
+    });
+    const offering = await prisma.offering.create({
+      data: {
+        courseId: course.id,
+        term: "weekly-monitor-fixture",
+        sectionCode: "M1",
+        programmeYear: 1,
+        status: "Active",
+        startDate: new Date("2026-11-16T00:00:00.000Z"),
+        endDate: new Date("2026-11-30T00:00:00.000Z"),
+        meetings: {
+          create: [{ dayOfWeek: "Monday", startTime: "07:00", endTime: "09:00" }],
+        },
+      },
+    });
+    try {
+      const response = await request(
+        "/api/dashboard/weekly-teaching?weekStart=2026-11-23",
+        signToken(admin),
+      );
+      expect(response.status).toBe(200);
+      const { WeeklyTeachingReportSchema } = await import("@dse-pms/shared-types");
+      const report = WeeklyTeachingReportSchema.parse(response.body);
+      const session = report.sessions.find((row) => row.offeringId === offering.id);
+      expect(session?.date).toBe("2026-11-23");
+      expect(session?.status).toBe("missing_evidence");
+      expect(session?.occurrenceId).toBeNull();
+      expect(session?.scheduledMinutes).toBe(120);
+      expect(session?.deliveredMinutes).toBe(0);
+      const materialized = await prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS count
+        FROM "pms_attendance"."TeachingSessionOccurrence"
+        WHERE "offeringId" = ${offering.id}
+      `;
+      expect(Number(materialized[0]?.count ?? 0n)).toBe(0);
+    } finally {
+      await prisma.offering.delete({ where: { id: offering.id } });
+      await prisma.course.delete({ where: { id: course.id } });
+    }
+  });
+
   test("matches authoritative aggregate counts without exposing detail records", async () => {
     const response = await request("/api/dashboard/summary", signToken(admin));
     expect(response.status).toBe(200);
