@@ -82,7 +82,7 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
   }
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <p className="text-sm text-muted-foreground">Stories can link to a field visit, but private attendance records are never copied into articles. Only authorized programme staff can publish.</p>
+      <p className="text-sm text-muted-foreground">Stories can link to a field visit, but private attendance records are never copied into articles. Published articles are visible to signed-in DSE students, not the open internet. Use View published article or Preview draft to check the readable staff view.</p>
       {error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{error}</p>}
       {notice && <p role="status" className="rounded-lg bg-muted p-3 text-sm">{notice}</p>}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -96,7 +96,10 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
             <div key={item.id} className="space-y-2 border-t border-border pt-3">
               <button type="button" onClick={() => select(item)} className="text-left text-sm font-semibold text-primary hover:underline">{item.title}</button>
               <p className="text-xs text-muted-foreground">{item.status} · Revision {item.version} · {item.authorName}</p>
-              {item.status === "Published" && <Link href={"/portal/news/" + item.id} className="text-xs text-primary underline">Student article</Link>}
+              <Link href={"/dse-news/view/" + item.id}
+                className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 text-xs font-semibold text-primary hover:bg-muted">
+                {item.status === "Published" ? "View published article" : "Preview draft"}
+              </Link>
               {canPublish && item.status !== "Archived" && (
                 <div className="flex flex-wrap gap-2">
                   {item.status !== "Published"

@@ -164,6 +164,30 @@ const publicInformationManifest: PluginManifest = {
   ],
 };
 
+/** Published news is readable by students. Staff have their own preview route,
+ * so an Admin account never has to impersonate a student to review articles. */
+const dseNewsNavigationManifest: PluginManifest = {
+  id: "dse-programme-news",
+  name: "DSE News & Activities",
+  version: "0.1.0",
+  routes: [
+    {
+      label: "DSE News",
+      path: "/dse-news",
+      icon: "file-text",
+      roles: ["admin", "program_coordinator", "program_secretary", "lecturer"],
+      group: "Community",
+    },
+    {
+      label: "DSE News & Activities",
+      path: "/portal/news",
+      icon: "file-text",
+      roles: ["student"],
+      group: "Community",
+    },
+  ],
+};
+
 const frontendManifests = [
   ...pluginManifests.filter(
     (manifest) => manifest.id !== "rubrics" && manifest.id !== "qa",
@@ -177,6 +201,7 @@ const frontendManifests = [
   lecturerPortfolioManifest,
   finalProjectManifest,
   publicInformationManifest,
+  dseNewsNavigationManifest,
 ];
 
 const SIDEBAR_ROLES_WITHOUT_PLACEHOLDERS: Role[] = ["admin", "program_coordinator"];
