@@ -82,6 +82,8 @@ const RecheckAttendanceMarkInput = z
  */
 export const RecheckAttendanceInput = z.object({
   studentId: z.string().uuid(),
+  /** Optimistic concurrency precondition from the AttendanceSession the lecturer reviewed. */
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
   observation: RecheckAttendanceMarkInput,
   final: RecheckAttendanceMarkInput,
 });
