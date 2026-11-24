@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { PublicProgrammePageModel } from "@/lib/public-programme-page";
 import { ProgrammeThemeToggle } from "./program-theme-toggle";
+import { ProgrammeNewsHighlights } from "./program-news-highlights";
 import styles from "./program.module.css";
 
 const snapshotIcons = [CalendarDays, BookOpen, GraduationCap, BriefcaseBusiness] as const;
@@ -75,6 +76,7 @@ export function ProgrammeView({ content }: { content: PublicProgrammePageModel }
             <a href="#programme">Programme</a>
             <a href="#journey">Journey</a>
             <a href="#curriculum">Curriculum</a>
+            <Link href="/program/news">News & Activities</Link>
             {hasFaqs && <a href="#faq">FAQ</a>}
             {hasDates && <a href="#dates">Dates</a>}
             {hasContact && <a href="#contact">Contact</a>}
@@ -93,6 +95,7 @@ export function ProgrammeView({ content }: { content: PublicProgrammePageModel }
                 <a href="#programme">Programme</a>
                 <a href="#journey">Journey</a>
                 <a href="#curriculum">Curriculum</a>
+            <Link href="/program/news">News & Activities</Link>
                 {hasFaqs && <a href="#faq">FAQ</a>}
                 {hasDates && <a href="#dates">Dates</a>}
                 {hasContact && <a href="#contact">Contact</a>}
@@ -336,6 +339,7 @@ export function ProgrammeView({ content }: { content: PublicProgrammePageModel }
         </section>
       )}
 
+      <ProgrammeNewsHighlights />
       <footer className={styles.footer}>
         <div className={`${styles.shell} ${styles.footerInner}`}>
           <div>
@@ -346,6 +350,7 @@ export function ProgrammeView({ content }: { content: PublicProgrammePageModel }
             <a href="#programme">Programme</a>
             <a href="#journey">Journey</a>
             <a href="#curriculum">Curriculum</a>
+            <Link href="/program/news">News & Activities</Link>
             {hasFaqs && <a href="#faq">FAQ</a>}
             <Link href="/login">PMS Login</Link>
           </nav>
