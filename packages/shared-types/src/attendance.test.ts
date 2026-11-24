@@ -6,6 +6,7 @@ import {
 } from "./attendance.ts";
 
 const STUDENT = "11111111-1111-1111-1111-111111111111";
+const RECHECK_VERSION = "2026-09-13T08:00:00.000Z";
 
 test("attendance date accepts real ISO calendar dates", () => {
   expect(AttendanceDateSchema.safeParse("2026-08-15").success).toBe(true);
@@ -63,6 +64,7 @@ test("attendance save rejects duplicate students", () => {
 test("attendance recheck keeps observation separate from explicit final status", () => {
   const parsed = RecheckAttendanceInput.parse({
     studentId: STUDENT,
+    expectedUpdatedAt: RECHECK_VERSION,
     observation: { status: "Present", note: "Seen in second roll" },
     final: { status: "Late", note: "Arrived after first roll" },
   });
@@ -74,6 +76,7 @@ test("attendance recheck keeps observation separate from explicit final status",
 test("attendance recheck supports Permission Pending as observation or final state", () => {
   const parsed = RecheckAttendanceInput.parse({
     studentId: STUDENT,
+    expectedUpdatedAt: RECHECK_VERSION,
     observation: { permissionPending: true },
     final: { permissionPending: true, note: "Paper letter to follow" },
   });
@@ -84,13 +87,25 @@ test("attendance recheck supports Permission Pending as observation or final sta
 test("attendance recheck rejects ambiguous observation and final marks", () => {
   expect(RecheckAttendanceInput.safeParse({
     studentId: STUDENT,
+    expectedUpdatedAt: RECHECK_VERSION,
     observation: { status: "Present", permissionPending: true },
     final: { status: "Present" },
   }).success).toBe(false);
 
   expect(RecheckAttendanceInput.safeParse({
     studentId: STUDENT,
+    expectedUpdatedAt: RECHECK_VERSION,
     observation: { status: "Present" },
     final: { status: null, permissionPending: false },
   }).success).toBe(false);
+});
+
+
+test("attendance recheck requires the reviewed session version", () => {
+  const result = RecheckAttendanceInput.safeParse({
+    studentId: STUDENT,
+    observation: { status: "Present" },
+    final: { status: "Late" },
+  });
+  expect(result.success).toBe(false);
 });
