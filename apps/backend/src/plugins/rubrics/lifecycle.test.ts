@@ -70,3 +70,11 @@ test("physical deletion is limited to unlinked Draft rubrics", () => {
   expect(rubricDeleteConflict(snapshot("Active", 0))).not.toBeNull();
   expect(rubricDeleteConflict(snapshot("Archived", 0))).not.toBeNull();
 });
+
+test("active marking schemes remain private to owner and programme leadership", () => {
+  const scheme = { ...snapshot("Active"), instrumentKind: "marking_scheme" };
+  expect(canReadRubric(owner, scheme)).toBe(true);
+  expect(canReadRubric(admin, scheme)).toBe(true);
+  expect(canReadRubric(otherLecturer, scheme)).toBe(false);
+  expect(canReadRubric(reviewer, scheme)).toBe(false);
+});

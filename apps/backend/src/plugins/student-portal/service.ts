@@ -487,8 +487,8 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
           format: item.format,
           submissionMethod: item.submissionMethod,
           instructions: item.instructions,
-          rubricName: item.rubric && item.rubric.status !== "Draft" ? item.rubric.name : "",
-          rubricCriteria: item.rubric && item.rubric.status !== "Draft"
+          rubricName: item.rubric && item.rubric.status !== "Draft" && item.rubric.instrumentKind !== "marking_scheme" ? item.rubric.name : "",
+          rubricCriteria: item.rubric && item.rubric.status !== "Draft" && item.rubric.instrumentKind !== "marking_scheme"
             ? item.rubric.criterionRows.map((criterion) => ({
                 id: criterion.id,
                 name: criterion.name,

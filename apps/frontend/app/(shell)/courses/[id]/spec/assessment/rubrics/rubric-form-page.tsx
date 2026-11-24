@@ -83,6 +83,7 @@ export function RubricFormPage({
       try {
         const r = await rubricsApi.get(rubricId);
         if (cancelled) return;
+        if (r.instrumentKind === "marking_scheme") { router.replace("/rubric-bank"); return; }
         setName(r.name);
         setType(r.type);
         setStatus(r.status);
@@ -100,7 +101,7 @@ export function RubricFormPage({
     return () => {
       cancelled = true;
     };
-  }, [rubricId]);
+  }, [rubricId, router]);
 
   const maxPoints = useMemo(() => rubricMaxLevelPoints(levels), [levels]);
   const totalPoints = criteria.length * maxPoints;

@@ -97,8 +97,8 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
   return (
     <>
       <Topbar
-        title="Rubric Bank"
-        subtitle="Browse reusable assessment rubrics. Active rubrics can also be shared publicly."
+        title="Assessment Instrument Library"
+        subtitle="Browse reusable rubrics and marking schemes. Only traditional active rubrics have public links."
       />
       <main className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-[1500px] space-y-4">
@@ -121,7 +121,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage>Rubric Bank</BreadcrumbPage>
+                <BreadcrumbPage>Assessment Instrument Library</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -137,7 +137,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
               />
             </div>
             {canCreate ? (
-              <Button render={<Link href={`${base}/new`}><Plus className="h-4 w-4" />Create Rubric</Link>} />
+              <div className="flex flex-wrap gap-2"><Button variant="outline" render={<Link href="/rubric-bank">Manage marking schemes</Link>} /><Button render={<Link href={`${base}/new`}><Plus className="h-4 w-4" />Create Rubric</Link>} /></div>
             ) : null}
           </div>
 
@@ -213,7 +213,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
                         <td className="px-4 py-3">
                           <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${typeChipClass(rubric.type)}`}>
                             {rubric.type}
-                          </span>
+                          </span><div className="mt-1 text-xs text-muted-foreground">{rubric.instrumentKind === "marking_scheme" ? "Marking scheme" : "Rubric"}</div>
                         </td>
                         <td className="px-4 py-3 text-center font-medium text-foreground">
                           {rubric.criteria.length}
@@ -235,7 +235,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
                             >
                               <Eye className="h-4 w-4" />
                             </Link>
-                            {rubric.status === "Active" ? (
+                            {rubric.status === "Active" && rubric.instrumentKind !== "marking_scheme" ? (
                               <>
                                 <Link
                                   href={`/rubrics/${rubric.id}`}
@@ -258,7 +258,7 @@ export function RubricLibraryPage({ courseId }: { courseId: string }) {
                             ) : null}
                             {editable ? (
                               <Link
-                                href={`${base}/${rubric.id}/edit`}
+                                href={rubric.instrumentKind === "marking_scheme" ? "/rubric-bank" : `${base}/${rubric.id}/edit`}
                                 aria-label={`Edit ${rubric.name}`}
                                 title="Edit rubric"
                                 className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
