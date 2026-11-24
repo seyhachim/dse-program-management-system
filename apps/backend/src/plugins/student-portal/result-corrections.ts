@@ -1,3 +1,4 @@
+import { FinalizedQuestionChangeSchema } from "@dse-pms/shared-types";
 import type {
   FinalizedResultCorrectionHistory,
   FinalizedResultCorrectionWorkspace,
@@ -45,7 +46,7 @@ export const resultCorrectionsService = {
         courseSpec: {
           select: {
             id: true,
-            assessmentItems: { select: { id: true, name: true } },
+            assessmentItems: { select: { id: true, name: true, rubric: { select: { instrumentKind: true } }, criterionCloMappings: true } },
           },
         },
         enrollments: {
@@ -55,6 +56,7 @@ export const resultCorrectionsService = {
             results: {
               where: { finalizedAt: { not: null } },
               include: {
+                criterionScores: true,
                 publishedBy: { select: { name: true } },
                 finalizedBy: { select: { name: true } },
                 corrections: {
@@ -116,6 +118,7 @@ export const resultCorrectionsService = {
             publishedByName: result.publishedBy?.name ?? null,
             finalizedAt: result.finalizedAt.toISOString(),
             finalizedByName: result.finalizedBy?.name ?? null,
+            ...(assessment.rubric?.instrumentKind === "marking_scheme" ? { questionMarks: result.criterionScores.map((row) => ({ criterionId: row.criterionId, criterionName: row.criterionName, score: row.score, maxScore: row.maxScore, cloCodes: assessment.criterionCloMappings.filter((mapping) => mapping.criterionId === row.criterionId && mapping.rubricId === row.rubricId && mapping.rubricContentHash === row.rubricContentHash).map((mapping) => mapping.cloCode) })) } : {}),
             correctionSummary: {
               count: result._count.corrections,
               lastCorrectedAt: latest?.createdAt.toISOString() ?? null,
@@ -167,7 +170,7 @@ export const resultCorrectionsService = {
                 courseSpec: {
                   select: {
                     id: true,
-                    assessmentItems: { select: { id: true, name: true } },
+                    assessmentItems: { select: { id: true, name: true, rubric: { select: { instrumentKind: true } }, criterionCloMappings: true } },
                   },
                 },
               },
@@ -234,6 +237,7 @@ export const resultCorrectionsService = {
         correctedAt: correction.createdAt.toISOString(),
         correctedById: correction.correctedById,
         correctedByName: correction.correctedBy.name,
+        ...(Array.isArray(correction.questionChanges) && correction.questionChanges.length ? { questionChanges: FinalizedQuestionChangeSchema.array().parse(correction.questionChanges) } : {}),
       })),
     };
   },

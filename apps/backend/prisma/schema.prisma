@@ -2934,6 +2934,7 @@ model AssessmentResultCorrection {
   afterScore         Float
   afterMaxScore      Float
   afterFeedback      String
+  questionChanges    Json @default("[]")
   reason             String
   correctedById      String
   correctedBy        User             @relation("AssessmentResultCorrectionActor", fields: [correctedById], references: [id], onDelete: Restrict)
@@ -3274,6 +3275,7 @@ model Rubric {
   id              String                     @id @default(uuid())
   name            String
   type            String
+  instrumentKind  String                     @default("rubric")
   description     String                     @default("")
   status          RubricStatus               @default(Draft)
   ownerId         String?
@@ -3316,6 +3318,7 @@ model RubricCriterion {
   rubric   Rubric       @relation(fields: [rubricId], references: [id], onDelete: Cascade)
   name     String
   order    Int
+  maxPoints Float?
   cells    RubricCell[]
 
   @@id([rubricId, id])

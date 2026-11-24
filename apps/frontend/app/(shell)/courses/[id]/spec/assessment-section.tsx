@@ -128,7 +128,7 @@ export function AssessmentSection({
           <>
             <Button size="sm" variant="outline" onClick={openRubrics}>
               <ClipboardList className="mr-1.5 h-4 w-4" />
-              Rubric Library
+              Assessment Instrument Library
             </Button>
             <Button size="sm" onClick={openAdd}>
               <Plus className="mr-1.5 h-4 w-4" />
