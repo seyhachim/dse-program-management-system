@@ -67,8 +67,8 @@ dbDescribe("course project group registration database integrity", () => {
     expect(await prisma.assessmentResult.count({ where: { enrollmentId: { in: [a.enrollmentId, b.enrollmentId, c.enrollmentId] } } })).toBe(0);
     const registration = await prisma.courseProjectGroupRegistration.findFirstOrThrow({ where: { offeringId: offering.id } });
     const event = await prisma.courseProjectGroupRegistrationEvent.findFirstOrThrow({ where: { registrationId: registration.id, action: "approve" } });
-    await expect(prisma.courseProjectGroupRegistrationEvent.update({ where: { id: event.id }, data: { action: "rewrite" } })).rejects.toThrow(/append-only/i);
-    await expect(prisma.courseProjectGroupRegistrationEvent.delete({ where: { id: event.id } })).rejects.toThrow(/append-only/i);
+    await expect(async () => { await prisma.courseProjectGroupRegistrationEvent.update({ where: { id: event.id }, data: { action: "rewrite" } }); }).toThrow(/append-only/i);
+    await expect(async () => { await prisma.courseProjectGroupRegistrationEvent.delete({ where: { id: event.id } }); }).toThrow(/append-only/i);
     await service.configure(offering.id, assessment.id, lecturer.id, { ...policy, enabled: false });
     await expect(service.studentAction(offering.id, assessment.id, c.userId, { action: "create", name: "Late" })).rejects.toThrow();
     // Append-only academic/registration evidence intentionally remains only in the isolated CI database.
