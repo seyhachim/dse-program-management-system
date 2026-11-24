@@ -15,6 +15,7 @@ import { prisma } from "../../core/db/prisma.ts";
 import { groupAssessmentService } from "./group-assessment-results.ts";
 import { canManageOfferingResults } from "./result-management-access.ts";
 export { canManageOfferingResults } from "./result-management-access.ts";
+import { markingSchemeCloEvidence } from "../../core/academic/marking-scheme-evidence.ts";
 import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { summarizeMarkingSchemeScores } from "@dse-pms/shared-types";
 import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
@@ -31,6 +32,8 @@ type ReviewAssessment = {
   status: string;
   weight: number | null;
   cloCodes: string[];
+  rubric?: { instrumentKind: string } | null;
+  criterionCloMappings?: Array<{ criterionId: string; rubricId: string; rubricContentHash: string; cloCode: string }>;
 };
 type ReviewClo = {
   order: number;
@@ -302,7 +305,7 @@ export const resultsLifecycleService = {
             clos: { orderBy: { order: "asc" } },
             assessmentItems: {
               orderBy: { order: "asc" },
-              include: { criterionCloMappings: true },
+              include: { criterionCloMappings: true, rubric: { select: { instrumentKind: true } } },
             },
           },
         },
@@ -480,6 +483,7 @@ export const resultsLifecycleService = {
       const summary = summarizeMarkingSchemeScores({ name: scheme.name, questions }, preparedRows.map((row) => ({ questionId: row.criterionId, score: row.score })));
       if (!summary.complete || summary.earnedPoints === null) throw new PortalConflictError("Enter every question mark before saving this student draft; blank marks are not zero");
       const earnedPoints = summary.earnedPoints;
+      if (!assessment.cloCodes.length || !assessment.cloCodes.every((code) => markingSchemeCloEvidence(code, assessment.criterionCloMappings, preparedRows, { score: earnedPoints, maxScore: summary.maximumPoints }))) throw new PortalConflictError("The marking scheme mappings are incomplete or inconsistent; revise the specification before grading");
       return prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT "id" FROM "Offering" WHERE "id" = ${context.enrollment.offeringId} FOR UPDATE`;
         const currentOffering = await tx.offering.findUnique({ where: { id: context.enrollment.offeringId }, select: { courseSpecId: true } });
@@ -576,9 +580,9 @@ export const resultsLifecycleService = {
         const hash = rubricContentHash(scheme);
         const questions = scheme.criterionRows;
         const maxima = questions.reduce((sum, question) => sum + (question.maxPoints ?? 0), 0);
-        const valid = questions.length > 0 && results.every((result) => {
+        const valid = questions.length > 0 && assessment.cloCodes.length > 0 && results.every((result) => {
           const rows = result.criterionScores;
-          return rows.length === questions.length && questions.every((question) => rows.some((row) => row.criterionId === question.id && row.rubricId === scheme.id && row.rubricContentHash === hash && row.maxScore === question.maxPoints && row.score >= 0 && row.score <= row.maxScore && Number.isFinite(row.score))) && Math.abs(result.maxScore - maxima) < 1e-9 && Math.abs(result.score - rows.reduce((sum, row) => sum + row.score, 0)) < 1e-9;
+          return assessment.cloCodes.every((code) => markingSchemeCloEvidence(code, assessment.criterionCloMappings, rows, result)) && rows.length === questions.length && questions.every((question) => rows.some((row) => row.criterionId === question.id && row.rubricId === scheme.id && row.rubricContentHash === hash && row.maxScore === question.maxPoints && row.score >= 0 && row.score <= row.maxScore && Number.isFinite(row.score))) && Math.abs(result.maxScore - maxima) < 1e-9 && Math.abs(result.score - rows.reduce((sum, row) => sum + row.score, 0)) < 1e-9;
         });
         if (!valid) throw new PortalConflictError("Every marking scheme result must match complete question scores before publication");
       }

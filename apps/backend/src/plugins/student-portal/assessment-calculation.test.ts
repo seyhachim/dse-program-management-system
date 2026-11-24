@@ -108,3 +108,7 @@ describe("marking scheme evidence", () => {
     expect(outcome.percentage).toBe(70);
   });
 });
+
+ test("linked marking scheme without mappings never falls back to the exam total", () => {
+  expect(calculateCloEvidence("CLO1", [{ id: "exam", status: "Active", weight: 25, cloCodes: ["CLO1"], rubric: { instrumentKind: "marking_scheme" } }], [{ assessmentItemId: "exam", score: 18, maxScore: 25 }]).percentage).toBeNull();
+});

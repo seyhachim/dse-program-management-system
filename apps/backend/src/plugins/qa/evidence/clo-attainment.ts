@@ -77,6 +77,7 @@ export async function generateCloAttainmentSnapshots(
       select: {
         id: true,
         cloCodes: true,
+        rubric: { select: { instrumentKind: true } },
         criterionCloMappings: {
           select: { rubricId: true, criterionId: true, criterionName: true, rubricContentHash: true, cloCode: true },
         },
@@ -85,7 +86,8 @@ export async function generateCloAttainmentSnapshots(
     }),
   ]);
 
-  const hasSchemes = assessments.some((assessment) => hasMarkingSchemeMappings(assessment.criterionCloMappings));
+  const isScheme = (assessment: (typeof assessments)[number]) => assessment.rubric?.instrumentKind === "marking_scheme" || hasMarkingSchemeMappings(assessment.criterionCloMappings);
+  const hasSchemes = assessments.some((assessment) => isScheme(assessment));
   const calculationVersion = hasSchemes ? MARKING_SCHEME_ATTAINMENT_VERSION : input.calculationVersion ?? CLO_ATTAINMENT_CALCULATION_VERSION;
   if (hasSchemes && input.calculationVersion !== undefined && input.calculationVersion !== MARKING_SCHEME_ATTAINMENT_VERSION) throw new Error("Marking schemes require the versioned points-based calculation");
   const snapshots: QaCloAttainmentSnapshot[] = [];
@@ -110,7 +112,7 @@ export async function generateCloAttainmentSnapshots(
         if (result.courseSpecId !== offering.courseSpecId) continue;
         const assessment = relevantById.get(result.assessmentItemId);
         if (!assessment) continue;
-        if (hasMarkingSchemeMappings(assessment.criterionCloMappings)) {
+        if (isScheme(assessment)) {
           const aggregate = markingSchemeCloEvidence(cloCode, assessment.criterionCloMappings, result.criterionScores, result);
           if (!aggregate) continue;
           percentages.push(aggregate.percentage);
@@ -171,7 +173,7 @@ export async function generateCloAttainmentSnapshots(
 
     const sourceAssessmentItemIds = uniqueSorted(relevant.map((assessment) => assessment.id));
     const sourceMappingKeys = uniqueSorted(relevant.flatMap((assessment) => [
-      ...(!hasMarkingSchemeMappings(assessment.criterionCloMappings) && assessment.cloCodes.includes(cloCode) ? [`assessment:${offering.courseSpecId}:${assessment.id}:${cloCode}`] : []),
+      ...(!isScheme(assessment) && assessment.cloCodes.includes(cloCode) ? [`assessment:${offering.courseSpecId}:${assessment.id}:${cloCode}`] : []),
       ...assessment.criterionCloMappings
         .filter((mapping) => mapping.cloCode === cloCode)
         .map((mapping) => `criterion:${offering.courseSpecId}:${assessment.id}:${mapping.rubricId}:${mapping.criterionId}:${cloCode}:${mapping.rubricContentHash}`),

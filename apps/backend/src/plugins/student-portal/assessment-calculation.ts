@@ -6,6 +6,7 @@ export type GradeAssessment = {
   status: string;
   weight: number | null;
   cloCodes: string[];
+  rubric?: { instrumentKind: string } | null;
   criterionCloMappings?: Array<{ criterionId: string; rubricId: string; rubricContentHash: string; cloCode: string }>;
 };
 
@@ -131,7 +132,7 @@ export function calculateCloEvidence(
     results.map((result) => [result.assessmentItemId, result]),
   );
   const schemeAssessments = new Map(assessments.filter((assessment) =>
-    hasMarkingSchemeMappings(assessment.criterionCloMappings ?? [])
+    assessment.rubric?.instrumentKind === "marking_scheme" || hasMarkingSchemeMappings(assessment.criterionCloMappings ?? [])
   ).map((assessment) => [assessment.id, assessment]));
   const schemeTotals = new Map<string, number>();
   const completeSchemeEvidence: CriterionCloEvidenceInput[] = [];
