@@ -73,7 +73,7 @@ export const weeklyTeachingService = {
           ],
         },
         select: {
-          id: true, term: true, sectionCode: true, programmeYear: true,
+          id: true, term: true, sectionCode: true, programmeYear: true, status: true,
           startDate: true, endDate: true,
           course: { select: { code: true, title: true } },
           lecturer: { select: { id: true, name: true } },
