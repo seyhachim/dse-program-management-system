@@ -80,9 +80,24 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Publication failed"); }
     finally { setSaving(false); }
   }
+  async function setPublic(item: DseNewsView, showPublic: boolean) {
+    if(showPublic&&!window.confirm("Publish this article and approved photos to the OPEN INTERNET without login? Verify rights for every identifiable person.")) return;
+    setSaving(true);setError("");setNotice("");
+    try {
+      const changed=await dseNewsApi.approvePublic(item.id,{
+        expectedVersion:item.version,
+        public:showPublic,
+        confirmPhotoRights:showPublic,
+      });
+      if(editing?.id===item.id)setEditing(changed);
+      setNotice(showPublic?"Public website publication approved.":"Public website publication removed.");
+      await load();
+    }catch(reason){setError(reason instanceof Error?reason.message:"Could not change public approval");}
+    finally{setSaving(false);}
+  }
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <p className="text-sm text-muted-foreground">Stories can link to a field visit, but private attendance records are never copied into articles. Published articles are visible to signed-in DSE students, not the open internet. Use View published article or Preview draft to check the readable staff view.</p>
+      <p className="text-sm text-muted-foreground">Stories can link to a field visit, but private attendance records are never copied into articles. Student publication and open-internet website approval are separate. Only explicitly approved articles become public. Use View published article or Preview draft to check the readable staff view.</p>
       {error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{error}</p>}
       {notice && <p role="status" className="rounded-lg bg-muted p-3 text-sm">{notice}</p>}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -100,6 +115,14 @@ export function NewsManageClient({ initialActivityId }: { initialActivityId: str
                 className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 text-xs font-semibold text-primary hover:bg-muted">
                 {item.status === "Published" ? "View published article" : "Preview draft"}
               </Link>
+              {item.publicPublishedAt && <Link className="inline-block text-xs text-primary underline"
+                href={"/program/news/"+item.id} target="_blank">Open public website article</Link>}
+              {canPublish && item.status === "Published" && (
+                <button type="button" disabled={saving} className="rounded border px-2 py-1 text-xs"
+                  onClick={()=>void setPublic(item,!Boolean(item.publicPublishedAt))}>
+                  {item.publicPublishedAt?"Remove from public website":"Approve for public website"}
+                </button>
+              )}
               {canPublish && item.status !== "Archived" && (
                 <div className="flex flex-wrap gap-2">
                   {item.status !== "Published"
