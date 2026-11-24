@@ -96,6 +96,34 @@ suite("Sindora trip participants and DSE News — isolated integration", () => {
     expect((await request(statusPath,coordinator,"POST",{expectedVersion:1,status:"Draft"})).status).toBe(409);
     expect(await prisma.dseNewsAuditEvent.count({where:{articleId}})).toBe(2);
   });
+  test("anonymous public projection is opt-in and revocable without roster exposure",async()=>{
+    const publicList="/api/programme/public/news";
+    const publicDetail=publicList+"/"+articleId;
+    const admin="/api/student-portal/news/manage/"+articleId+"/public";
+    expect((await request(publicDetail,null)).status).toBe(404);
+    const initial=await request(publicList,null);
+    expect(initial.status).toBe(200);
+    expect(initial.body.some((a:{id:string})=>a.id===articleId)).toBe(false);
+    expect((await request(admin,student,"POST",{expectedVersion:2,public:true,confirmPhotoRights:true})).status).toBe(403);
+    expect((await request(admin,lecturer,"POST",{expectedVersion:2,public:true,confirmPhotoRights:true})).status).toBe(403);
+    const approved=await request(admin,coordinator,"POST",{expectedVersion:2,public:true,confirmPhotoRights:true});
+    expect(approved.status).toBe(200);
+    expect(approved.body.publicPublishedAt).not.toBeNull();
+    const article=await request(publicDetail,null);
+    expect(article.status).toBe(200);
+    expect(article.body.title).toBe("Synthetic Sindora Study Visit");
+    for(const forbidden of ["activityId","authorId","studentId","offeringId","storagePath","studentName","participantId"]){
+      expect(JSON.stringify(article.body)).not.toContain(forbidden);
+    }
+    expect((await request(publicList,null)).body.some((a:{id:string})=>a.id===articleId)).toBe(true);
+    expect((await request(admin,coordinator,"POST",{expectedVersion:2,public:false})).status).toBe(409);
+    const removed=await request(admin,coordinator,"POST",{expectedVersion:3,public:false});
+    expect(removed.status).toBe(200);
+    expect((await request(publicDetail,null)).status).toBe(404);
+    expect((await request("/api/student-portal/news/"+articleId,student)).status).toBe(200);
+    expect(await prisma.dseNewsAuditEvent.count({where:{articleId}})).toBe(4);
+  });
+
 });
 async function loadUser(email:string):Promise<AuthUser>{
   const row=await prisma.user.findUniqueOrThrow({where:{email},include:{roleAssignments:{include:{role:true}}}});
