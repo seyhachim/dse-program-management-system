@@ -18,7 +18,9 @@ suite("Sindora trip participants and DSE News — isolated integration", () => {
     if(!["localhost","127.0.0.1"].includes(host))throw Error("Refusing hosted database for trip test");
     process.env.AUTH_MODE="dev";
     process.env.JWT_SECRET="isolated-sindora-travel-news-integration-secret-123456789";
-    [lecturer,coordinator,student]=await Promise.all(["lecturer@dse.dev","coordinator@dse.dev","student@dse.dev"].map(loadUser));
+    lecturer = await loadUser("lecturer@dse.dev");
+    coordinator = await loadUser("coordinator@dse.dev");
+    student = await loadUser("student@dse.dev");
     outsider={...lecturer,id:"not-assigned-lecturer",programmeRoles:[{role:"lecturer",programmeId:"elsewhere"}]};
     let profile=await prisma.student.findUnique({where:{userId:student.id}});
     if(!profile){profile=await prisma.student.create({data:{name:"Synthetic Student",email:student.email,userId:student.id,status:"Active"}});madeProfile=true;}
