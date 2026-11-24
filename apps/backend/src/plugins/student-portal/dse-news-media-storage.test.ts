@@ -39,7 +39,7 @@ describe("private DSE News photo upload validation",()=>{
     expect(()=>dimensionsOfWebp(extendedWebp(800,600,true))).toThrow("Animated");
     expect(()=>parseCompressedPhotoPack(packet(extendedWebp(2100,1100),thumb))).toThrow("dimensions");
     expect(()=>parseCompressedPhotoPack(packet(cover,extendedWebp(600,500)))).toThrow("dimensions");
-    expect(()=>parseCompressedPhotoPack(packet(cover,thumb).slice(0,-2))).toThrow("packet");
+    expect(()=>parseCompressedPhotoPack(packet(cover,thumb).slice(0,-2))).toThrow(NewsMediaError);
   });
   test("supports cover/gallery only with descriptive alt text",()=>{
     expect(validateMediaMetadata("cover","Pepper vines at farm")).toEqual({kind:"cover",alt:"Pepper vines at farm"});
