@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { PublicRubricSchema, RubricSchema } from "./rubrics.ts";
+import { PublicRubricSchema, RubricSchema, CreateRubricInput, rubricTotalPoints } from "./rubrics.ts";
 
 const activeRubric = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -52,4 +52,13 @@ test("public rubric contract strips management-only fields", () => {
   expect("assessmentUsageCount" in parsed).toBe(false);
   expect("createdAt" in parsed).toBe(false);
   expect("updatedAt" in parsed).toBe(false);
+});
+
+test("point-based marking schemes require independent positive maxima and no rating levels", () => {
+  const input = { name: "Midterm", type: "Exam", instrumentKind: "marking_scheme", levels: [], criteria: [{ id: "q1", name: "Q1", maxPoints: 6, descriptors: [] }, { id: "q2", name: "Q2", maxPoints: 8, descriptors: [] }] };
+  const scheme = CreateRubricInput.parse(input);
+  expect(rubricTotalPoints(scheme)).toBe(14);
+  expect(CreateRubricInput.safeParse({ ...input, levels: activeRubric.levels }).success).toBe(false);
+  expect(CreateRubricInput.safeParse({ ...input, criteria: [{ id: "q1", name: "Q1", descriptors: [] }] }).success).toBe(false);
+  expect(CreateRubricInput.safeParse({ ...input, instrumentKind: "rubric" }).success).toBe(false);
 });

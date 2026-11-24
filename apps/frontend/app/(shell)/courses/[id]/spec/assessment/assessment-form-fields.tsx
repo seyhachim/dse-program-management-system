@@ -408,9 +408,9 @@ export function AssessmentFormFields({
         </div>
       </Section>
 
-      <Section n={4} title="Marking & Rubric">
+      <Section n={4} title="Marking & Assessment Instrument">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <Field label="Rubric">
+          <Field label="Assessment instrument">
             <select
               value={draft.rubricId}
               onChange={(event) =>
@@ -422,10 +422,10 @@ export function AssessmentFormFields({
               }
               className={selectCls}
             >
-              <option value="">— No rubric —</option>
+              <option value="">— Direct score (no instrument) —</option>
               {rubrics.map((rubric) => (
                 <option key={rubric.id} value={rubric.id}>
-                  {rubric.name} ({rubric.type})
+                  {rubric.name} ({rubric.instrumentKind === "marking_scheme" ? "Marking scheme" : "Rubric"})
                 </option>
               ))}
               {missingRubric ? (
@@ -440,7 +440,7 @@ export function AssessmentFormFields({
               href={`/courses/${courseId}/spec/assessment/rubrics`}
               className="inline-flex h-9 items-center justify-center rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted"
             >
-              Rubric Library
+              Assessment Instrument Library
             </Link>
           </div>
         </div>
@@ -452,7 +452,7 @@ export function AssessmentFormFields({
                 {selectedRubric.name}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {selectedRubric.criteria.length} criteria · {rubricScaleSummary(selectedRubric.levels)}
+                {selectedRubric.instrumentKind === "marking_scheme" ? `${selectedRubric.criteria.length} questions · map each question to exactly one active CLO` : `${selectedRubric.criteria.length} criteria · ${rubricScaleSummary(selectedRubric.levels)}`}
               </p>
             </div>
             <div className="divide-y divide-border">
@@ -466,7 +466,7 @@ export function AssessmentFormFields({
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-foreground">{criterion.name}</span>
+                      <span className="text-foreground">{criterion.name}{selectedRubric.instrumentKind === "marking_scheme" ? ` · ${criterion.maxPoints} pts` : ""}</span>
                       {draft.mode === "group_individual" ? (
                         <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                           Score as
@@ -499,7 +499,7 @@ export function AssessmentFormFields({
               ))}
             </div>
             <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-              Map only the CLOs each rubric criterion directly measures. Criterion mappings refine evidence traceability and never inherit or reuse the local course-grade weight.
+              Map only the CLOs directly measured by each scoring item. Marking schemes require one CLO per question and individual assessment mode. Local course-grade weight is separate from CLO evidence.
             </div>
           </div>
         ) : (

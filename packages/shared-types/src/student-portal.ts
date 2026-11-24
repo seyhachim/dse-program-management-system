@@ -304,9 +304,10 @@ export const SaveAssessmentCriterionScoresInput = z.object({
   assessmentItemId: z.string().min(1),
   scores: z.array(z.object({
     criterionId: z.string().min(1),
-    score: z.coerce.number().min(0),
+    score: z.number().finite().min(0),
     rubricLevelId: z.string().nullable().optional(),
   })),
+  feedback: z.string().trim().max(5000).optional(),
 });
 export type SaveAssessmentCriterionScoresInput = z.infer<typeof SaveAssessmentCriterionScoresInput>;
 
@@ -332,6 +333,7 @@ export const CorrectFinalizedAssessmentResultInput = z.object({
   feedback: z.string().trim().max(5000).default(""),
   reason: z.string().trim().min(1, "A correction reason is required").max(2000),
   expectedUpdatedAt: z.string().datetime(),
+  questionScores: z.array(z.object({ criterionId: z.string().min(1), score: z.number().finite().nonnegative() })).min(1).optional(),
 }).refine((value) => value.score <= value.maxScore, {
   message: "Score cannot exceed maximum score",
   path: ["score"],
@@ -378,6 +380,7 @@ export const SetAssessmentDeadlineInput = z.object({
 export type SetAssessmentDeadlineInput = z.infer<typeof SetAssessmentDeadlineInput>;
 
 export interface CourseDeliveryRubricCriterion {
+  maxPoints?: number;
   id: string;
   name: string;
   cloCodes: string[];
@@ -407,6 +410,7 @@ export interface CourseDeliveryResultRow {
 }
 
 export interface CourseDeliveryAssessment {
+  instrumentKind?: "rubric" | "marking_scheme";
   id: string;
   name: string;
   type: string;

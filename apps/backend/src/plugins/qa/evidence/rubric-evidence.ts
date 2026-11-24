@@ -26,6 +26,7 @@ type RubricEvidenceRow = {
   rubricId: string;
   rubricName: string;
   rubricType: string;
+  instrumentKind?: string;
   rubricStatus: "Active" | "Archived";
   rubricUpdatedAt: Date;
   criterionCount: number | bigint;
@@ -63,7 +64,7 @@ export function rubricEvidenceCandidate(
     sourceDomain: definition.sourceDomain,
     title: `${row.courseCode} — ${row.assessmentName} — ${row.rubricName}`,
     summary:
-      criterionCount > 0
+      row.instrumentKind === "marking_scheme" ? `${criterionCount} question(s) in a linked point-based marking scheme (exam content withheld).` : criterionCount > 0
         ? `${criterionCount} rubric criterion(s): ${row.criteriaSummary}`
         : "Linked rubric has no criteria.",
     entityType: "CourseSpecAssessmentRubric",
@@ -97,6 +98,7 @@ export function rubricEvidenceCandidate(
       rubricVersion: row.rubricId,
       rubricName: row.rubricName,
       rubricType: row.rubricType,
+      ...(row.instrumentKind === "marking_scheme" ? { instrumentKind: "marking_scheme" } : {}),
       rubricStatus: row.rubricStatus,
       criterionCount,
     },
@@ -130,10 +132,11 @@ export async function retrieveRubricEvidenceCandidates(
       r.id AS "rubricId",
       r.name AS "rubricName",
       r.type AS "rubricType",
+      r."instrumentKind" AS "instrumentKind",
       r.status::text AS "rubricStatus",
       r."updatedAt" AS "rubricUpdatedAt",
       COUNT(rc.id) AS "criterionCount",
-      COALESCE(string_agg(rc.name, ', ' ORDER BY rc."order"), '') AS "criteriaSummary"
+      CASE WHEN r."instrumentKind" = 'marking_scheme' THEN '' ELSE COALESCE(string_agg(rc.name, ', ' ORDER BY rc."order"), '') END AS "criteriaSummary"
     FROM "Course" c
     JOIN "CourseSpec" cs ON cs."courseId" = c.id
     JOIN "CourseSpecAssessmentItem" a ON a."courseSpecId" = cs.id
@@ -150,7 +153,7 @@ export async function retrieveRubricEvidenceCandidates(
       )
     GROUP BY
       c.id, c.code, cs.id, cs."reviewStatus", a.id, a.name,
-      r.id, r.name, r.type, r.status, r."updatedAt"
+      r.id, r.name, r.type, r."instrumentKind", r.status, r."updatedAt"
     ORDER BY c.code, cs."versionMajor", cs."versionMinor", a."order"
   `;
 
