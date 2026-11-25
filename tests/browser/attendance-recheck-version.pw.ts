@@ -26,6 +26,10 @@ async function stubAttendance(page: Page, includeSecondStudent = false) {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname.endsWith("/semester-notes")) { await route.fulfill({ json: [] }); return; }
     const id = offeringIds.find((value) => pathname.includes(value))!;
+    if (pathname.includes("/attendance/students/")) {
+      await route.fulfill({ json: { offeringId: id, studentId, history: [] } });
+      return;
+    }
     const date = pathname.match(/attendance\/(\d{4}-\d{2}-\d{2})/)?.[1];
     const counts = { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0, Unmarked: includeSecondStudent ? 2 : 1 };
     await route.fulfill({ json: date
@@ -91,7 +95,15 @@ test("Check 2 refuses a background-refreshed register version", async ({ browser
   refreshed = true;
   await page.waitForTimeout(5100);
   const response = page.waitForResponse((r) => dateRoute.test(r.url()) && r.request().method() === "GET");
-  await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
+  await page.evaluate(() => {
+    // React Query reacts to an actual hidden → visible transition, not merely
+    // a repeated visibility event while the page is already focused.
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    window.dispatchEvent(new Event("visibilitychange"));
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    window.dispatchEvent(new Event("visibilitychange"));
+    Reflect.deleteProperty(document, "visibilityState");
+  });
   await response;
   await expect(dialog.getByText("Final attendance", { exact: true }).locator("..")
     .getByText("Present", { exact: true })).toBeVisible();
