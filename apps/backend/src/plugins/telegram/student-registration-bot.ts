@@ -19,11 +19,13 @@ export async function studentRegistrationBotReply(raw: unknown) {
     WHERE "telegramUserId" = ${action.telegramUserId} LIMIT 1
   `;
   if (existing.length) return reply("You already have or previously had a PMS account. Please use your existing account or contact the DSE coordinator for recovery.", removeKeyboard);
-  const pending = await prisma.$queryRaw<Array<{ id: string }>>`
-    SELECT "id" FROM "telegram_security"."StudentRegistrationRequest"
+  const pending = await prisma.$queryRaw<Array<{ id: string; status: string }>>`
+    SELECT "id", "status" FROM "telegram_security"."StudentRegistrationRequest"
     WHERE "telegramUserId" = ${action.telegramUserId} LIMIT 1
   `;
-  if (pending.length) return reply("You already submitted a registration. Please contact your DSE coordinator for status or corrections.", removeKeyboard);
+  const registrationUrl = new URL("/telegram/registration", config.miniAppUrl).toString();
+  const openRegistration = { keyboard: [[{ text: "Open registration", web_app: { url: registrationUrl } }]], resize_keyboard: true, one_time_keyboard: true };
+  if (pending[0] && pending[0].status !== "NEEDS_CORRECTION") return reply("You already submitted a registration. Open registration to check your status.", openRegistration);
   if (action.kind === "start") {
     await prisma.$executeRaw`
       INSERT INTO "telegram_security"."StudentRegistrationBotConsent" ("telegramUserId", "state", "expiresAt")
@@ -48,7 +50,7 @@ export async function studentRegistrationBotReply(raw: unknown) {
   if (changed !== 1) return reply("Your registration session is not active. Open PMS and choose Register with Telegram again.", removeKeyboard);
   // No authentication token or phone data is placed in this URL.
   return reply("Continue to the PMS Mini App to complete your student registration. Your registration requires staff approval.", {
-    keyboard: [[{ text: "Complete registration", web_app: { url: config.miniAppUrl } }]],
+    keyboard: [[{ text: "Complete registration", web_app: { url: registrationUrl } }]],
     resize_keyboard: true, one_time_keyboard: true,
   });
 }
