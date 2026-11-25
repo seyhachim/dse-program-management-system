@@ -23,7 +23,7 @@ export async function deliverRegistrationDecision(reviewId: string): Promise<Not
         ? "Your DSE PMS registration requires corrections. Contact your coordinator, then restart registration from the official bot."
         : "Your DSE PMS registration was not approved. Contact your coordinator for clarification.";
       const url=row.decision==="APPROVE"?config.miniAppUrl:new URL("/telegram/registration",config.miniAppUrl).toString();
-      const boundedFetch:typeof fetch=(input,init)=>fetch(input,{...init,signal:AbortSignal.timeout(10000)});
+      const boundedFetch=((input: Parameters<typeof fetch>[0],init?: Parameters<typeof fetch>[1])=>fetch(input,{...init,signal:AbortSignal.timeout(10000)})) as typeof fetch;
       const messageId=await sendTelegramPmsMessage(row.telegramUserId,message,url,boundedFetch);
       await prisma.$executeRaw`UPDATE "telegram_security"."StudentRegistrationReview" SET "notificationState"='SENT',"notificationMessageId"=${messageId},"notificationUpdatedAt"=CURRENT_TIMESTAMP WHERE "id"=${reviewId} AND "notificationState"='SENDING'`;
       return "SENT";
