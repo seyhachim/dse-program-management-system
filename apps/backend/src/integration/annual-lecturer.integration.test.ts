@@ -11,7 +11,7 @@ import { prisma } from "../core/db/prisma.ts";
 
 const integrationDescribe = process.env.BACKEND_INTEGRATION_TESTS === "1" ? describe : describe.skip;
 const TEST_SECRET = "annual-lecturer-integration-secret-at-least-32-characters";
-type HttpResponse = { status: number; body: unknown };
+type HttpResponse = { status: number; body: unknown; cacheControl: string | null };
 type StaffRow = {
   lecturerId: string; classification: string; submissionStatus: string; submissionFingerprint?: string;
   teaching: Array<{ offeringId: string; confirmed: boolean; reviewId: string | null }>;
@@ -81,8 +81,59 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
   test("review, deduplication, historical teaching, evidence and versioned export", async () => {
     const lt = signToken(lecturer), ct = signToken(contributor),
       rt = signToken(coordinator), st = signToken(student);
-    expect((await request(`/api/lecturers/annual/${yearId}/summary`, st)).status).toBe(403);
+    // All protected routes must fail closed before any data or mutation.
+    const annual = "/api/lecturers/annual";
+    const scoped = (user: AuthUser, role: Role) => signToken({
+      ...user, roles: [role], programmeRoles: [{ role, programmeId: "synthetic-other-programme" }],
+    });
+    const foreignLecturer = scoped(lecturer, "lecturer");
+    const foreignCoordinator = scoped(coordinator, "program_coordinator");
+    const scopedAdmin = scoped(coordinator, "admin");
+    const dual = signToken({
+      ...lecturer, roles: ["lecturer", "program_coordinator"],
+      programmeRoles: [
+        {role: "lecturer", programmeId: "dse"},
+        {role: "program_coordinator", programmeId: "dse"},
+      ],
+    });
+    const readPaths = ["/years", `/${yearId}/me`, `/${yearId}/summary`, `/${yearId}/export`];
+    const mutations: Array<[string, string]> = [
+      [`/${yearId}/reporting-window`, "PUT"],
+      [`/${yearId}/review-staff`, "POST"],
+      [`/${yearId}/review-teaching`, "POST"],
+      [`/${yearId}/review-submission`, "POST"],
+      [`/${yearId}/release`, "POST"],
+      [`/${yearId}/me/evidence`, "POST"],
+      [`/${yearId}/me/submit`, "POST"],
+      [`/${yearId}/me/evidence/${randomUUID()}`, "DELETE"],
+    ];
+    for (const path of readPaths) {
+      expect((await request(annual + path, null)).status).toBe(401);
+      for (const token of [st, foreignLecturer, foreignCoordinator, scopedAdmin]) {
+        expect((await request(annual + path, token)).status).toBe(403);
+      }
+    }
+    for (const [path, method] of mutations) {
+      expect((await request(annual + path, null, method, {})).status).toBe(401);
+      for (const token of [st, foreignLecturer, foreignCoordinator, scopedAdmin]) {
+        expect((await request(annual + path, token, method, {})).status).toBe(403);
+      }
+      if (!path.includes("/me/")) {
+        expect((await request(annual + path, lt, method, {})).status).toBe(403);
+      } else {
+        expect((await request(annual + path, rt, method, {})).status).toBe(403);
+      }
+    }
+    expect((await request(`${annual}/${yearId}/summary`, lt)).status).toBe(403);
+    expect((await request(`${annual}/${yearId}/export`, lt)).status).toBe(403);
     expect((await request("/api/lecturers/annual/years", lt)).status).toBe(200);
+    const privateRecord = await request(`${annual}/${yearId}/me`, lt);
+    expect(privateRecord.status).toBe(200);
+    expect(privateRecord.cacheControl).toContain("private");
+    expect(privateRecord.cacheControl).toContain("no-store");
+    expect((privateRecord.body as {staff: StaffRow}).staff.lecturerId).toBe(lecturer.id);
+    expect(JSON.stringify(privateRecord.body)).not.toContain(contributor.id);
+    expect((await request(`${annual}/${randomUUID()}/summary`, rt)).status).toBe(404);
 
     const before = (await request(`/api/lecturers/annual/${yearId}/summary`, rt)).body as Report;
     expect((await request(`/api/lecturers/annual/${yearId}/release`, rt, "POST", {})).status).toBe(400);
@@ -101,6 +152,7 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
       verdict: "confirmed", reason: "Verified synthetic teaching",
       evidenceUrl: "https://example.invalid/teaching" };
     expect((await request(`/api/lecturers/annual/${yearId}/review-teaching`, lt, "POST", teach)).status).toBe(403);
+    expect((await request(`/api/lecturers/annual/${yearId}/review-teaching`, dual, "POST", teach)).status).toBe(400);
     expect((await request(`/api/lecturers/annual/${yearId}/review-teaching`, rt, "POST", teach)).status).toBe(204);
 
     const oldPublication = await request("/api/lecturers/me/portfolio-items", ct, "POST", {
@@ -125,6 +177,16 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
     const pubId = (pub.body as { id: string }).id;
     expect((await request(`/api/lecturers/annual/${yearId}/me/evidence`, ct, "POST", { itemId: pubId })).status).toBe(204);
     expect((await request(`/api/lecturers/annual/${yearId}/me/evidence`, lt, "POST", { itemId: pubId })).status).toBe(404);
+    expect((await request(`/api/lecturers/${contributor.id}/portfolio-items`, lt)).status).toBe(403);
+    expect((await request(`/api/lecturers/${contributor.id}/portfolio-items`, foreignCoordinator)).status).toBe(403);
+    expect((await request(`/api/lecturers/${contributor.id}/portfolio-items/${pubId}/review`, lt,
+      "POST", {action: "verified", note: "Unauthorized review"})).status).toBe(403);
+    // A no-op unlink of someone else's item must not remove the owner's link.
+    expect((await request(`/api/lecturers/annual/${yearId}/me/evidence/${pubId}`, lt, "DELETE")).status).toBe(204);
+    const contributorRecord = await request(`/api/lecturers/annual/${yearId}/me`, ct);
+    expect((contributorRecord.body as {staff:StaffRow}).staff.evidence.some(item=>item.id===pubId)).toBe(true);
+    const lecturerRecord = await request(`/api/lecturers/annual/${yearId}/me`, lt);
+    expect((lecturerRecord.body as {staff:StaffRow}).staff.evidence.some(item=>item.id===pubId)).toBe(false);
     expect((await request(`/api/lecturers/${contributor.id}/portfolio-items/${pubId}/review`, rt,
       "POST", { action: "verified", note: "DOI checked" })).status).toBe(200);
 
@@ -146,6 +208,8 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
     expect(coauthored.status).toBe(201);
     const coauthorId = (coauthored.body as { id: string }).id;
     expect((await request(`/api/lecturers/annual/${yearId}/me/evidence`, lt, "POST", { itemId: coauthorId })).status).toBe(204);
+    expect((await request(`/api/lecturers/${lecturer.id}/portfolio-items/${coauthorId}/review`, dual,
+      "POST", {action: "verified", note: "Attempted self verification"})).status).toBe(403);
     expect((await request(`/api/lecturers/${lecturer.id}/portfolio-items/${coauthorId}/review`, rt,
       "POST", { action: "verified", note: "Coauthor verified" })).status).toBe(200);
     expect((await request(`/api/lecturers/annual/${yearId}/me/submit`, ct,
@@ -170,6 +234,10 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
       qualification:"Master",evidenceUrl:"https://example.invalid/staff-roster",
       reason:"Attempted self review",
     })).status).toBe(403);
+    expect((await request(`/api/lecturers/annual/${yearId}/review-staff`, dual, "POST", {
+      lecturerId:lecturer.id,employmentType:"part_time",qualification:"Master",
+      evidenceUrl:"https://example.invalid/staff-roster",reason:"Attempted dual-role self review",
+    })).status).toBe(400);
     for (const id of [lecturer.id,contributor.id]) {
       expect((await request(`/api/lecturers/annual/${yearId}/review-staff`, rt, "POST", {
         lecturerId:id,employmentType:"part_time",
@@ -195,6 +263,12 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
     expect(current.submissionStatus).toBe("submitted");
     expect((await request(reviewPath,rt,"POST",{...decision,fingerprint:current.submissionFingerprint})).status).toBe(204);
     expect(((await request(`/api/lecturers/annual/${yearId}/summary`,rt)).body as Report).staff.find(s=>s.lecturerId===contributor.id)?.submissionStatus).toBe("verified");
+    // The self-review guard must still apply to a coordinator who is a lecturer,
+    // including when the supplied fingerprint is syntactically valid.
+    expect((await request(reviewPath,dual,"POST",{
+      lecturerId:lecturer.id,decision:"verified",fingerprint:"0".repeat(64),
+      reason:"Attempted dual-role self review",
+    })).status).toBe(400);
     const release = await request(`/api/lecturers/annual/${yearId}/release`, rt, "POST", {});
     expect(release.status).toBe(201);
     expect((release.body as Report).releaseVersion).toBe(1);
@@ -219,14 +293,14 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
     expect(rejected).toBe(true);
   });
 
-  async function request(path: string, token: string, method = "GET", body?: unknown): Promise<HttpResponse> {
+  async function request(path: string, token: string | null, method = "GET", body?: unknown): Promise<HttpResponse> {
     const response = await fetch(baseUrl + path, {
       method,
-      headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "content-type": "application/json" }) },
+      headers: { ...(token ? {Authorization: `Bearer ${token}`} : {}), ...(body === undefined ? {} : { "content-type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const raw = await response.text();
-    return { status: response.status, body: raw ? JSON.parse(raw) : null };
+    return { status: response.status, body: raw ? JSON.parse(raw) : null, cacheControl: response.headers.get("cache-control") };
   }
 });
 
