@@ -8,6 +8,8 @@ import { api, ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { protectedQueryKey } from "@/lib/query-client";
 
+export type EvidencePopulation = "individual" | "group" | "component";
+export type EvidenceSelection = { offeringId: string; assessmentItemId: string; population: EvidencePopulation };
 type Context = { courseSpecId: string; assessments: { id: string; name: string; mode: string }[] };
 type Attachment = { filename: string; mimeType: string; sizeBytes: number; sha256: string };
 type Revision = {
@@ -18,14 +20,14 @@ type Revision = {
 type Overview = {
   access: { contribute: boolean; review: boolean };
   suggestions: { eligibleCount: number; suggestions: { sourceId: string; rank: string; percentage: number; tied: boolean }[] };
-  eligibleResults: { resultId: string; enrollmentId: string; score: number; maxScore: number; feedbackAvailable: boolean }[];
+  eligibleResults: { resultId: string; enrollmentId: string; label: string | null; memberEnrollmentIds: string[]; groupName: string | null; score: number; maxScore: number; feedbackAvailable: boolean }[];
   evidence: Revision[];
 };
 function message(error: unknown) { return error instanceof ApiError ? error.message : "Evidence operation failed. Please reload and retry."; }
 const selectStyle = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm";
 const panelStyle = "rounded-xl border border-border bg-card p-4 space-y-3";
 
-export function AssessmentEvidencePanel({ offering }: { offering: CourseDeliveryOffering }) {
+export function AssessmentEvidencePanel({ offering, initial }: { offering: CourseDeliveryOffering; initial?: EvidenceSelection }) {
   const { me } = useMe();
   const root = "/api/qa/assessment-evidence/offerings/" + encodeURIComponent(offering.offeringId);
   const context = useQuery({
@@ -35,26 +37,32 @@ export function AssessmentEvidencePanel({ offering }: { offering: CourseDelivery
   });
   if (context.isError) return <section className={panelStyle}><h2 className="font-semibold">Assessment Evidence</h2><p role="alert" className="text-sm text-destructive">{message(context.error)}</p><Button variant="outline" onClick={() => void context.refetch()}>Retry</Button></section>;
   if (!context.data) return <p className="text-sm text-muted-foreground">Loading authorized assessment context…</p>;
-  return <EvidenceAssessmentPicker key={(me?.id ?? "pending") + ":" + offering.offeringId + ":" + context.data.courseSpecId} offering={offering} context={context.data} root={root} userId={me?.id ?? "pending"} />;
+  return <EvidenceAssessmentPicker key={(me?.id ?? "pending") + ":" + offering.offeringId + ":" + context.data.courseSpecId} offering={offering} context={context.data} root={root} userId={me?.id ?? "pending"} initial={initial} />;
 }
-function EvidenceAssessmentPicker({ offering, context, root, userId }: { offering: CourseDeliveryOffering; context: Context; root: string; userId: string }) {
-  const [selected, setSelected] = useState(context.assessments.find(x => x.mode === "Individual")?.id ?? "");
+function EvidenceAssessmentPicker({ offering, context, root, userId, initial }: { offering: CourseDeliveryOffering; context: Context; root: string; userId: string; initial?: EvidenceSelection }) {
+  const [selected, setSelected] = useState(initial?.assessmentItemId ?? context.assessments[0]?.id ?? "");
+  const [groupPopulation, setGroupPopulation] = useState<EvidencePopulation>(initial?.population === "component" ? "component" : "group");
   const assessment = context.assessments.find(x => x.id === selected);
+  const population: EvidencePopulation = assessment?.mode === "Individual" ? "individual" : assessment?.mode === "GroupIndividual" ? groupPopulation : "group";
   const deliveryAssessment = offering.assessments.find(x => x.id === selected);
   return <section className={panelStyle}>
     <h2 className="text-lg font-semibold">Assessment Evidence</h2>
-    <p className="text-sm text-muted-foreground">Private marked work for AUN-QA. Suggested samples are relative ranks, not official achievement levels. Only published and finalized individual marks are eligible.</p>
+    <p className="text-sm text-muted-foreground">Private marked work for AUN-QA. Suggested samples are relative ranks, not official achievement levels. Only published and finalized source marks are eligible. Shared group work and individual contributions are collected separately.</p>
     <label className="block text-sm font-medium">Assessment
       <select className={selectStyle} value={selected} onChange={e => setSelected(e.target.value)}>
         <option value="">Select assessment</option>
-        {context.assessments.map(a => <option key={a.id} value={a.id}>{a.name}{a.mode !== "Individual" ? " (group evidence pending)" : ""}</option>)}
+        {context.assessments.map(a => <option key={a.id} value={a.id}>{a.name}{a.mode === "GroupIndividual" ? " (group + individual)" : a.mode === "Group" ? " (group)" : ""}</option>)}
       </select>
     </label>
-    {assessment?.mode === "Individual" ? <EvidenceRows key={assessment.id} base={root + "/specs/" + encodeURIComponent(context.courseSpecId) + "/assessments/" + encodeURIComponent(assessment.id)} userId={userId} students={deliveryAssessment?.results ?? []} /> :
-      <p className="text-sm text-muted-foreground">{assessment ? "Group and individual-component evidence will use a separate workflow." : "Select an individual assessment to start."}</p>}
+    {assessment?.mode === "GroupIndividual" && <label className="block text-sm font-medium">Evidence population
+      <select className={selectStyle} value={groupPopulation} onChange={e => setGroupPopulation(e.target.value as EvidencePopulation)}>
+        <option value="group">Shared group work</option><option value="component">Individual contribution / defence</option>
+      </select></label>}
+    {assessment ? <EvidenceRows key={assessment.id + ":" + population} base={root + "/specs/" + encodeURIComponent(context.courseSpecId) + "/assessments/" + encodeURIComponent(assessment.id) + "/populations/" + population} population={population} userId={userId} students={deliveryAssessment?.results ?? []} /> :
+      <p className="text-sm text-muted-foreground">Select an assessment to start.</p>}
   </section>;
 }
-function EvidenceRows({ base, userId, students }: { base: string; userId: string; students: { enrollmentId: string; studentName: string; studentCode: string | null }[] }) {
+function EvidenceRows({ base, userId, students, population }: { base: string; userId: string; population: EvidencePopulation; students: { enrollmentId: string; studentName: string; studentCode: string | null }[] }) {
   const [chosen, setChosen] = useState("");
   const query = useQuery({ queryKey: protectedQueryKey({ userId }, "assessment-evidence", base),
     queryFn: () => api.get<Overview>(base), staleTime: 0, gcTime: 0, retry: false });
@@ -65,6 +73,7 @@ function EvidenceRows({ base, userId, students }: { base: string; userId: string
     const student = students.find(s => s.enrollmentId === enrollmentId);
     return student ? student.studentName + (student.studentCode ? " · " + student.studentCode : "") : "Enrolled student";
   };
+  const sourceLabel = (s: Overview["eligibleResults"][number]) => population === "group" ? (s.label ?? "Group") + " · " + s.memberEnrollmentIds.length + " members" : studentLabel(s.enrollmentId) + (s.groupName ? " · " + s.groupName : "");
   const current = data.eligibleResults.find(s => s.resultId === chosen);
   const revision = data.evidence.find(e => e.resultId === chosen);
   const verified = data.evidence.filter(e => e.effectiveStatus === "verified").length;
@@ -78,25 +87,25 @@ function EvidenceRows({ base, userId, students }: { base: string; userId: string
       {data.suggestions.suggestions.map(s => {
         const result = data.eligibleResults.find(x => x.resultId === s.sourceId);
         return <button key={s.sourceId} type="button" onClick={() => setChosen(s.sourceId)} className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted">
-          <span>{result ? studentLabel(result.enrollmentId) : "Student"} · {s.rank}{s.tied ? " (tied)" : ""}</span><span className="font-medium">{s.percentage.toFixed(1)}%</span>
+          <span>{result ? sourceLabel(result) : "Student"} · {s.rank}{s.tied ? " (tied)" : ""}</span><span className="font-medium">{s.percentage.toFixed(1)}%</span>
         </button>;
       })}
     </div>}
-    <label className="block text-sm font-medium">Choose eligible student
+    <label className="block text-sm font-medium">Choose eligible {population === "group" ? "group" : "student"}
       <select className={selectStyle} value={chosen} onChange={e => setChosen(e.target.value)}>
-        <option value="">Choose a student</option>
-        {data.eligibleResults.map(s => <option key={s.resultId} value={s.resultId}>{studentLabel(s.enrollmentId)} — {s.score}/{s.maxScore}{data.evidence.find(e => e.resultId === s.resultId) ? " · evidence exists" : ""}</option>)}
+        <option value="">Choose a {population === "group" ? "group" : "student"}</option>
+        {data.eligibleResults.map(s => <option key={s.resultId} value={s.resultId}>{sourceLabel(s)} — {s.score}/{s.maxScore}{data.evidence.find(e => e.resultId === s.resultId) ? " · evidence exists" : ""}</option>)}
       </select>
     </label>
     {!data.eligibleResults.length && <p className="text-sm text-muted-foreground">No eligible finalized results yet. Publish and finalize marks using the existing Results workflow.</p>}
-    {current && <EvidenceEditor key={current.resultId + ":" + (revision?.revision ?? 0)} path={base + "/results/" + encodeURIComponent(current.resultId)} revision={revision} current={current} access={data.access} changed={async () => { await query.refetch(); }} />}
+    {current && <EvidenceEditor key={current.resultId + ":" + (revision?.revision ?? 0)} path={base + "/results/" + encodeURIComponent(current.resultId)} revision={revision} current={current} population={population} access={data.access} changed={async () => { await query.refetch(); }} />}
     {data.evidence.length > 0 && <div className="space-y-2"><h3 className="text-sm font-semibold">Collected evidence</h3>
-      {data.evidence.map(e => { const result = data.eligibleResults.find(s => s.resultId === e.resultId); return <button key={e.resultId} type="button" disabled={!result} onClick={() => setChosen(e.resultId)} className="flex w-full justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-60"><span>{result ? studentLabel(result.enrollmentId) : "Historical source unavailable"} · revision {e.revision}</span><span>{(e.effectiveStatus ?? e.status).replaceAll("_"," ")}</span></button>; })}
+      {data.evidence.map(e => { const result = data.eligibleResults.find(s => s.resultId === e.resultId); return <button key={e.resultId} type="button" disabled={!result} onClick={() => setChosen(e.resultId)} className="flex w-full justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-60"><span>{result ? sourceLabel(result) : "Historical source unavailable"} · revision {e.revision}</span><span>{(e.effectiveStatus ?? e.status).replaceAll("_"," ")}</span></button>; })}
     </div>}
   </div>;
 }
-function EvidenceEditor({ path, revision, current, access, changed }: {
-  path: string; revision?: Revision; current: Overview["eligibleResults"][number]; access: Overview["access"]; changed: () => Promise<void>;
+function EvidenceEditor({ path, revision, current, population, access, changed }: {
+  path: string; revision?: Revision; current: Overview["eligibleResults"][number]; population: EvidencePopulation; access: Overview["access"]; changed: () => Promise<void>;
 }) {
   const [reason, setReason] = useState(revision?.selectionReason ?? "");
   const [reference, setReference] = useState(revision?.workReference ?? "");
@@ -136,7 +145,9 @@ function EvidenceEditor({ path, revision, current, access, changed }: {
     }, false);
   }
   return <div className={panelStyle}>
-    <div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">Student evidence · {current.score}/{current.maxScore}</h3><span className="text-sm">{status?.replaceAll("_"," ") ?? "Not collected"}</span></div>
+    <div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{population === "group" ? "Shared group evidence" : population === "component" ? "Individual contribution evidence" : "Student evidence"} · {current.score}/{current.maxScore}</h3><span className="text-sm">{status?.replaceAll("_"," ") ?? "Not collected"}</span></div>
+    {population === "group" && <p className="text-sm text-muted-foreground">Attach the shared artifact once for this group. Locked membership: {current.memberEnrollmentIds.length} students.</p>}
+    {population === "component" && <p className="text-sm text-muted-foreground">Attach this student’s own marked contribution or defence, not a duplicate of the shared artifact. Score includes the recorded adjustment.</p>}
     <p className="text-xs text-muted-foreground">Official feedback {current.feedbackAvailable ? "available in Results" : "not recorded"}. Saving evidence never changes grades.</p>
     {revision?.reviewReason && <p className="text-sm">Review note: {revision.reviewReason}</p>}
     {revision?.workReference && <a href={revision.workReference} target="_blank" rel="noopener noreferrer" className="text-sm underline">Open restricted work reference</a>}
