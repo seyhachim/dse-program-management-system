@@ -35,7 +35,7 @@ export function AssessmentEvidencePanel({ offering }: { offering: CourseDelivery
   });
   if (context.isError) return <section className={panelStyle}><h2 className="font-semibold">Assessment Evidence</h2><p role="alert" className="text-sm text-destructive">{message(context.error)}</p><Button variant="outline" onClick={() => void context.refetch()}>Retry</Button></section>;
   if (!context.data) return <p className="text-sm text-muted-foreground">Loading authorized assessment context…</p>;
-  return <EvidenceAssessmentPicker key={offering.offeringId + ":" + context.data.courseSpecId} offering={offering} context={context.data} root={root} userId={me?.id ?? "pending"} />;
+  return <EvidenceAssessmentPicker key={(me?.id ?? "pending") + ":" + offering.offeringId + ":" + context.data.courseSpecId} offering={offering} context={context.data} root={root} userId={me?.id ?? "pending"} />;
 }
 function EvidenceAssessmentPicker({ offering, context, root, userId }: { offering: CourseDeliveryOffering; context: Context; root: string; userId: string }) {
   const [selected, setSelected] = useState(context.assessments.find(x => x.mode === "Individual")?.id ?? "");
