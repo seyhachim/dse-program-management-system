@@ -116,3 +116,46 @@ describe("annual lecturer MVP acceptance scenarios",()=>{
     expect(r.statistics.activeTeaching).toBe(0);
   });
 });
+
+describe("annual export snapshot context (#1298)", () => {
+  test("CSV has one explicit report row and rectangular staff rows; Excel has summary sheet", () => {
+    const r = { ...report([person("l1", { teaching: [teaching("o1")] }), person("l2")]), releaseVersion: 7 };
+    const csv = annualReportCsv(r);
+    const lines = csv.trimEnd().split("\r\n");
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toContain('"Row type","Report version","Programme scope"');
+    expect(lines[1]).toContain('"report","7","DSE"');
+    expect(lines[2]).toContain('"staff","7"');
+    expect(lines[3]).toContain('"staff","7"');
+    expect(lines.map(line => line.split('","').length)).toEqual(Array(4).fill(lines[0]!.split('","').length));
+    const excel = annualReportExcelXml(r);
+    expect(excel).toContain('ss:Name="Annual staff"');
+    expect(excel).toContain('ss:Name="Report summary"');
+    expect(excel).toContain("Distinct lecturer headcount; not FTE");
+    expect(excel).toContain("Registry headcount (denominator)");
+    expect(excel).toContain("CPD interpretation");
+    expect(excel).not.toContain(r.reportingWindow!.evidenceUrl);
+  });
+  test("empty registry still exports release scope and zero headcount", () => {
+    const r = { ...report([]), releaseVersion: 3 };
+    expect(annualReportCsv(r).trimEnd().split("\r\n")).toHaveLength(2);
+    expect(annualReportCsv(r)).toContain('"report","3","DSE"');
+    expect(annualReportExcelXml(r)).toContain("Registry headcount (denominator)");
+  });
+  test("Khmer text, CSV formula protection and XML-invalid controls", () => {
+    const r = { ...report([
+      person("l1", { name: "សុភា & <គ្រូ> 😀" }),
+      person("l2", { name: "=1+1" }),
+      person("l3", { name: "bad\u0001text" }),
+    ]), releaseVersion: 1 };
+    const csv = annualReportCsv(r);
+    expect(csv.startsWith("\ufeff")).toBe(true);
+    expect(csv).toContain("សុភា & <គ្រូ> 😀");
+    expect(csv).toContain('"\'=1+1"');
+    const excel = annualReportExcelXml(r);
+    expect(excel).toContain("សុភា &amp; &lt;គ្រូ&gt; 😀");
+    expect(excel).toContain('<Data ss:Type="String">=1+1</Data>');
+    expect(excel).not.toContain("\u0001");
+    expect(excel).toContain("bad\uFFFDtext");
+  });
+});
