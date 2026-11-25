@@ -43,7 +43,7 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
         const course = await tx.course.create({ data: { programmeId: "dse", code: "EX-SVC-" + suffix, title: "Synthetic service exam" } });
         const spec = await tx.courseSpec.create({ data: { courseId: course.id, reviewStatus: "Approved", approvedAt: new Date(),
           clos: { create: [{ order: 0, description: "Synthetic analysis" }, { order: 1, description: "Synthetic practice" }] },
-          assessmentItems: { create: { id: "exam", order: 0, name: "Synthetic exam", type: "Exam", mode: "Individual", status: "Active", weight: 100, cloCodes: ["CLO1", "CLO2"] } } } });
+          assessmentItems: { create: ["exam","race-grade-first","race-variant-first","race-serializable","legacy"].map((id,order) => ({ id, order, name: "Synthetic "+id, type: "Exam", mode: "Individual" as const, status: "Active" as const, weight: 20, cloCodes: ["CLO1", "CLO2"] })) } } });
         const offering = await tx.offering.create({ data: { courseId: course.id, courseSpecId: spec.id, term: suffix, sectionCode: "M1", lecturerId: teacher.id, status: "Active" } });
         const other = await tx.offering.create({ data: { courseId: course.id, courseSpecId: spec.id, term: suffix, sectionCode: "M2", lecturerId: otherTeacher.id, status: "Active" } });
         const student = await tx.student.create({ data: { name: "Synthetic student", studentId: "EX-SVC-" + suffix } });
@@ -142,9 +142,72 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       expect(await service.assignBulk(teacher, { ...scope, entries: [entry] })).toHaveLength(1);
       expect((await service.history(teacher, { ...scope, enrollmentId: probe.id }))[0]?.variantId).toBe("C");
       await expect(service.history(otherTeacher, { ...scope, enrollmentId: probe.id })).rejects.toBeInstanceOf(ExamVariantAccessError);
-      const mark = await db.assessmentResult.create({ data: { enrollmentId: f.enrolled.id, courseSpecId: f.spec.id, assessmentItemId: "exam", score: 80, maxScore: 100 } });
-      await expect(service.assign(teacher, { ...initial, expectedRevision: 2 })).rejects.toBeInstanceOf(ExamVariantConflictError);
-      expect(await db.assessmentResult.findUniqueOrThrow({ where: { id: mark.id } })).toEqual(mark);
+      // Phase 3A: legacy marks cannot coexist with a configured assessment.
+      const rawMark = (tx: Pick<typeof db,"$executeRaw">, itemId: string, enrollmentId: string = f.enrolled.id) => tx.$executeRaw`
+        INSERT INTO public."AssessmentResult" (id,"enrollmentId","courseSpecId","assessmentItemId",score,"maxScore","updatedAt")
+        VALUES (${randomUUID()},${enrollmentId},${f.spec.id},${itemId},80,100,now())`;
+      const configure = (tx: Pick<typeof db,"$executeRaw">, itemId: string) => tx.$executeRaw`
+        INSERT INTO exam_variant."ExamConfiguration" ("courseSpecId","assessmentItemId","courseId","programmeId","examMaximum","createdById")
+        VALUES (${f.spec.id},${itemId},${f.offering.courseId},'dse',100,${f.reviewer.id})`;
+      await expect((async () => await rawMark(db,"exam"))()).rejects.toThrow("variant-aware grading");
+      await expect((async () => await rawMark(db,"exam",f.foreign.id))()).rejects.toThrow("variant-aware grading");
+      const { resultsLifecycleService } = await import("../../plugins/student-portal/results-lifecycle.ts");
+      await expect(resultsLifecycleService.saveDraft(f.teacher.id, false, { enrollmentId: f.enrolled.id, assessmentItemId: "exam", score: 80, maxScore: 100, feedback: "" })).rejects.toThrow("variant-aware grading");
+      await expect(resultsLifecycleService.saveCriterionScores(f.teacher.id, false, { enrollmentId: f.enrolled.id, assessmentItemId: "exam", scores: [] })).rejects.toThrow("variant-aware grading");
+      await expect(resultsLifecycleService.publishAssessment(f.teacher.id, false, scope)).rejects.toThrow("variant-aware grading");
+      await expect(resultsLifecycleService.finalizeAssessment(f.teacher.id, false, scope)).rejects.toThrow("variant-aware grading");
+      // The original legacy workflow remains writable, publishable and finalizable.
+      const mark = await db.assessmentResult.create({ data: { enrollmentId: f.enrolled.id, courseSpecId: f.spec.id, assessmentItemId: "legacy", score: 80, maxScore: 100 } });
+      const edited = await db.assessmentResult.update({ where: { id: mark.id }, data: { score: 81 } });
+      expect(edited.score).toBe(81);
+      const published = await db.assessmentResult.update({ where: { id: mark.id }, data: { publishedAt: new Date(), publishedById: f.teacher.id } });
+      expect(published.publishedAt).not.toBeNull();
+      const finalized = await db.assessmentResult.update({ where: { id: mark.id }, data: { finalizedAt: new Date(), finalizedById: f.teacher.id } });
+      expect(finalized.finalizedAt).not.toBeNull();
+      await expect((async () => await configure(db,"legacy"))()).rejects.toThrow("historical reconciliation");
+      expect(await db.assessmentResult.findUniqueOrThrow({ where: { id: mark.id } })).toEqual(finalized);
+      // Test both winner orders with separate committed transactions. The second
+      // starts while the first owns the durable fence, and may block until commit.
+      for (const [itemId, gradeFirst] of [["race-grade-first",true],["race-variant-first",false]] as const) {
+        let firstReady!: () => void;
+        let release!: () => void;
+        const ready = new Promise<void>(r => { firstReady=r; });
+        const gate = new Promise<void>(r => { release=r; });
+        const first = db.$transaction(async tx => {
+          if (gradeFirst) await rawMark(tx,itemId); else await configure(tx,itemId);
+          firstReady(); await gate;
+        }, { timeout: 20000 });
+        // Also reject ready if fixture creation itself fails instead of hanging.
+        await Promise.race([ready,first]);
+        const second = db.$transaction(async tx => {
+          if (gradeFirst) await configure(tx,itemId); else await rawMark(tx,itemId);
+        }, { timeout: 20000 });
+        const settled = Promise.allSettled([first,second]);
+        release();
+        const outcomes = await settled;
+        expect(outcomes[0]?.status).toBe("fulfilled");
+        expect(outcomes[1]?.status).toBe("rejected");
+        expect(await db.assessmentResult.count({where:{courseSpecId:f.spec.id,assessmentItemId:itemId}})).toBe(gradeFirst?1:0);
+        const modes = await db.$queryRaw<Array<{mode:string}>>`SELECT mode FROM exam_variant."ExamGradingFence"
+          WHERE "courseSpecId"=${f.spec.id} AND "assessmentItemId"=${itemId}`;
+        expect(modes).toEqual([{mode:gradeFirst?"legacy":"variant"}]);
+      }
+      // A pre-existing Serializable snapshot must not evade a committed
+      // configuration, even though it cannot see that configuration itself.
+      let snapshotReady!: () => void;
+      let resume!: () => void;
+      const snapshotGate = new Promise<void>(r => { snapshotReady=r; });
+      const resumeGate = new Promise<void>(r => { resume=r; });
+      const stale = db.$transaction(async tx => {
+        await tx.$queryRaw`SELECT id FROM public."CourseSpec" WHERE id=${f.spec.id}`;
+        snapshotReady(); await resumeGate;
+        await rawMark(tx,"race-serializable");
+      }, { isolationLevel:"Serializable",timeout:20000 });
+      const staleResult = Promise.allSettled([stale]);
+      await Promise.race([snapshotGate,stale]);
+      try { await configure(db,"race-serializable"); } finally { resume(); }
+      expect((await staleResult)[0]?.status).toBe("rejected");
+      expect(await db.assessmentResult.count({where:{courseSpecId:f.spec.id,assessmentItemId:"race-serializable"}})).toBe(0);
       await db.rubric.update({ where: { id: f.instrument.id }, data: { status: "Archived" } });
       expect((await service.resolve(teacher, resolve)).snapshot).toEqual(b.snapshot);
       await db.userRoleAssignment.delete({ where: { userId_roleId: { userId: f.reviewer.id, roleId: f.coordinatorRole.id } } });

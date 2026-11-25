@@ -154,12 +154,17 @@ dbDescribe("exam variant persistence (#1371 Phase 2A)", () => {
         await rejected(tx, rebind, "23503");
         expect((await tx.offering.findUniqueOrThrow({ where: { id: rebindProbe.id } })).courseSpecId).toBe(spec.id);
 
-        const result = await tx.assessmentResult.create({ data: { enrollmentId: enrollment.id, courseSpecId: spec.id, assessmentItemId: "exam", score: 80, maxScore: 100 } });
-        await rejected(tx, () => tx.$executeRaw`UPDATE exam_variant."ExamPaperAssignment" SET revision=3,"variantId"=${a.variantId},"variantHash"=${a.variantHash} WHERE id=${assignmentId}`, /Existing result blocks/);
-        const existingOther = await tx.assessmentResult.create({ data: { enrollmentId: foreignEnrollment.id, courseSpecId: spec.id, assessmentItemId: "exam", score: 64, maxScore: 100 } });
-        await rejected(tx, () => assign(randomUUID(), foreignEnrollment.id, other.id, b), /Existing result blocks/);
-        expect(await tx.assessmentResult.findUniqueOrThrow({ where: { id: result.id } })).toEqual(result);
-        expect(await tx.assessmentResult.findUniqueOrThrow({ where: { id: existingOther.id } })).toEqual(existingOther);
+        // Phase 3A intentionally blocks ALL legacy results for configured scopes,
+        // whether or not the student already has a confirmed paper.
+        const rawMark = (enrollmentId: string) => tx.$executeRaw`
+          INSERT INTO public."AssessmentResult" (id,"enrollmentId","courseSpecId","assessmentItemId",score,"maxScore","updatedAt")
+          VALUES (${randomUUID()},${enrollmentId},${spec.id},'exam',80,100,now())`;
+        await rejected(tx, () => rawMark(enrollment.id), /variant-aware grading/);
+        await rejected(tx, () => rawMark(foreignEnrollment.id), /variant-aware grading/);
+        await rejected(tx, () => tx.$executeRaw`UPDATE public."AssessmentResult" SET "assessmentItemId"='exam' WHERE id=${historic.id}`, /variant-aware grading/);
+        await rejected(tx, () => tx.$executeRaw`UPDATE exam_variant."ExamGradingFence" SET mode='legacy' WHERE "courseSpecId"=${spec.id} AND "assessmentItemId"='exam'`, /grading mode history is immutable/);
+        await rejected(tx, () => tx.$executeRaw`DELETE FROM exam_variant."ExamGradingFence" WHERE "courseSpecId"=${spec.id} AND "assessmentItemId"='exam'`, /grading mode history is immutable/);
+        expect(await tx.assessmentResult.count({ where: { courseSpecId: spec.id, assessmentItemId: "exam" } })).toBe(0);
         expect(await tx.assessmentResult.findUniqueOrThrow({ where: { id: historic.id } })).toEqual(historic);
         expect((await tx.$queryRaw<Array<{ count: number }>>`SELECT count(*)::int AS count FROM exam_variant."ExamAssignmentEvent" WHERE "assignmentId"=${assignmentId}`)[0]?.count).toBe(2);
 
