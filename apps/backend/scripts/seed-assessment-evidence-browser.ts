@@ -20,12 +20,16 @@ async function main() {
   for (const sectionCode of ["M1","M2"]) {
     const offering = await prisma.offering.create({ data: { courseId: course.id, courseSpecId: spec.id, lecturerId: lecturer.id, term: "Evidence pilot CI only", sectionCode, status: "Active" } });
     const enrollmentIds: string[] = [];
-    for (const [index, score] of [40,70,90].entries()) {
+    for (const index of [0,1,2]) {
       const code = "TSA-CI-" + sectionCode + "-" + (index + 1);
       const student = await prisma.student.create({ data: { name: "Synthetic " + sectionCode + " Learner " + (index + 1), email: code.toLowerCase() + "@example.invalid", studentId: code, status: "Active" } });
       const enrollment = await prisma.enrollment.create({ data: { offeringId: offering.id, studentId: student.id } });
       enrollmentIds.push(enrollment.id);
-      const result = await prisma.assessmentResult.create({ data: { enrollmentId: enrollment.id, courseSpecId: spec.id, assessmentItemId: "pilot-lab", score, maxScore: 100, feedback: "Synthetic marked work", publishedAt: new Date(), publishedById: lecturer.id } });
+    }
+    // Enroll the entire roster before finalizing any result; the roster lock is intentional.
+    for (const [index, score] of [40,70,90].entries()) {
+      const enrollmentId = enrollmentIds[index]!;
+      const result = await prisma.assessmentResult.create({ data: { enrollmentId, courseSpecId: spec.id, assessmentItemId: "pilot-lab", score, maxScore: 100, feedback: "Synthetic marked work", publishedAt: new Date(), publishedById: lecturer.id } });
       await prisma.assessmentResult.update({ where: { id: result.id }, data: { finalizedAt: new Date(), finalizedById: lecturer.id } });
     }
     const groups = await groupAssessmentService.replaceGroups(lecturer.id, false, offering.id, "pilot-project", { groups: [{ name: "Synthetic " + sectionCode + " Group", enrollmentIds }] });
