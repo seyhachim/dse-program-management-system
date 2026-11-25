@@ -133,7 +133,7 @@ export function CourseDeliveryClient() {
                   <ResultsPanel offering={selected} onChanged={changed} />
                 </TabsContent>
                 <TabsContent value="assessment-evidence" className="mt-4">
-                  <AssessmentEvidencePanel key={selected.offeringId + ":" + (evidenceSelection?.assessmentItemId ?? "") + ":" + (evidenceSelection?.population ?? "")} offering={selected} initial={evidenceSelection?.offeringId === selected.offeringId ? evidenceSelection : undefined} />
+                  <AssessmentEvidencePanel key={selected.offeringId + ":" + (evidenceSelection?.assessmentItemId ?? "") + ":" + (evidenceSelection?.population ?? "")} offeringId={selected.offeringId} initial={evidenceSelection?.offeringId === selected.offeringId ? evidenceSelection : undefined} />
                 </TabsContent>
                 <TabsContent value="feedback" className="mt-4">
                   <FeedbackPanel offering={selected} />
@@ -175,7 +175,8 @@ function CourseHeader({ offerings, selected, onSelect }: {
           <select
             value={selected.offeringId}
             onChange={(event) => onSelect(event.target.value)}
-            className="mt-1 block h-10 min-w-72 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            aria-label="Course section"
+            className="mt-1 block h-10 w-full min-w-0 max-w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
           >
             {offerings.map((offering) => (
               <option key={offering.offeringId} value={offering.offeringId}>
