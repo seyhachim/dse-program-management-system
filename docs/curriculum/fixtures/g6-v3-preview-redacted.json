@@ -1,0 +1,1064 @@
+{
+  "formatVersion": "dse-curriculum-v1",
+  "programmeCode": "DSE",
+  "curriculum": {
+    "code": "DSE",
+    "name": "Bachelor of Engineering in Data Science and Engineering (Honors Program)",
+    "academicYear": "2026-2027",
+    "version": "3.0",
+    "defaultPathwayCode": "COURSEWORK"
+  },
+  "pathways": [
+    {
+      "code": "COURSEWORK",
+      "name": "Skill-oriented — Coursework",
+      "yearLevel": 4,
+      "semester": "Second",
+      "isDefault": true,
+      "creditTarget": 12,
+      "sortOrder": 0
+    },
+    {
+      "code": "RESEARCH",
+      "name": "Research-oriented — Research",
+      "yearLevel": 4,
+      "semester": "Second",
+      "isDefault": false,
+      "creditTarget": 18,
+      "sortOrder": 1
+    },
+    {
+      "code": "INDUSTRY",
+      "name": "Industry-oriented — Industrial Internship/Project",
+      "yearLevel": 4,
+      "semester": "Second",
+      "isDefault": false,
+      "creditTarget": 18,
+      "sortOrder": 2
+    }
+  ],
+  "courses": [
+    {
+      "code": "ENG101",
+      "title": "English I: Academic Reading",
+      "yearLevel": 1,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 0,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "IDS101",
+      "title": "Introduction to Data Science and Engineering",
+      "yearLevel": 1,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 1,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "BPR101",
+      "title": "Basic Programming",
+      "yearLevel": 1,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 2,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "DLI101",
+      "title": "Digital Literacy",
+      "yearLevel": 1,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 3,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "CCS101",
+      "title": "Climate Change and Sustainable Development",
+      "yearLevel": 1,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 4,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "KCI101",
+      "title": "Khmer Civilization",
+      "yearLevel": 1,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 5,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "ENG102",
+      "title": "English II: Communication and Academic Writing",
+      "yearLevel": 1,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 0,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "MAT102",
+      "title": "Math I: Calculus",
+      "yearLevel": 1,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 1,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "APR102",
+      "title": "Advanced Programming",
+      "yearLevel": 1,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 2,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "STA102",
+      "title": "Statistics I: Probability and Descriptive Statistics",
+      "yearLevel": 1,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 3,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "PDT102",
+      "title": "Personal Development and Teamwork",
+      "yearLevel": 1,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 4,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "HCA102",
+      "title": "History of Cambodia",
+      "yearLevel": 1,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 5,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": "",
+      "courseType": "Basic"
+    },
+    {
+      "code": "MAT101",
+      "title": "Math II: Linear Algebra",
+      "yearLevel": 2,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 0,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 4,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 4,
+        "lecture": 4,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "DSA201",
+      "title": "Data Structures and Algorithms I",
+      "yearLevel": 2,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 1,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "BIA201",
+      "title": "Business Intelligence and Analytics",
+      "yearLevel": 2,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 2,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": "",
+      "courseType": "Core"
+    },
+    {
+      "code": "STA201",
+      "title": "Statistics II: Inferential Statistics and Statistical Modeling",
+      "yearLevel": 2,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 3,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "RDM201",
+      "title": "Relational Database Modeling and SQL",
+      "yearLevel": 2,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 4,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "WEF201",
+      "title": "Web Engineering Fundamentals",
+      "yearLevel": 2,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 5,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "MAT202",
+      "title": "Math III: Discrete Mathematics",
+      "yearLevel": 2,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 0,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 4,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 4,
+        "lecture": 4,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "DSA202",
+      "title": "Data Structures and Algorithms II",
+      "yearLevel": 2,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 1,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "EIN202",
+      "title": "Entrepreneurship and Innovation",
+      "yearLevel": 2,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 2,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "PAN202",
+      "title": "Predictive Analytics",
+      "yearLevel": 2,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 3,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "NDA202",
+      "title": "NoSQL Databases",
+      "yearLevel": 2,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 4,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "PPR202",
+      "title": "Project Practicum: Applied Web Engineering",
+      "yearLevel": 2,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 5,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 0,
+        "lab": 4,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 2,
+        "lecture": 0,
+        "lab": 2,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "TSA301",
+      "title": "Time Series Analysis",
+      "yearLevel": 3,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 0,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "DMI301",
+      "title": "Data Mining",
+      "yearLevel": 3,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 1,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "DSS301",
+      "title": "Data Science for Smart Agriculture",
+      "yearLevel": 3,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 2,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "IOT301",
+      "title": "IoT and Smart Systems",
+      "yearLevel": 3,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 3,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "MLD301",
+      "title": "Machine Learning and Deep Learning",
+      "yearLevel": 3,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 4,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "AAI302",
+      "title": "Agentic AI Development",
+      "yearLevel": 3,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 0,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": "",
+      "courseType": "Core",
+      "catalogueCode": "AAI302-G6"
+    },
+    {
+      "code": "BDE302",
+      "title": "Big Data Engineering: Acquisition and Processing",
+      "yearLevel": 3,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 1,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "PML302",
+      "title": "Professional Mindset and Leadership Development",
+      "yearLevel": 3,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 2,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "AIE302",
+      "title": "AI Engineering for Smart Agriculture",
+      "yearLevel": 3,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 3,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "PPR302",
+      "title": "Project Practicum: Applied Machine Learning and Deep Learning",
+      "yearLevel": 3,
+      "semester": "Second",
+      "pathwayCode": null,
+      "sortOrder": 4,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 0,
+        "lab": 4,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 2,
+        "lecture": 0,
+        "lab": 2,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "DWD401",
+      "title": "Data Warehousing and Data Engineering",
+      "yearLevel": 4,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 0,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "NLP401",
+      "title": "Natural Language Processing",
+      "yearLevel": 4,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 1,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "ERD401",
+      "title": "Ethics and Responsible Data Science",
+      "yearLevel": 4,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 2,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "FPR401",
+      "title": "Final Project I: Data Science and AI",
+      "yearLevel": 4,
+      "semester": "First",
+      "pathwayCode": null,
+      "sortOrder": 3,
+      "weeklyHours": {
+        "total": 6,
+        "lecture": 0,
+        "lab": 6,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 0,
+        "lab": 3,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "CRY402",
+      "title": "Cryptography",
+      "yearLevel": 4,
+      "semester": "Second",
+      "pathwayCode": "COURSEWORK",
+      "sortOrder": 0,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "LLM402",
+      "title": "Large Language Models",
+      "yearLevel": 4,
+      "semester": "Second",
+      "pathwayCode": "COURSEWORK",
+      "sortOrder": 1,
+      "weeklyHours": {
+        "total": 4,
+        "lecture": 2,
+        "lab": 2,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 2,
+        "lab": 1,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "CSE402",
+      "title": "Cyber Security",
+      "yearLevel": 4,
+      "semester": "Second",
+      "pathwayCode": "COURSEWORK",
+      "sortOrder": 2,
+      "weeklyHours": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 3,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "FPR402",
+      "title": "Final Project II: Data Science and AI + Report",
+      "yearLevel": 4,
+      "semester": "Second",
+      "pathwayCode": "COURSEWORK",
+      "sortOrder": 3,
+      "weeklyHours": {
+        "total": 6,
+        "lecture": 0,
+        "lab": 6,
+        "fieldVisit": 0
+      },
+      "credits": {
+        "total": 3,
+        "lecture": 0,
+        "lab": 3,
+        "fieldVisit": 0,
+        "breakdownProvided": true
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "THE402",
+      "title": "Thesis",
+      "yearLevel": 4,
+      "semester": "Second",
+      "pathwayCode": "RESEARCH",
+      "sortOrder": 0,
+      "weeklyHours": null,
+      "credits": {
+        "total": 18,
+        "lecture": 0,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": false
+      },
+      "lecturerText": ""
+    },
+    {
+      "code": "INT402",
+      "title": "Industrial Internship",
+      "yearLevel": 4,
+      "semester": "Second",
+      "pathwayCode": "INDUSTRY",
+      "sortOrder": 0,
+      "weeklyHours": null,
+      "credits": {
+        "total": 18,
+        "lecture": 0,
+        "lab": 0,
+        "fieldVisit": 0,
+        "breakdownProvided": false
+      },
+      "lecturerText": ""
+    }
+  ],
+  "declaredTotals": {
+    "semesterCredits": [
+      {
+        "yearLevel": 1,
+        "semester": "First",
+        "credits": 18
+      },
+      {
+        "yearLevel": 1,
+        "semester": "Second",
+        "credits": 18
+      },
+      {
+        "yearLevel": 2,
+        "semester": "First",
+        "credits": 19
+      },
+      {
+        "yearLevel": 2,
+        "semester": "Second",
+        "credits": 18
+      },
+      {
+        "yearLevel": 3,
+        "semester": "First",
+        "credits": 15
+      },
+      {
+        "yearLevel": 3,
+        "semester": "Second",
+        "credits": 14
+      },
+      {
+        "yearLevel": 4,
+        "semester": "First",
+        "credits": 12
+      },
+      {
+        "yearLevel": 4,
+        "semester": "Second",
+        "credits": 12
+      }
+    ],
+    "pathwayCredits": [
+      {
+        "pathwayCode": "COURSEWORK",
+        "credits": 12
+      },
+      {
+        "pathwayCode": "RESEARCH",
+        "credits": 18
+      },
+      {
+        "pathwayCode": "INDUSTRY",
+        "credits": 18
+      }
+    ],
+    "programmeCourseCount": 42,
+    "programmeCredits": 126
+  }
+}

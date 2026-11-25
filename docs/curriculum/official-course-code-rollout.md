@@ -42,6 +42,15 @@ Draft implementation; no release or production import is authorized.
 - Student handbook source is published curriculum totals, not course rows; export already freezes published source snapshots, so no handbook data rewrite is appropriate. No dedicated transcript implementation found in the inspected tree. Standalone reports without exact context retain catalogue labels; annual lecturer export is owned by #1299 and needs coordination, not a competing patch.
 - Added context validation unit tests and expanded portal DB regression for exact bound code, document filename, announcement, legacy completed fallback and unauthorized access. Added synthetic two-generation offering/QA candidate test and contextual CLO attainment/published results regression. Full cross-generation browser verification remains a release gate.
 
+## Phase 5: release readiness evidence (2026-11-25)
+
+- Phase 4B exact-head e125840: all 17 Actions workflows passed, including browser smoke baseline.
+- Read-only Neon staging verification: existing separate project dse-pms-staging, Free plan, database marker matches expected; snapshot table exists, zero snapshot rows, zero curriculum versions, zero duplicate groups, feature migration not applied. Existing account fixtures have not been independently validated, so no branch copy or migration was made. Annual lecturer UAT branches untouched. Hosted frontend/backend/auth still not verified.
+- Source candidate retrieved from previous G6 preview JSON. Converted only AAI302-G6 to official AAI302 plus catalogueCode AAI302-G6; committed redacted fixture (lecturer text omitted for CI). Source arithmetic: 44 rows, 42 default-route courses / 126 credits, research/industry 39 courses / 132 credits each. Keep Draft; 130-credit cap requires academic decision. No actual production import or approval.
+- Full source-shape preview regression uses isolated synthetic catalogue, verifies no placement/audit/status writes and exact alias resolution. It is not a production catalogue preview.
+- Added authenticated local Playwright test for exact contextual PDF and Word downloads (signature, filename, mobile), Draft and wrong-placement denial, and student API denial; runs in disposable CI only. Latest execution still required.
+- Do not run a manual SQL migration on persistent staging; use reviewed Prisma migration runner on a separately verified synthetic-only target. No Vercel or Render deployment was requested.
+
 ## Remaining merge blockers
 
 1. Validate the new version-wide constraint and duplicate preflight on isolated staging, including detached legacy snapshots. No production migration or data correction authorized.

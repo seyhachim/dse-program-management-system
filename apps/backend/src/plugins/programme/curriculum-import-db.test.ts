@@ -1,4 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { readFile } from "node:fs/promises";
+import { DseCurriculumImportSchema } from "@dse-pms/shared-types";
 import { CourseType, PrismaClient } from "@prisma/client";
 import { curriculumImportService } from "./curriculum-import-service.ts";
 import { curriculumService } from "./curriculum-service.ts";
@@ -173,6 +175,51 @@ function uploadFor(f: Awaited<ReturnType<typeof fixture>>) {
 const applyInput = (upload: ReturnType<typeof uploadFor>) => ({ ...upload, decisions: [] });
 
 describeDb("curriculum JSON import and artifact persistence", () => {
+  test("full G6 source preview is read-only and preserves academic pathway totals", async () => {
+    const f = await fixture();
+    const source = DseCurriculumImportSchema.parse(JSON.parse(await readFile(
+      new URL("../../../../../docs/curriculum/fixtures/g6-v3-preview-redacted.json", import.meta.url), "utf8",
+    )));
+    // Isolated catalogue identities, not copied production records.
+    const courses = source.courses.map((row) => ({
+      ...row, catalogueCode: `${row.catalogueCode ?? row.code}-${f.token}`,
+    }));
+    const newCourse = await prisma.course.create({
+      data: { programmeId: f.programme.id, code: `AAI302-G6-${f.token}`, title: "Agentic AI Development", credits: 3, courseType: "Core" },
+    });
+    const oldCourse = await prisma.course.create({
+      data: { programmeId: f.programme.id, code: `AAI302-${f.token}`, title: "Applied AI and Deep Learning", credits: 3, courseType: "Core" },
+    });
+    await prisma.course.createMany({ data: courses.filter((row) => row.code !== "AAI302").map((row) => ({
+      programmeId: f.programme.id, code: row.catalogueCode, title: row.title, credits: row.credits.total,
+      courseType: row.courseType ?? "Core",
+    })) });
+    const g6 = await prisma.programmeCurriculumVersion.create({
+      data: { curriculumId: f.curriculum.id, versionMajor: 3, versionMinor: 0, cohortLabel: "G6", createdById: f.user.id },
+    });
+    const payload = { ...source, programmeCode: f.programme.code, curriculum: {
+      ...source.curriculum, code: f.curriculum.code, name: f.curriculum.name,
+    }, courses };
+    const before = await prisma.programmeCurriculumAuditAction.count({ where: { curriculumVersionId: g6.id } });
+    const preview = await curriculumImportService.preview(g6.id, { fileName: "g6-v3-preview-redacted.json", jsonText: JSON.stringify(payload) });
+    expect(preview.target.status).toBe("Draft");
+    expect(preview.courses).toHaveLength(44);
+    expect(preview.canApply).toBe(true);
+    expect(preview.courses.find((row) => row.code === "AAI302")?.existingCourseId).toBe(newCourse.id);
+    expect(newCourse.id).not.toBe(oldCourse.id);
+    expect(preview.totals.selectedRouteCourseCount).toBe(42);
+    expect(preview.totals.computedSelectedRouteCredits).toBe(126);
+    expect(preview.totals.commonCredits).toBe(114);
+    for (const code of ["RESEARCH", "INDUSTRY"]) {
+      const route = preview.totals.pathways.find((row) => row.code === code);
+      expect(preview.totals.commonCredits + (route?.credits ?? 0)).toBe(132);
+    }
+    // 130-credit cap remains a separate academic decision, not importer approval.
+    expect(await prisma.programmeCurriculumCourse.count({ where: { curriculumVersionId: g6.id } })).toBe(0);
+    expect(await prisma.programmeCurriculumAuditAction.count({ where: { curriculumVersionId: g6.id } })).toBe(before);
+    expect((await prisma.programmeCurriculumVersion.findUniqueOrThrow({ where: { id: g6.id } })).status).toBe("Draft");
+  });
+
   test("preview is read-only and all alternatives become canonical pathway placements", async () => {
     const f = await fixture();
     const upload = uploadFor(f);
