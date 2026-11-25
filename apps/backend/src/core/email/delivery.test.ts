@@ -53,7 +53,7 @@ describe("transactional email provider selection",()=>{
   });
   test("provider failure returns a generic error, without fallback",async()=>{
     let count=0;
-    const fake=(async()=>{count++;return new Response("secret provider detail",{status:429});}) as typeof fetch;
+    const fake=(async (_input:Parameters<typeof fetch>[0], _init?:Parameters<typeof fetch>[1])=>{count++;return new Response("secret provider detail",{status:429});}) as typeof fetch;
     await expect(deliverEmail(readEmailDeliveryConfig(brevo),msg,{fetch:fake})).rejects.toThrow("Email delivery unavailable");
     expect(count).toBe(1);
   });
