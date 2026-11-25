@@ -26,6 +26,7 @@ import { useMe } from "@/lib/auth";
 import { courseDeliveryApi, toDateTimeLocal } from "@/lib/course-delivery";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
+import { AssessmentEvidencePanel } from "./assessment-evidence-panel";
 import { GroupAssessmentPanel } from "./group-assessment-panel";
 
 export function CourseDeliveryClient() {
@@ -109,6 +110,7 @@ export function CourseDeliveryClient() {
                   <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
                   <TabsTrigger value="results">Results</TabsTrigger>
                   <TabsTrigger value="feedback">Feedback</TabsTrigger>
+                  <TabsTrigger value="assessment-evidence">Assessment Evidence</TabsTrigger>
                 </TabsList>
                 <TabsContent value="announcements" className="mt-4">
                   <AnnouncementsPanel offering={selected} onChanged={changed} />
@@ -118,6 +120,9 @@ export function CourseDeliveryClient() {
                 </TabsContent>
                 <TabsContent value="results" className="mt-4">
                   <ResultsPanel offering={selected} onChanged={changed} />
+                </TabsContent>
+                <TabsContent value="assessment-evidence" className="mt-4">
+                  <AssessmentEvidencePanel key={selected.offeringId} offering={selected} />
                 </TabsContent>
                 <TabsContent value="feedback" className="mt-4">
                   <FeedbackPanel offering={selected} />
