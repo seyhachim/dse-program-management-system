@@ -101,6 +101,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "OfferingAssessmentDeadline",
   "AssessmentResult",
   "AssessmentResultCorrection",
+  "AssessmentEvidenceRevision",
   "AssessmentCriterionScore",
   "AssessmentGroup",
   "AssessmentGroupMember",
