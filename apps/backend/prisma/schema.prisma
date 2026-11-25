@@ -370,6 +370,7 @@ enum UserSecurityAuditAction {
 /// via the Lecturers plugin. title/qualification/phone feed the syllabus
 /// "Course Details" instructor block.
 model User {
+  assessmentEvidenceActions AssessmentEvidenceRevision[] @relation("AssessmentEvidenceActor")
   id            String         @id @default(uuid())
   authId        String?        @unique
   email         String         @unique
@@ -2441,6 +2442,7 @@ model CourseSpecWeek {
 /// selection as a valid state, unlike CLO teaching/assessment method ids, which fail
 /// hard on a bad id by design.
 model CourseSpecAssessmentItem {
+  assessmentEvidenceRevisions AssessmentEvidenceRevision[]
   id                     String                          @default(uuid())
   courseSpecId           String
   courseSpec             CourseSpec                      @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)
@@ -2631,6 +2633,7 @@ model CourseSpecStudentResponsibility {
 /// lecturer, a seat capacity, and enrolled students. The architectural proof point:
 /// it links Students <-> Courses <-> Lecturers through the registry.
 model Offering {
+  assessmentEvidenceRevisions AssessmentEvidenceRevision[]
   id                       String                  @id @default(uuid())
   courseId                 String
   course                   Course                  @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -2896,6 +2899,7 @@ model OfferingAssessmentDeadline {
 /// A result is visible to a student only after `publishedAt` is set. The
 /// enrollment relation is the authorization boundary for all portal reads.
 model AssessmentResult {
+  evidenceRevisions AssessmentEvidenceRevision[]
   id               String                       @id @default(uuid())
   enrollmentId     String
   enrollment       Enrollment                   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
@@ -3673,4 +3677,36 @@ model DseNewsMedia {
   createdAt     DateTime       @default(now())
 
   @@index([articleId, kind])
+}
+
+
+/// Append-only, staff-only evidence workflow. Each transition is a new revision.
+/// Canonical grade and criterion records remain the source of academic truth.
+model AssessmentEvidenceRevision {
+  id               String @id @default(uuid())
+  resultId         String
+  result           AssessmentResult @relation(fields: [resultId], references: [id], onDelete: Restrict)
+  offeringId       String
+  offering         Offering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  courseSpecId     String
+  assessmentItemId String
+  assessmentItem   CourseSpecAssessmentItem @relation(fields: [courseSpecId, assessmentItemId], references: [courseSpecId, id], onDelete: Restrict)
+  revision         Int
+  status           String
+  action           String
+  sourceHash       String
+  score            Float
+  maxScore         Float
+  sourceSnapshot   Json
+  workReference    String?
+  selectionReason  String
+  reviewReason     String?
+  actorId          String
+  actor            User @relation("AssessmentEvidenceActor", fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt        DateTime @default(now())
+
+  @@unique([resultId, revision], map: "AssessmentEvidenceRevision_result_revision_key")
+  @@index([offeringId, courseSpecId, assessmentItemId], map: "AssessmentEvidenceRevision_context_idx")
+  @@index([courseSpecId, assessmentItemId], map: "AssessmentEvidenceRevision_item_idx")
+  @@index([actorId])
 }
