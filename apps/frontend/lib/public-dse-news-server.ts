@@ -1,9 +1,10 @@
 import "server-only";
-import type { PublicDseNewsArticle, PublicDseNewsCard } from "@dse-pms/shared-types";
+import { cache } from "react";
+import type { PublicDseNewsCard } from "@dse-pms/shared-types";
+import { fetchPublicNewsArticle } from "./public-dse-news-article";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 const NEWS_API = API_URL + "/api/programme/public/programmes/dse/news";
-const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function loadPublicNews(): Promise<PublicDseNewsCard[]> {
   try {
@@ -12,11 +13,7 @@ export async function loadPublicNews(): Promise<PublicDseNewsCard[]> {
     return await response.json() as PublicDseNewsCard[];
   } catch { return []; }
 }
-export async function loadPublicNewsArticle(id: string): Promise<PublicDseNewsArticle | null> {
-  if (!ID.test(id)) return null;
-  try {
-    const response = await fetch(NEWS_API + "/" + encodeURIComponent(id), {cache:"no-store",headers:{Accept:"application/json"},signal:AbortSignal.timeout(5000)});
-    if (!response.ok) return null;
-    return await response.json() as PublicDseNewsArticle;
-  } catch { return null; }
-}
+
+// Metadata and page share the same request-local article result (or error).
+// Do not cache across requests: public approval can be withdrawn at any time.
+export const loadPublicNewsArticle = cache((id: string) => fetchPublicNewsArticle(NEWS_API, id));
