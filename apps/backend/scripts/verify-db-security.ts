@@ -239,6 +239,7 @@ const EXPECTED_LECTURER_PORTFOLIO_TABLES = [
 
 const EXPECTED_LECTURER_ANNUAL_TABLES = [
   "AnnualSubmission",
+  "AnnualSubmissionReviewEvent",
   "AnnualTeachingReview",
   "AnnualTeachingReviewEvent",
   "AnnualEvidenceLink",

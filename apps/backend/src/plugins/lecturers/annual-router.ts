@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { LinkAnnualEvidenceInput, ReviewAnnualTeachingInput, SubmitAnnualActivityInput, ReviewAnnualStaffInput, UpdateAnnualReportingWindowInput } from "@dse-pms/shared-types";
+import { LinkAnnualEvidenceInput, ReviewAnnualTeachingInput, SubmitAnnualActivityInput, ReviewAnnualStaffInput, UpdateAnnualReportingWindowInput, ReviewAnnualSubmissionInput } from "@dse-pms/shared-types";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 import { hasGlobalRole, hasRoleInProgramme } from "../../core/auth/token.ts";
 import { lecturerAnnualService, AnnualNotFoundError, AnnualValidationError } from "./annual-service.ts";
@@ -28,6 +28,7 @@ function replyError(res:Response,error:unknown):void {
 // Mounted at /api/lecturers/annual under the parent's requireAuth.
 export function createLecturerAnnualRouter():Router {
   const router=Router();
+  router.use((_req,res,next)=>{res.set("Cache-Control","private, no-store");next();});
   router.get("/years",(req,res,next)=>{
     if(canCoordinate(req)||hasRoleInProgramme(req.user!,"lecturer",DEFAULT_PROGRAMME_ID)){
       next();return;
@@ -86,6 +87,14 @@ export function createLecturerAnnualRouter():Router {
   router.get("/:yearId/summary",requireCoordinator,async(req,res)=>{
     try{res.json(await lecturerAnnualService.summary(req.params.yearId!));}
     catch(error){replyError(res,error);}
+  });
+  router.post("/:yearId/review-submission",requireCoordinator,async(req,res)=>{
+    const parsed=ReviewAnnualSubmissionInput.safeParse(req.body);
+    if(!parsed.success){res.status(400).json({error:"Invalid submission review",details:parsed.error.flatten()});return;}
+    try{
+      await lecturerAnnualService.reviewSubmission(req.params.yearId!,req.user!.id,parsed.data);
+      res.status(204).end();
+    }catch(error){replyError(res,error);}
   });
   router.post("/:yearId/review-teaching",requireCoordinator,async(req,res)=>{
     const parsed=ReviewAnnualTeachingInput.safeParse(req.body);

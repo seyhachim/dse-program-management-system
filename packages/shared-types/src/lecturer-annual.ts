@@ -37,6 +37,14 @@ export const SubmitAnnualActivityInput = z.object({
   note: z.string().trim().max(1000).default(""),
 }).strict();
 
+export const ReviewAnnualSubmissionInput = z.object({
+  lecturerId: z.string().uuid(),
+  decision: z.enum(["verified", "needs_changes"]),
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  reason: z.string().trim().min(5).max(2000),
+}).strict();
+export type ReviewAnnualSubmissionInput = z.infer<typeof ReviewAnnualSubmissionInput>;
+
 export interface AnnualYear {
   id: string;
   label: string;
@@ -81,6 +89,9 @@ export interface AnnualEvidence {
   startDate: string | null;
   endDate: string | null;
   attribution: AnnualEvidenceAttribution;
+  role?: string;
+  description?: string;
+  updatedAt?: string;
 }
 
 export interface AnnualLecturer {
@@ -91,7 +102,10 @@ export interface AnnualLecturer {
   staffSnapshotStatus: "verified" | "missing";
   staffReviewEventId: string | null;
   classification: "teaching_active" | "other_contributor" | "unconfirmed";
-  submissionStatus: "submitted" | "unreported";
+  submissionStatus: "submitted" | "unreported" | "verified" | "needs_changes";
+  submissionNote?: string;
+  submissionFingerprint?: string;
+  submissionReview?: { id: string; reason: string; reviewedAt: string; stale: boolean };
   teaching: AnnualTeaching[];
   evidence: AnnualEvidence[];
   verifiedActivityCount: number;

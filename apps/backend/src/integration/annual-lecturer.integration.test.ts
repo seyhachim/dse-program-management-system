@@ -13,7 +13,7 @@ const integrationDescribe = process.env.BACKEND_INTEGRATION_TESTS === "1" ? desc
 const TEST_SECRET = "annual-lecturer-integration-secret-at-least-32-characters";
 type HttpResponse = { status: number; body: unknown };
 type StaffRow = {
-  lecturerId: string; classification: string; submissionStatus: string;
+  lecturerId: string; classification: string; submissionStatus: string; submissionFingerprint?: string;
   teaching: Array<{ offeringId: string; confirmed: boolean; reviewId: string | null }>;
   evidence: Array<{ id: string; verificationStatus: string }>;
   employmentType: string | null;
@@ -181,6 +181,20 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
     expect(reviewed.statistics.staffSnapshotsMissing).toBe(0);
     expect(reviewed.staff.find(s=>s.lecturerId===lecturer.id)?.employmentType).toBe("part_time");
 
+    const submission=reviewed.staff.find(s=>s.lecturerId===contributor.id)!;
+    const decision={lecturerId:contributor.id,decision:"verified",fingerprint:submission.submissionFingerprint!,reason:"Reviewed annual evidence"};
+    const reviewPath=`/api/lecturers/annual/${yearId}/review-submission`;
+    expect((await request(reviewPath,ct,"POST",decision)).status).toBe(403);
+    expect((await request(reviewPath,rt,"POST",{...decision,fingerprint:"0".repeat(64)})).status).toBe(400);
+    expect((await request(reviewPath,rt,"POST",{...decision,decision:"needs_changes"})).status).toBe(204);
+    expect(((await request(`/api/lecturers/annual/${yearId}/summary`,rt)).body as Report).staff.find(s=>s.lecturerId===contributor.id)?.submissionStatus).toBe("needs_changes");
+    expect((await request(`/api/lecturers/annual/${yearId}/release`,rt,"POST",{})).status).toBe(400);
+    expect((await request(`/api/lecturers/annual/${yearId}/me/submit`,ct,"POST",{note:"Corrected annual record"})).status).toBe(204);
+    expect((await request(reviewPath,rt,"POST",decision)).status).toBe(400);
+    const current=((await request(`/api/lecturers/annual/${yearId}/summary`,rt)).body as Report).staff.find(s=>s.lecturerId===contributor.id)!;
+    expect(current.submissionStatus).toBe("submitted");
+    expect((await request(reviewPath,rt,"POST",{...decision,fingerprint:current.submissionFingerprint})).status).toBe(204);
+    expect(((await request(`/api/lecturers/annual/${yearId}/summary`,rt)).body as Report).staff.find(s=>s.lecturerId===contributor.id)?.submissionStatus).toBe("verified");
     const release = await request(`/api/lecturers/annual/${yearId}/release`, rt, "POST", {});
     expect(release.status).toBe(201);
     expect((release.body as Report).releaseVersion).toBe(1);

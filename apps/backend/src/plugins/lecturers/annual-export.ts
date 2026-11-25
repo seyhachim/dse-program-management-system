@@ -1,18 +1,22 @@
 import type { AnnualSummary } from "@dse-pms/shared-types";
-const quote = (v:unknown) => '"' + String(v??"").replace(/"/g,'""') + '"';
+const quote = (v:unknown) => {
+  const raw=String(v??"");
+  const safe=/^[\s\uFEFF]*[=+\-@]|^[\t\r\n]/.test(raw)?"'"+raw:raw;
+  return '"'+safe.replace(/"/g,'""')+'"';
+};
 const xml=(v:unknown)=>String(v??"").replace(/&/g,"&amp;")
   .replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
 export function annualReportRows(report:AnnualSummary):string[][] {
   return [
     ["Academic year","Window start","Window end","Lecturer ID","Lecturer","Employment type","Qualification",
-      "Annual classification","Submission","Confirmed sections","Verified activities",
+      "Annual classification","Submission","Annual submission review ID","Confirmed sections","Verified activities",
       "Teaching source IDs","Evidence item IDs","Verification event IDs","Staff snapshot status","Annual staff review event ID","Evidence attribution"],
     ...report.staff.map(person=>[
       report.academicYear.label,report.reportingWindow?.startDate??"Not configured",
       report.reportingWindow?.endDate??"Not configured",person.lecturerId,person.name,
       person.employmentType??"Not recorded",person.qualification??"Not recorded",
-      person.classification,person.submissionStatus,
+      person.classification,person.submissionStatus,person.submissionReview&&!person.submissionReview.stale?person.submissionReview.id:"",
       String(person.teaching.filter(t=>t.confirmed).length),
       String(person.verifiedActivityCount),
       person.teaching.filter(t=>t.confirmed)

@@ -89,3 +89,6 @@ scenarios. The separate Vercel Hobby frontend may automatically create a
 preview build for a feature branch; prefer one batched push, do not trigger
 manual redeploys, and do not promote to production until database migration,
 CI, QA and API checks are green.
+
+## Annual submission review
+The annual page defaults to 2025–2026 when that academic year exists. Staff who hold both roles can switch between their own record and coordinator review. Configure an approved reporting period before submission. Lecturers may submit/resubmit an optional note and link their own dated portfolio items. Coordinators review individual teaching, historical staff and evidence, then explicitly verify the annual submission or return it with a reason. Reviews are append-only, self-review is denied, and changed source evidence invalidates the earlier decision. Submitted or returned records must be reviewed before an official release; unreported people remain explicitly unreported. Evidence is linked through the existing private portfolio; direct file uploads are not included. CSV exports escape spreadsheet formula prefixes. Excel remains SpreadsheetML XML.

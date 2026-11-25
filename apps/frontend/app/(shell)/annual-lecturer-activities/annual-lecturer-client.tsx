@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AnnualLecturer, AnnualReportingWindow, AnnualSummary, AnnualYear } from "@dse-pms/shared-types";
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
@@ -19,7 +19,12 @@ function download(filename:string,body:string,mime:string):void {
 }
 export function AnnualLecturerClient(){
   const {me}=useMe();
-  const coordinator=Boolean(me?.roles.some(r=>r==="admin"||r==="program_coordinator"));
+  const canCoordinate=Boolean(me?.roles.some(r=>r==="admin"||r==="program_coordinator"));
+  const canSubmit=Boolean(me?.roles.includes("lecturer"));
+  const [ownMode,setOwnMode]=useState(false);
+  const coordinator=canCoordinate&&!ownMode;
+  const generation=useRef(0);
+  const [submissionNote,setSubmissionNote]=useState("");
   const [years,setYears]=useState<AnnualYear[]>([]);
   const [yearId,setYearId]=useState("");
   const [summary,setSummary]=useState<AnnualSummary|null>(null);
@@ -37,38 +42,51 @@ export function AnnualLecturerClient(){
     let active=true;
     lecturersApi.annualYears().then(result=>{
       if(!active)return;
-      setYears(result);setYearId(current=>current||result[0]?.id||"");
+      setYears(result);setYearId(current=>current||result.find(y=>y.startYear===2025&&y.endYear===2026)?.id||result[0]?.id||"");
     }).catch(e=>{if(active)setError(message(e));})
       .finally(()=>{if(active)setLoading(false);});
     return()=>{active=false;};
   },[]);
 
   const reload=useCallback(async()=>{
-    if(!yearId)return;
-    setLoading(true);setError(null);
+    if(!yearId||!me?.id)return;
+    const seq=++generation.current;
+    setLoading(true);setError(null);setSummary(null);setOwn(null);setOwnWindow(null);setPortfolio([]);
     try{
       if(coordinator){
         const result=await lecturersApi.annualSummary(yearId);
+        if(seq!==generation.current)return;
         setSummary(result);
       }else{
         const [result,items]=await Promise.all([
           lecturersApi.annualMe(yearId),lecturersApi.portfolioItems(),
         ]);
+        if(seq!==generation.current)return;
         setOwn(result.staff);
+        setSubmissionNote(result.staff?.submissionNote??"");
         setOwnWindow(result.reportingWindow);
         setPortfolio(items.map(i=>({id:i.id,title:i.title,kind:i.kind,startDate:i.startDate,endDate:i.endDate})));
       }
-    }catch(e){setError(message(e));}
-    finally{setLoading(false);}
-  },[coordinator,yearId]);
+    }catch(e){if(seq===generation.current)setError(message(e));}
+    finally{if(seq===generation.current)setLoading(false);}
+  },[coordinator,yearId,me?.id]);
 
-  useEffect(()=>{void reload();},[reload]);
+  useEffect(()=>{void reload();return()=>{generation.current++;};},[reload]);
 
   async function perform(action:()=>Promise<unknown>,success:string){
     setSaving(true);setError(null);setNotice(null);
     try{await action();setNotice(success);await reload();}
     catch(e){setError(message(e));}
     finally{setSaving(false);}
+  }
+
+  async function reviewSubmission(person:AnnualLecturer,decision:"verified"|"needs_changes"){
+    if(!person.submissionFingerprint)return;
+    const reason=window.prompt(decision==="verified"?"Verification reason (required):":"What should the lecturer correct?");
+    if(!reason||reason.trim().length<5)return;
+    await perform(()=>lecturersApi.annualReviewSubmission(yearId,{lecturerId:person.lecturerId,
+      fingerprint:person.submissionFingerprint!,decision,reason:reason.trim()}),
+      decision==="verified"?"Annual submission verified.":"Returned to lecturer for changes.");
   }
 
   async function reviewTeaching(lecturerId:string,offeringId:string,verdict:"confirmed"|"not_delivered"){
@@ -139,6 +157,10 @@ export function AnnualLecturerClient(){
         </select>
       </label>
     </header>
+    {canCoordinate&&canSubmit&&<div className="flex flex-wrap gap-2">
+      <button type="button" disabled={saving} aria-pressed={!ownMode} onClick={()=>setOwnMode(false)} className="rounded-md border px-3 py-2 text-sm">Coordinator review</button>
+      <button type="button" disabled={saving} aria-pressed={ownMode} onClick={()=>setOwnMode(true)} className="rounded-md border px-3 py-2 text-sm">My annual record</button>
+    </div>}
     {error&&<p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
     {notice&&<p role="status" className="rounded-lg border border-border bg-card p-3 text-sm text-foreground">{notice}</p>}
     {loading&&<p className="text-sm text-muted-foreground">Loading annual evidence…</p>}
@@ -175,7 +197,7 @@ export function AnnualLecturerClient(){
           </div>)}
       </div>
       <div className="flex flex-wrap gap-2">
-        <button className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50" disabled={saving||!summary.reportingWindow||summary.statistics.staffSnapshotsMissing>0||summary.statistics.unattributedEvidence>0}
+        <button className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50" disabled={saving||!summary.reportingWindow||summary.statistics.staffSnapshotsMissing>0||summary.statistics.unattributedEvidence>0||summary.staff.some(p=>p.submissionStatus==="submitted"||p.submissionStatus==="needs_changes")}
           onClick={()=>{if(window.confirm("Release an immutable annual report snapshot from the currently verified records?"))
             void perform(()=>lecturersApi.annualRelease(yearId),"Annual report version released.");}}>
           Release reviewed snapshot
@@ -197,7 +219,7 @@ export function AnnualLecturerClient(){
               <td className="px-3 py-3 font-medium">{person.name}</td>
               <td className="px-3 py-3">{person.employmentType?.replace(/_/g," ")??"Unverified"}</td>
               <td className="px-3 py-3">{person.classification.replace(/_/g," ")}</td>
-              <td className="px-3 py-3">{person.submissionStatus}</td>
+              <td className="px-3 py-3">{person.submissionStatus.replace(/_/g," ")}</td>
               <td className="px-3 py-3">{person.teaching.filter(t=>t.confirmed).length}</td>
               <td className="px-3 py-3">{person.verifiedActivityCount}</td>
               <td className="px-3 py-3">
@@ -205,6 +227,15 @@ export function AnnualLecturerClient(){
                   {expanded===person.lecturerId?"Hide":"Review"}
                 </button>
                 {expanded===person.lecturerId&&<div className="mt-3 min-w-[290px] space-y-3">
+                  <div className="rounded-lg border border-border p-2 space-y-2">
+                    <p className="font-medium">Annual submission: {person.submissionStatus.replace(/_/g," ")}</p>
+                    {person.submissionNote&&<p className="whitespace-pre-wrap text-xs">{person.submissionNote}</p>}
+                    {person.submissionReview&&<p className="text-xs">{person.submissionReview.stale?"Previous review is no longer current. ":""}{person.submissionReview.reason}</p>}
+                    {person.submissionFingerprint&&person.lecturerId!==me?.id&&<div className="flex flex-wrap gap-2">
+                      <button disabled={saving} className="text-xs text-primary underline" onClick={()=>void reviewSubmission(person,"verified")}>Verify annual submission</button>
+                      <button disabled={saving} className="text-xs text-primary underline" onClick={()=>void reviewSubmission(person,"needs_changes")}>Return for changes</button>
+                    </div>}
+                  </div>
                   <div className="rounded-lg border border-border p-2">
                     <p className="font-medium">Historical staffing: {person.staffSnapshotStatus}</p>
                     <p className="text-xs text-muted-foreground">Qualification: {person.qualification??"Pending official verification"}</p>
@@ -217,13 +248,15 @@ export function AnnualLecturerClient(){
                     <p className="text-xs text-muted-foreground">{t.confirmed?"Delivery confirmed":"Assigned, unconfirmed"}
                       {t.discrepancy?" · conflicting records":""} · Sessions: {t.deliveredSessions}</p>
                     <div className="mt-2 flex gap-2">
-                      <button disabled={saving} className="text-xs text-primary underline" onClick={()=>void reviewTeaching(person.lecturerId,t.offeringId,"confirmed")}>Confirm</button>
-                      <button disabled={saving} className="text-xs text-primary underline" onClick={()=>void reviewTeaching(person.lecturerId,t.offeringId,"not_delivered")}>Not delivered</button>
+                      <button disabled={saving||person.lecturerId===me?.id} className="text-xs text-primary underline" onClick={()=>void reviewTeaching(person.lecturerId,t.offeringId,"confirmed")}>Confirm</button>
+                      <button disabled={saving||person.lecturerId===me?.id} className="text-xs text-primary underline" onClick={()=>void reviewTeaching(person.lecturerId,t.offeringId,"not_delivered")}>Not delivered</button>
                     </div>
                   </div>)}
                   {person.evidence.map(item=><div key={item.id} className="rounded-lg border border-border p-2">
                     <p className="font-medium">{item.title}</p>
                     <p className="text-xs text-muted-foreground">{item.kind} · {item.verificationStatus} · {item.attribution} · {item.startDate??"Undated"}</p>
+                    {item.role&&<p className="text-xs">{item.role}</p>}
+                    {item.description&&<p className="whitespace-pre-wrap text-xs">{item.description}</p>}
                     {item.url&&<a className="text-xs text-primary underline" href={item.url} rel="noopener noreferrer" target="_blank">Evidence link</a>}
                     <div className="mt-1 flex gap-2">
                       <button disabled={saving||person.lecturerId===me?.id||item.attribution!=="in_period"} className="text-xs text-primary underline"
@@ -245,6 +278,7 @@ export function AnnualLecturerClient(){
       <p className="text-sm text-muted-foreground">Your assignments come from PMS. Link dated portfolio activities that overlap the official reporting window.</p>
       <p className="text-xs text-muted-foreground">Reporting window: {ownWindow?ownWindow.startDate+" to "+ownWindow.endDate:"Not configured by the coordinator"}</p>
       <p className="text-sm">Annual status: <strong>{own?.classification.replace(/_/g," ")??"Not recorded"}</strong> · Submission: <strong>{own?.submissionStatus??"unreported"}</strong></p>
+      {own?.submissionReview&&<p className="rounded-md border p-3 text-sm">{own.submissionReview.stale?"Previous review (record changed): ":"Coordinator feedback: "}{own.submissionReview.reason}</p>}
       <div className="space-y-2">
         {(own?.teaching??[]).map(t=><p key={t.offeringId} className="rounded-lg bg-muted/50 p-3 text-sm">
           {t.courseCode} — {t.courseTitle} · {t.term} · {t.confirmed?"Confirmed":"Pending delivery verification"}
@@ -255,7 +289,7 @@ export function AnnualLecturerClient(){
         <select className="min-w-48 rounded-md border border-border bg-background px-3 py-2 text-sm"
           value={selectedEvidence} onChange={e=>setSelectedEvidence(e.target.value)}>
           <option value="">Choose a portfolio activity</option>
-          {portfolio.map(item=><option key={item.id} value={item.id}>{item.title} · {item.kind} · {item.startDate??"undated"}</option>)}
+          {portfolio.filter(item=>ownWindow&&item.startDate&&item.startDate<=ownWindow.endDate&&(item.endDate??item.startDate)>=ownWindow.startDate&&!own?.evidence.some(e=>e.id===item.id)).map(item=><option key={item.id} value={item.id}>{item.title} · {item.kind} · {item.startDate??"undated"}</option>)}
         </select>
         <button disabled={saving||!selectedEvidence||!ownWindow}
           className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50"
@@ -270,9 +304,13 @@ export function AnnualLecturerClient(){
             onClick={()=>void perform(()=>lecturersApi.annualUnlinkEvidence(yearId,item.id),"Activity unlinked from this reporting year.")}>Unlink</button>
         </div>)}
       </div>
-      <button disabled={saving} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
-        onClick={()=>void perform(()=>lecturersApi.annualSubmit(yearId),"Annual submission recorded. Activities await coordinator verification.")}>
-        Submit annual activities
+      <label className="block text-sm">Annual submission note (optional)
+        <textarea maxLength={1000} value={submissionNote} onChange={e=>setSubmissionNote(e.target.value)}
+          className="mt-1 block w-full rounded-md border border-border bg-background p-2" placeholder="Explain any missing teaching records, contributions or corrections."/>
+      </label>
+      <button disabled={saving||!ownWindow||!own} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
+        onClick={()=>{if(window.confirm("Submit this annual record for independent coordinator review?"))void perform(()=>lecturersApi.annualSubmit(yearId,submissionNote),"Annual submission recorded. Activities await coordinator verification.");}}>
+        {own?.submissionStatus==="unreported"?"Submit annual activities":"Resubmit annual activities"}
       </button>
     </section>}
   </div>;
