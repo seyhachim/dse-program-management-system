@@ -7,6 +7,7 @@ import type { Prisma } from "@prisma/client";
 import { signToken, type AuthUser, type Role } from "../core/auth/token.ts";
 import { createApp } from "../core/app.ts";
 import { prisma } from "../core/db/prisma.ts";
+import { groupAssessmentService } from "../plugins/student-portal/group-assessment-results.ts";
 import { resultsLifecycleService } from "../plugins/student-portal/results-lifecycle.ts";
 
 const isolated = process.env.BACKEND_INTEGRATION_TESTS === "1" ? describe : describe.skip;
@@ -167,4 +168,108 @@ isolated("assessment evidence protected API and immutable history", () => {
     expect(retained.attachment.filename).toBe("synthetic.pdf");
     expect(retained.attachment.objectKey).toBeUndefined();
   }, 30000);
+
+  test("collects one shared group sample, separates individual contributions and reports coordinator coverage", async () => {
+    const suffix = randomUUID();
+    const course = await prisma.course.findFirstOrThrow({ where: { programmeId: "dse" } });
+    const latest = await prisma.courseSpec.findFirst({ where: { courseId: course.id }, orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }] });
+    const itemId = "evidence-group-" + suffix;
+    const spec = await prisma.courseSpec.create({ data: {
+      courseId: course.id, versionMajor: (latest?.versionMajor ?? 0) + 1, versionMinor: 0,
+      revisionType: "Major", revisionTriggers: ["ProgrammeCoordinator"], revisionReason: "Synthetic group evidence test",
+      changeSummary: "Isolated test", reviewStatus: "Approved", approvedAt: new Date(),
+      assessmentItems: { create: [{ id: itemId, order: 0, name: "Synthetic shared project and defence",
+        type: "Project + Defense", mode: "GroupIndividual", groupWeight: 70, individualWeight: 30, status: "Active", weight: 100 }] },
+    } });
+    const term = "evidence-group-ci-" + suffix;
+    const offering = await prisma.offering.create({ data: {
+      courseId: course.id, courseSpecId: spec.id, lecturerId: lecturer.id, term, sectionCode: "A", status: "Active",
+    } });
+    const enrollmentIds: string[] = [];
+    for (const marker of ["a", "b"]) {
+      const profile = await prisma.student.create({ data: {
+        name: "Synthetic group member " + marker, email: marker + suffix + "@example.invalid",
+        studentId: "G-EVID-" + marker + suffix, status: "Active",
+      } });
+      enrollmentIds.push((await prisma.enrollment.create({ data: { offeringId: offering.id, studentId: profile.id } })).id);
+    }
+    const context = "/api/qa/assessment-evidence/offerings/" + offering.id + "/specs/" + spec.id + "/assessments/" + itemId;
+    const groupPath = context + "/populations/group", componentPath = context + "/populations/component";
+    const dashboard = "/api/qa/assessment-evidence/programmes/dse/dashboard?" + new URLSearchParams({ term }).toString();
+    expect((await request(dashboard, null)).status).toBe(401);
+    expect((await request(dashboard, lecturer)).status).toBe(404);
+    expect((await request(dashboard, student)).status).toBe(404);
+    expect((await request(dashboard, { ...coordinator, programmeRoles: [{ role: "program_coordinator", programmeId: "other-programme" }] })).status).toBe(404);
+    const initial = await request(dashboard, coordinator);
+    expect(initial.status).toBe(200);
+    expect(initial.body.rows[0].assessments.map((x: { state: string }) => x.state)).toEqual(["not_ready", "not_ready"]);
+    const workspace = await groupAssessmentService.replaceGroups(lecturer.id, false, offering.id, itemId, { groups: [{ name: "Synthetic Group A", enrollmentIds }] });
+    const groupId = workspace.groups[0]!.id;
+    await groupAssessmentService.saveGroupScore(lecturer.id, false, offering.id, itemId, groupId, { score: 80, maxScore: 100, feedback: "Synthetic group feedback" });
+    for (const [i, enrollmentId] of enrollmentIds.entries()) {
+      await groupAssessmentService.saveIndividualComponent(lecturer.id, false, offering.id, itemId, enrollmentId, {
+        score: i === 0 ? 60 : 90, maxScore: 100, feedback: "Synthetic defence feedback", adjustmentPoints: 0, adjustmentReason: "",
+      });
+    }
+    expect((await request(groupPath, lecturer)).body.suggestions.eligibleCount).toBe(0);
+    await resultsLifecycleService.publishAssessment(lecturer.id, false, { offeringId: offering.id, assessmentItemId: itemId });
+    await resultsLifecycleService.finalizeAssessment(lecturer.id, false, { offeringId: offering.id, assessmentItemId: itemId });
+    expect((await request(context, lecturer)).status).toBe(409);
+    expect((await request(groupPath, unrelated)).status).toBe(404);
+    const shared = await request(groupPath, lecturer);
+    const individual = await request(componentPath, lecturer);
+    expect(shared.status).toBe(200); expect(individual.status).toBe(200);
+    expect(shared.body.suggestions.eligibleCount).toBe(1);
+    expect(shared.body.eligibleResults[0].memberEnrollmentIds).toHaveLength(2);
+    expect(individual.body.suggestions.eligibleCount).toBe(2);
+    const groupSource = shared.body.eligibleResults[0].resultId as string;
+    const componentSource = individual.body.eligibleResults[0].resultId as string;
+    const draft = { action: "create", expectedRevision: 0, selectionReason: "Synthetic marked sample", workReference: ref };
+    const groupUrl = groupPath + "/results/" + groupSource + "/revisions";
+    const componentUrl = componentPath + "/results/" + componentSource + "/revisions";
+    expect((await request(groupPath + "/results/" + componentSource + "/revisions", lecturer, draft)).status).toBe(404);
+    expect((await request(componentPath + "/results/" + groupSource + "/revisions", lecturer, draft)).status).toBe(404);
+    for (const url of [groupUrl, componentUrl]) {
+      expect((await request(url, lecturer, draft)).status).toBe(201);
+      expect((await request(url, lecturer, { action: "submit", expectedRevision: 1, confirmedMarkedWork: true })).status).toBe(201);
+      const review = { action: "verify", expectedRevision: 2, reviewReason: "Synthetic independent review", confirmedRestrictedWorkAndMarks: true };
+      expect((await request(url, lecturer, review)).status).toBe(403);
+      expect((await request(url, coordinator, review)).status).toBe(201);
+    }
+    const coverage = await request(dashboard, coordinator);
+    expect(coverage.status).toBe(200);
+    expect(coverage.body.totalOfferings).toBe(1);
+    expect(coverage.body.rows[0].assessments).toEqual([
+      expect.objectContaining({ population: "group", eligibleCount: 1, verified: 1, target: 1, gap: 0, state: "target_met" }),
+      expect.objectContaining({ population: "component", eligibleCount: 2, verified: 1, target: 2, gap: 1, state: "evidence_needed" }),
+    ]);
+    expect(JSON.stringify(coverage.body)).not.toContain(groupSource);
+    expect(JSON.stringify(coverage.body)).not.toContain(componentSource);
+    expect(JSON.stringify(coverage.body)).not.toContain(ref);
+    const officialGroup = await prisma.assessmentGroupScore.findUniqueOrThrow({ where: { id: groupSource } });
+    const officialComponent = await prisma.assessmentIndividualComponent.findUniqueOrThrow({ where: { id: componentSource } });
+    expect(officialGroup.score).toBe(80);
+    await groupAssessmentService.correctGroupScore(lecturer.id, false, offering.id, itemId, groupId, {
+      score: 85, maxScore: 100, feedback: "Synthetic corrected shared work", reason: "Synthetic moderation",
+      expectedUpdatedAt: officialGroup.updatedAt.toISOString(),
+    });
+    const after = await request(dashboard, coordinator);
+    expect(after.body.rows[0].assessments).toEqual([
+      expect.objectContaining({ population: "group", stale: 1, verified: 0, gap: 1 }),
+      expect.objectContaining({ population: "component", stale: 0, verified: 1, gap: 1 }),
+    ]);
+    await groupAssessmentService.correctIndividualComponent(lecturer.id, false, offering.id, itemId, officialComponent.enrollmentId, {
+      score: officialComponent.score + 1, maxScore: officialComponent.maxScore, feedback: "Synthetic corrected defence",
+      adjustmentPoints: 0, adjustmentReason: "", reason: "Synthetic moderation of defence", expectedUpdatedAt: officialComponent.updatedAt.toISOString(),
+    });
+    expect((await request(componentPath, coordinator)).body.evidence[0].effectiveStatus).toBe("stale");
+    const stored = await prisma.assessmentEvidenceRevision.findFirstOrThrow({ where: { groupScoreId: groupSource, revision: 3 } });
+    expect(stored.resultId).toBeNull();
+    expect(stored.componentId).toBeNull();
+    await expect(prisma.assessmentEvidenceRevision.create({ data: {
+      resultId: sourceId, groupScoreId: groupSource, offeringId: offering.id, courseSpecId: spec.id, assessmentItemId: itemId,
+      revision: 4, status: "draft", action: "revise", sourceHash: stored.sourceHash, sourceSnapshot: stored.sourceSnapshot as Prisma.InputJsonObject,
+      score: 85, maxScore: 100, selectionReason: "Invalid mixed source", actorId: lecturer.id,
+    } })).rejects.toThrow();
+  }, 60000);
 });
