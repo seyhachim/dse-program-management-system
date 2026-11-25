@@ -2,6 +2,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { CourseType, PrismaClient } from "@prisma/client";
 import { curriculumImportService } from "./curriculum-import-service.ts";
 import { curriculumService } from "./curriculum-service.ts";
+import { curriculumCourseSpecService } from "./curriculum-course-spec-service.ts";
+import { offeringCurriculumService } from "./offering-curriculum-service.ts";
 
 const dbTestsEnabled = process.env.CURRICULUM_DB_TESTS === "1";
 const describeDb = dbTestsEnabled ? describe : describe.skip;
@@ -244,6 +246,70 @@ describeDb("curriculum JSON import and artifact persistence", () => {
       },
     });
     expect(importAudit).not.toBeNull();
+  });
+
+  test("official code is scoped to the exact placement without changing canonical course identity", async () => {
+    const f = await fixture();
+    const upload = uploadFor(f);
+    await curriculumImportService.apply(f.version.id, f.user.id, applyInput(upload));
+
+    const g6Course = await prisma.course.create({
+      data: {
+        programmeId: f.programme.id,
+        code: `AGENT-${f.token}-G6`,
+        title: "Agentic AI Development",
+        credits: 3,
+        courseType: CourseType.Core,
+      },
+    });
+    const g6 = await prisma.programmeCurriculumVersion.create({
+      data: {
+        curriculumId: f.curriculum.id,
+        versionMajor: 3,
+        versionMinor: 0,
+        createdById: f.user.id,
+        cohortLabel: "G6",
+        academicYear: "2026",
+      },
+    });
+    const placement = await prisma.programmeCurriculumCourse.create({
+      data: {
+        curriculumVersionId: g6.id,
+        courseId: g6Course.id,
+        yearLevel: 1,
+        semester: "First",
+        creditsSnapshot: 3,
+        courseTypeSnapshot: CourseType.Core,
+      },
+    });
+
+    // Synthetic draft fixture only: the next slice will expose a validated importer.
+    const updated = await prisma.$executeRaw`
+      UPDATE curriculum_artifact."CourseSnapshot"
+      SET "courseCodeSnapshot" = ${f.common.code}
+      WHERE "placementId" = ${placement.id}
+        AND "curriculumVersionId" = ${g6.id}
+        AND "courseId" = ${g6Course.id}
+    `;
+    expect(updated).toBe(1);
+
+    const readOld = await curriculumService.getById(f.curriculum.id, f.version.id);
+    const readNew = await curriculumService.getById(f.curriculum.id, g6.id);
+    const oldCourse = readOld.years[0]?.semesters[0]?.courses.find((course) => course.courseId === f.common.id);
+    const newCourse = readNew.years[0]?.semesters[0]?.courses.find((course) => course.courseId === g6Course.id);
+    expect(oldCourse?.code).toBe(f.common.code);
+    expect(newCourse?.code).toBe(f.common.code);
+    expect(newCourse?.title).toBe("Agentic AI Development");
+    expect(newCourse?.courseId).not.toBe(oldCourse?.courseId);
+
+    const bindings = await curriculumCourseSpecService.list(g6.id);
+    expect(bindings.bindings.find((row) => row.placementId === placement.id)?.courseCode).toBe(f.common.code);
+    expect(bindings.bindings.find((row) => row.placementId === placement.id)?.courseId).toBe(g6Course.id);
+    expect(await offeringCurriculumService.getPlacement(f.programme.id, placement.id)).toBeNull();
+    const canonical = await prisma.course.findUniqueOrThrow({ where: { id: g6Course.id } });
+    expect(canonical.code).toBe(g6Course.code);
+    const artifact = await curriculumImportService.artifact(g6.id);
+    expect(artifact.courses.find((course) => course.placementId === placement.id)?.code).toBe(f.common.code);
   });
 
   test("title conflicts require an explicit keep-existing decision", async () => {

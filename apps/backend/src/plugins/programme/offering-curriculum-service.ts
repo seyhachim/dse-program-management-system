@@ -6,6 +6,7 @@ import type {
 } from "@dse-pms/shared-types";
 import { Semester as PrismaSemester, type ProgrammeCurriculumStatus } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { loadCurriculumOfficialCodes } from "./curriculum-official-code.ts";
 
 const DELIVERY_STATUSES: ProgrammeCurriculumStatus[] = ["Approved", "Active", "Superseded"];
 
@@ -49,12 +50,12 @@ function placementRef(row: {
   pathwayId: string | null;
   courseSpecVersionId: string | null;
   course: { code: string; title: string };
-}): OfferingCurriculumPlacementRef {
+}, officialCodes: ReadonlyMap<string, string>): OfferingCurriculumPlacementRef {
   return {
     id: row.id,
     curriculumVersionId: row.curriculumVersionId,
     courseId: row.courseId,
-    courseCode: row.course.code,
+    courseCode: officialCodes.get(row.id) ?? row.course.code,
     courseTitle: row.course.title,
     yearLevel: row.yearLevel,
     semester: row.semester,
@@ -102,11 +103,12 @@ export const offeringCurriculumService: OfferingCurriculumServiceContract = {
       include: { course: { select: { code: true, title: true } } },
       orderBy: [{ sortOrder: "asc" }, { course: { code: "asc" } }],
     });
+    const officialCodes = await loadCurriculumOfficialCodes(curriculumVersionId);
     return rows.map((row) => placementRef({
       ...row,
       semester: row.semester as Semester,
       courseTypeSnapshot: row.courseTypeSnapshot,
-    }));
+    }, officialCodes));
   },
 
   async getPlacement(programmeId, curriculumCourseId) {
@@ -125,7 +127,7 @@ export const offeringCurriculumService: OfferingCurriculumServiceContract = {
           ...row,
           semester: row.semester as Semester,
           courseTypeSnapshot: row.courseTypeSnapshot,
-        })
+        }, await loadCurriculumOfficialCodes(row.curriculumVersionId))
       : null;
   },
 

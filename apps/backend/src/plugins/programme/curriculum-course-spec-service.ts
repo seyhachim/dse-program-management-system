@@ -62,11 +62,15 @@ async function loadPlacements(versionId: string): Promise<PlacementRow[]> {
     SELECT
       placement."id" AS "placementId",
       placement."courseId" AS "courseId",
-      course."code" AS "courseCode",
+      COALESCE(snapshot."courseCodeSnapshot", course."code") AS "courseCode",
       course."title" AS "courseTitle",
       placement."courseSpecVersionId" AS "courseSpecVersionId"
     FROM "ProgrammeCurriculumCourse" placement
     INNER JOIN "Course" course ON course."id" = placement."courseId"
+    LEFT JOIN curriculum_artifact."CourseSnapshot" snapshot
+      ON snapshot."placementId" = placement."id"
+      AND snapshot."curriculumVersionId" = placement."curriculumVersionId"
+      AND snapshot."courseId" = placement."courseId"
     WHERE placement."curriculumVersionId" = ${versionId}
     ORDER BY placement."yearLevel", placement."semester", placement."sortOrder", placement."courseId"
   `);
