@@ -3024,6 +3024,7 @@ model AssessmentGroupMember {
 /// One shared draft score for a group. It is provenance only; final student
 /// grades are materialized into AssessmentResult rows.
 model AssessmentGroupScore {
+  evidenceRevisions AssessmentEvidenceRevision[]
   id                String                           @id @default(uuid())
   groupId           String                           @unique
   group             AssessmentGroup                  @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -3064,6 +3065,7 @@ model AssessmentGroupCriterionScore {
 /// Per-student component used only by GroupIndividual assessments. The optional
 /// adjustment is explicit and reasoned; it is included in deterministic materialization.
 model AssessmentIndividualComponent {
+  evidenceRevisions AssessmentEvidenceRevision[]
   id               String                                    @id @default(uuid())
   groupId          String
   offeringId       String
@@ -3684,8 +3686,12 @@ model DseNewsMedia {
 /// Canonical grade and criterion records remain the source of academic truth.
 model AssessmentEvidenceRevision {
   id               String @id @default(uuid())
-  resultId         String
-  result           AssessmentResult @relation(fields: [resultId], references: [id], onDelete: Restrict)
+  resultId         String?
+  result           AssessmentResult? @relation(fields: [resultId], references: [id], onDelete: Restrict)
+  groupScoreId     String?
+  groupScore       AssessmentGroupScore? @relation(fields: [groupScoreId], references: [id], onDelete: Restrict)
+  componentId      String?
+  component        AssessmentIndividualComponent? @relation(fields: [componentId], references: [id], onDelete: Restrict)
   offeringId       String
   offering         Offering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
   courseSpecId     String
@@ -3707,6 +3713,8 @@ model AssessmentEvidenceRevision {
   createdAt        DateTime @default(now())
 
   @@unique([resultId, revision], map: "AssessmentEvidenceRevision_result_revision_key")
+  @@unique([groupScoreId, revision], map: "AssessmentEvidenceRevision_group_revision_key")
+  @@unique([componentId, revision], map: "AssessmentEvidenceRevision_component_revision_key")
   @@index([offeringId, courseSpecId, assessmentItemId], map: "AssessmentEvidenceRevision_context_idx")
   @@index([courseSpecId, assessmentItemId], map: "AssessmentEvidenceRevision_item_idx")
   @@index([actorId])
