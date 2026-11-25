@@ -128,8 +128,7 @@ async function verificationEvents(db: DbClient, itemId: string): Promise<Verific
   `;
 }
 
-async function presentItem(db: DbClient, row: ItemRow): Promise<LecturerPortfolioItem> {
-  const events = await verificationEvents(db, row.id);
+function serializeItem(row: ItemRow, events: readonly VerificationRow[]): LecturerPortfolioItem {
   return {
     id: row.id,
     lecturerId: row.lecturerId,
@@ -158,14 +157,45 @@ async function presentItem(db: DbClient, row: ItemRow): Promise<LecturerPortfoli
   };
 }
 
-async function listItems(lecturerId: string): Promise<LecturerPortfolioItem[]> {
-  const rows = await prisma.$queryRaw<ItemRow[]>`
+async function presentItem(db: DbClient, row: ItemRow): Promise<LecturerPortfolioItem> {
+  return serializeItem(row, await verificationEvents(db, row.id));
+}
+
+/** Owner-scoped list: one item query and at most one batched history query.
+ * Mutation responses still use the existing single-item history lookup.
+ */
+export async function listLecturerPortfolioItems(
+  db: Pick<DbClient, "$queryRaw">,
+  lecturerId: string,
+): Promise<LecturerPortfolioItem[]> {
+  const rows = await db.$queryRaw<ItemRow[]>`
     SELECT *
     FROM lecturer_portfolio."LecturerPortfolioItem"
     WHERE "lecturerId" = ${lecturerId}
     ORDER BY "isFeatured" DESC, "updatedAt" DESC, "id" ASC
   `;
-  return Promise.all(rows.map((row) => presentItem(prisma, row)));
+  if (rows.length === 0) return [];
+
+  const events = await db.$queryRaw<VerificationRow[]>`
+    SELECT v."id", v."itemId", v."action"::text AS "action", v."note",
+           v."actorId", u."name" AS "actorName", v."createdAt"
+    FROM lecturer_portfolio."LecturerPortfolioVerification" v
+    JOIN lecturer_portfolio."LecturerPortfolioItem" i ON i."id" = v."itemId"
+    JOIN public."User" u ON u."id" = v."actorId"
+    WHERE i."lecturerId" = ${lecturerId}
+    ORDER BY v."itemId" ASC, v."createdAt" ASC, v."id" ASC
+  `;
+  const byItem = new Map<string, VerificationRow[]>();
+  for (const event of events) {
+    const group = byItem.get(event.itemId);
+    if (group) group.push(event);
+    else byItem.set(event.itemId, [event]);
+  }
+  return rows.map((row) => serializeItem(row, byItem.get(row.id) ?? []));
+}
+
+function listItems(lecturerId: string): Promise<LecturerPortfolioItem[]> {
+  return listLecturerPortfolioItems(prisma, lecturerId);
 }
 
 export const lecturerPortfolioService = {
