@@ -188,6 +188,12 @@ const dseNewsNavigationManifest: PluginManifest = {
   ],
 };
 
+const annualLecturerManifest: PluginManifest = {
+  id: "lecturer-annual", name: "Annual Lecturer Activities", version: "0.1.0",
+  routes: [{ label: "Annual Lecturer Activities", path: "/annual-lecturer-activities",
+    icon: "clipboard-check", roles: ["admin", "program_coordinator", "lecturer"], group: "Academic" }],
+};
+
 const frontendManifests = [
   ...pluginManifests.filter(
     (manifest) => manifest.id !== "rubrics" && manifest.id !== "qa",
@@ -199,6 +205,7 @@ const frontendManifests = [
   studentHandbookManifest,
   communityManifest,
   lecturerPortfolioManifest,
+  annualLecturerManifest,
   finalProjectManifest,
   publicInformationManifest,
   dseNewsNavigationManifest,
