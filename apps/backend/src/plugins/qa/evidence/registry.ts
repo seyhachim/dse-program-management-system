@@ -166,12 +166,14 @@ async function queryRows(
         SELECT
           s.id AS "entityId",
           'QaCloAttainmentSnapshot' AS "entityType",
-          c.code || ' — ' || s."cloCode" || ' attainment (' || s."periodKey" || ')' AS title,
+          COALESCE(snapshot."courseCodeSnapshot", c.code) || ' — ' || s."cloCode" || ' attainment (' || s."periodKey" || ')' AS title,
           CASE WHEN s."studentCount" = 0 THEN 'No finalized mapped-result population for this snapshot.'
             ELSE s."achievedCount"::text || '/' || s."studentCount"::text || ' students met the ' || s."thresholdPercentage"::text || '% threshold (' || s."achievedRate"::text || '%).' END AS summary,
           '/courses/' || c.id || '/spec' AS route,
           s."generatedAt" AS "reportingDate",
           jsonb_build_object(
+            'courseCode', COALESCE(snapshot."courseCodeSnapshot", c.code), 'catalogueCode', c.code,
+            'curriculumVersionId', cv.id, 'placementId', placement.id,
             'courseSpecVersionId', s."courseSpecId", 'offeringId', s."offeringId", 'population', 'enrolled-students',
             'term', s."periodKey", 'periodKey', s."periodKey", 'cloCode', s."cloCode",
             'calculationVersion', s."calculationVersion", 'calculationHash', s."calculationHash",
@@ -180,6 +182,11 @@ async function queryRows(
           ) AS attributes
         FROM "QaCloAttainmentSnapshot" s
         JOIN "Course" c ON c.id = s."courseId"
+        LEFT JOIN "Offering" o ON o.id = s."offeringId" AND o."courseId" = s."courseId"
+        LEFT JOIN offering_governance."OfferingCurriculumBinding" binding ON binding."offeringId" = o.id
+        LEFT JOIN public."ProgrammeCurriculumCourse" placement ON placement.id = binding."curriculumCourseId" AND placement."courseId" = o."courseId"
+        LEFT JOIN public."ProgrammeCurriculumVersion" cv ON cv.id = placement."curriculumVersionId" AND cv.status IN ('Approved', 'Active', 'Superseded')
+        LEFT JOIN curriculum_artifact."CourseSnapshot" snapshot ON snapshot."placementId" = placement.id AND snapshot."curriculumVersionId" = cv.id AND snapshot."courseId" = o."courseId"
         WHERE s."programmeId" = ${programmeId}
         ORDER BY s."generatedAt" DESC, c.code, s."cloCode"
       `;
@@ -523,12 +530,15 @@ async function queryRows(
         SELECT
           r."courseSpecId" || ':' || r."assessmentItemId" AS "entityId",
           'AssessmentResultSet' AS "entityType",
-          c.code || ' — Published results for ' || COALESCE(a.name, r."assessmentItemId") AS title,
+          (CASE WHEN COUNT(snapshot."courseCodeSnapshot") = COUNT(r.id) AND COUNT(DISTINCT snapshot."courseCodeSnapshot") = 1 THEN MIN(snapshot."courseCodeSnapshot") ELSE c.code END) || ' — Published results for ' || COALESCE(a.name, r."assessmentItemId") AS title,
           COUNT(r.id)::text || ' published result(s).' AS summary,
           '/courses/' || c.id AS route,
           MAX(r."publishedAt") AS "reportingDate",
           jsonb_build_object(
-            'courseCode', c.code,
+            'courseCode', CASE WHEN COUNT(snapshot."courseCodeSnapshot") = COUNT(r.id) AND COUNT(DISTINCT snapshot."courseCodeSnapshot") = 1 THEN MIN(snapshot."courseCodeSnapshot") ELSE c.code END,
+            'catalogueCode', c.code,
+            'officialCodes', COALESCE(array_agg(DISTINCT snapshot."courseCodeSnapshot" ORDER BY snapshot."courseCodeSnapshot") FILTER (WHERE snapshot."courseCodeSnapshot" IS NOT NULL), ARRAY[]::text[]),
+            'unboundResultCount', COUNT(r.id) FILTER (WHERE snapshot."courseCodeSnapshot" IS NULL),
             'resultCount', COUNT(r.id),
             'feedbackCount', COUNT(r.id) FILTER (WHERE r.feedback <> ''),
             'averagePercent', ROUND(AVG(CASE WHEN r."maxScore" > 0 THEN (r.score / r."maxScore") * 100 ELSE NULL END)::numeric, 2)
@@ -537,6 +547,10 @@ async function queryRows(
         JOIN "Enrollment" e ON e.id = r."enrollmentId"
         JOIN "Offering" o ON o.id = e."offeringId"
         JOIN "Course" c ON c.id = o."courseId"
+        LEFT JOIN offering_governance."OfferingCurriculumBinding" binding ON binding."offeringId" = o.id
+        LEFT JOIN public."ProgrammeCurriculumCourse" placement ON placement.id = binding."curriculumCourseId" AND placement."courseId" = o."courseId"
+        LEFT JOIN public."ProgrammeCurriculumVersion" cv ON cv.id = placement."curriculumVersionId" AND cv.status IN ('Approved', 'Active', 'Superseded')
+        LEFT JOIN curriculum_artifact."CourseSnapshot" snapshot ON snapshot."placementId" = placement.id AND snapshot."curriculumVersionId" = cv.id AND snapshot."courseId" = o."courseId"
         LEFT JOIN "CourseSpecAssessmentItem" a
           ON a."courseSpecId" = r."courseSpecId" AND a.id = r."assessmentItemId"
         WHERE c."programmeId" = ${programmeId}

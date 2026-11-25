@@ -33,6 +33,15 @@ Draft implementation; no release or production import is authorized.
 - Existing approved course documents served through the portal inherit the contextual summary code; staff standalone CourseSpec printing, transcript/report inventory and all other direct SQL/export paths still need audit and explicit context handling.
 - Correct Phase 3 duplicate test assertion to SQLSTATE 23505. Prior CI showed the database really rejected the duplicate and Phase 3 editor/clone comparison passed. New CI required.
 
+## Phase 4B: documents, delivery and evidence
+
+- Phase 4A baseline commit ebec39d passed all 17 Actions workflows.
+- Curriculum CourseSpec bindings now link to an exact historical CourseSpec preview with version and placement IDs. The existing programme-scoped binding API must confirm the exact course, exact approved spec and Approved/Active/Superseded curriculum before the preview or either export renders. Invalid or Draft context fails closed; standalone historic documents retain stored codes. PDF, Word, header/footer and filenames share the resolved presentation model.
+- Teaching-session monitor and lecturer portfolio teaching projections resolve exact offering codes. Existing portal/Telegram schedule and attendance screens use the contextual portal or offering projections; schedule-impact rows remain ID-based.
+- CLO attainment evidence candidate display and published result aggregates expose contextual codes without mutating stored evidence or changing aggregate keys. Mixed or unbound result sets retain the catalogue label and expose code coverage.
+- Student handbook source is published curriculum totals, not course rows; export already freezes published source snapshots, so no handbook data rewrite is appropriate. No dedicated transcript implementation found in the inspected tree. Standalone reports without exact context retain catalogue labels; annual lecturer export is owned by #1299 and needs coordination, not a competing patch.
+- Added context validation unit tests and expanded portal DB regression for exact bound code, document filename, announcement, legacy completed fallback and unauthorized access. Full cross-generation browser verification remains a release gate.
+
 ## Remaining merge blockers
 
 1. Validate the new version-wide constraint and duplicate preflight on isolated staging, including detached legacy snapshots. No production migration or data correction authorized.

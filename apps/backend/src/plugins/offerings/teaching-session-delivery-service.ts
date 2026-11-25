@@ -15,6 +15,7 @@ import type {
 } from "@dse-pms/shared-types";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { loadOfferingOfficialCodes } from "../../core/academic/offering-official-code.ts";
 import { classDeliveryService } from "./class-delivery-service.ts";
 import {
   ClassResponsibilityEligibilityError,
@@ -280,7 +281,7 @@ async function monitorCourse(offeringId: string): Promise<TeachingSessionMonitor
   });
   if (!offering) throw new TeachingSessionDeliveryReferenceError("Offering not found");
   return {
-    code: offering.course.code,
+    code: (await loadOfferingOfficialCodes([offeringId])).get(offeringId) ?? offering.course.code,
     title: offering.course.title,
     sectionCode: offering.sectionCode,
   };
