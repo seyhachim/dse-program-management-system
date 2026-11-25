@@ -256,6 +256,7 @@ const EXPECTED_EXAM_VARIANT_TABLES = [
   "ExamOfferingPermission",
   "ExamPaperAssignment",
   "ExamAssignmentEvent",
+  "ExamModerationSubmission",
 ] as const;
 
 const FORBIDDEN_GRANTEES = new Set([
