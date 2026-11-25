@@ -76,7 +76,7 @@ function Workspace({offeringId,assessmentItemId}:{offeringId:string;assessmentIt
     try{const snapshot=await api.post<ExamWorkspaceSnapshot>(base+"preview",body);setPreview({inputKey,snapshot});}
     catch(e){setError(e instanceof Error?e.message:"Preview unavailable");}finally{setBusy(false);}
   }
-  function submit(){if(verified){setPreview(null);void run("submit",body,"Submitted for moderation.");}}
+  function submit(){if(verified){setPreview(null);void run("submit",{...body,expectedHash:verified.variantHash},"Submitted for moderation.");}}
   function assign(){if(!paper)return;void run("assign",{...scope,entries:selected.map(r=>({enrollmentId:r.enrollmentId,variantId:paper.variantId,variantHash:paper.variantHash,expectedRevision:r.assignment?.revision??0,reason,evidenceRef}))},"Assignments confirmed atomically.");}
   return <div className="space-y-4">
     {notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}
