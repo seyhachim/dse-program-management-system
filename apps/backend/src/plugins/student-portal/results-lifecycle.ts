@@ -12,6 +12,7 @@ import type {
   SaveAssessmentCriterionScoresInput,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { loadOfferingOfficialCodes } from "../../core/academic/offering-official-code.ts";
 import { groupAssessmentService } from "./group-assessment-results.ts";
 import { canManageOfferingResults } from "./result-management-access.ts";
 export { canManageOfferingResults } from "./result-management-access.ts";
@@ -336,7 +337,7 @@ export const resultsLifecycleService = {
     return {
       offeringId: offering.id,
       courseSpecId: spec.id,
-      courseCode: offering.course.code,
+      courseCode: (await loadOfferingOfficialCodes([offering.id])).get(offering.id) ?? offering.course.code,
       courseTitle: offering.course.title,
       sectionCode: offering.sectionCode,
       rows: offering.enrollments.map((enrollment) =>

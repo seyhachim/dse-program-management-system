@@ -551,7 +551,7 @@ async function queryRows(
         SELECT
           o.id AS "entityId",
           'Offering' AS "entityType",
-          c.code || ' ' || o.term || ' Section ' || o."sectionCode" AS title,
+          COALESCE(snapshot."courseCodeSnapshot", c.code) || ' ' || o.term || ' Section ' || o."sectionCode" AS title,
           'Primary lecturer: ' || COALESCE(u.name, 'Unassigned') ||
             '; co-lecturers: ' || (
               SELECT COUNT(*)::text FROM "OfferingCoLecturer" oc WHERE oc."offeringId" = o.id
@@ -559,7 +559,8 @@ async function queryRows(
           '/courses/' || c.id AS route,
           o."createdAt" AS "reportingDate",
           jsonb_build_object(
-            'courseCode', c.code,
+            'courseCode', COALESCE(snapshot."courseCodeSnapshot", c.code),
+            'catalogueCode', c.code,
             'term', o.term,
             'sectionCode', o."sectionCode",
             'primaryLecturer', COALESCE(u.name, ''),
@@ -567,6 +568,10 @@ async function queryRows(
           ) AS attributes
         FROM "Offering" o
         JOIN "Course" c ON c.id = o."courseId"
+        LEFT JOIN offering_governance."OfferingCurriculumBinding" binding ON binding."offeringId" = o.id
+        LEFT JOIN public."ProgrammeCurriculumCourse" placement ON placement.id = binding."curriculumCourseId" AND placement."courseId" = o."courseId"
+        LEFT JOIN public."ProgrammeCurriculumVersion" cv ON cv.id = placement."curriculumVersionId" AND cv.status IN ('Approved', 'Active', 'Superseded')
+        LEFT JOIN curriculum_artifact."CourseSnapshot" snapshot ON snapshot."placementId" = placement.id AND snapshot."curriculumVersionId" = cv.id AND snapshot."courseId" = o."courseId"
         LEFT JOIN "User" u ON u.id = o."lecturerId"
         WHERE c."programmeId" = ${programmeId}
         ORDER BY o.term DESC, c.code, o."sectionCode"
@@ -589,7 +594,7 @@ async function queryRows(
         SELECT
           m.id || ':' || a."lecturerId" AS "entityId",
           'OfferingMeetingWorkload' AS "entityType",
-          u.name || ' — ' || c.code || ' ' || m."activityType" AS title,
+          u.name || ' — ' || COALESCE(snapshot."courseCodeSnapshot", c.code) || ' ' || m."activityType" AS title,
           m."dayOfWeek" || ' ' || m."startTime" || '–' || m."endTime" ||
             CASE WHEN m.room IS NOT NULL AND m.room <> '' THEN ' (' || m.room || ')' ELSE '' END AS summary,
           '/courses/' || c.id AS route,
@@ -597,7 +602,8 @@ async function queryRows(
           jsonb_build_object(
             'lecturerId', u.id,
             'lecturerName', u.name,
-            'courseCode', c.code,
+            'courseCode', COALESCE(snapshot."courseCodeSnapshot", c.code),
+            'catalogueCode', c.code,
             'term', o.term,
             'sectionCode', o."sectionCode",
             'dayOfWeek', m."dayOfWeek",
@@ -608,6 +614,10 @@ async function queryRows(
         FROM assignments a
         JOIN "Offering" o ON o.id = a."offeringId"
         JOIN "Course" c ON c.id = o."courseId"
+        LEFT JOIN offering_governance."OfferingCurriculumBinding" binding ON binding."offeringId" = o.id
+        LEFT JOIN public."ProgrammeCurriculumCourse" placement ON placement.id = binding."curriculumCourseId" AND placement."courseId" = o."courseId"
+        LEFT JOIN public."ProgrammeCurriculumVersion" cv ON cv.id = placement."curriculumVersionId" AND cv.status IN ('Approved', 'Active', 'Superseded')
+        LEFT JOIN curriculum_artifact."CourseSnapshot" snapshot ON snapshot."placementId" = placement.id AND snapshot."curriculumVersionId" = cv.id AND snapshot."courseId" = o."courseId"
         JOIN "User" u ON u.id = a."lecturerId"
         JOIN "OfferingMeeting" m ON m."offeringId" = o.id
         ORDER BY u.name, o.term DESC, c.code, m."dayOfWeek", m."startTime"

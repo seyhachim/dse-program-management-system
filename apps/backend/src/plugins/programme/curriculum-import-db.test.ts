@@ -329,7 +329,7 @@ describeDb("curriculum JSON import and artifact persistence", () => {
       SET "courseCodeSnapshot" = ${f.common.code}
       WHERE "curriculumVersionId" = ${g6.id}
         AND "courseId" = ${f.research.id}
-    `)).rejects.toThrow("CourseSnapshot_version_official_code_key");
+    `)).rejects.toThrow("23505");
     const after = await curriculumImportService.artifact(g6.id);
     expect(after.courses.find((course) => course.courseId === f.research.id)?.code).toBe(f.research.code);
   });

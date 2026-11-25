@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import type { AttendanceStatus, TelegramStudentAttendanceHistory } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { loadOfferingOfficialCodes } from "../../core/academic/offering-official-code.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { evaluateAttendanceHealth, type AttendanceHealthRecord } from "./attendance-health.ts";
 import { ReferenceError } from "./service.ts";
@@ -371,7 +372,7 @@ export const studentAttendanceHistoryService = {
   async pendingForUser(userId: string) {
     const student = await students().getByUserId(userId);
     if (!student || student.status !== "Active") return [];
-    return prisma.$queryRaw<Array<{
+    const rows = await prisma.$queryRaw<Array<{
       permissionPendingId: string;
       offeringId: string;
       date: Date;
@@ -399,5 +400,7 @@ export const studentAttendanceHistoryService = {
         AND p."resolvedAt" IS NULL
       ORDER BY s."sessionDate" DESC
     `;
+    const officialCodes = await loadOfferingOfficialCodes(rows.map((row) => row.offeringId));
+    return rows.map((row) => ({ ...row, courseCode: officialCodes.get(row.offeringId) ?? row.courseCode }));
   },
 };

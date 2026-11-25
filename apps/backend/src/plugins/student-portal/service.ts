@@ -20,6 +20,7 @@ import type {
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { loadOfferingOfficialCodes } from "../../core/academic/offering-official-code.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { calculateCloEvidence, calculateCourseGrade } from "./assessment-calculation.ts";
@@ -141,7 +142,11 @@ async function enrolledRowsForStudent(student: PortalStudent) {
     include: enrollmentInclude,
     orderBy: { createdAt: "desc" },
   });
-  return Object.assign(rows, { student });
+  const officialCodes = await loadOfferingOfficialCodes(rows.map((row) => row.offeringId));
+  return Object.assign(rows.map((row) => ({
+    ...row,
+    officialCode: officialCodes.get(row.offeringId) ?? row.offering.course.code,
+  })), { student });
 }
 
 async function enrolledRows(userId: string) {
@@ -340,7 +345,7 @@ function toSummary(row: EnrollmentRow): PortalCourseSummary {
     offeringId: offering.id,
     enrollmentId: row.id,
     courseId: offering.course.id,
-    code: offering.course.code,
+    code: row.officialCode,
     title: offering.course.title,
     description: offering.course.description,
     credits: offering.course.credits,
@@ -403,7 +408,7 @@ function homeCourseSnapshot(row: EnrollmentRow) {
       .filter((item) => item.status === "Active" && !resultAssessmentIds.has(item.id))
       .map((item) => ({
         offeringId: row.offeringId,
-        courseCode: row.offering.course.code,
+        courseCode: row.officialCode,
         assessmentId: item.id,
         name: item.name,
         dueAt: deadlines.get(item.id)?.toISOString() ?? null,
@@ -563,7 +568,7 @@ function announcementsFrom(rows: EnrollmentRow[]): PortalAnnouncement[] {
     .map((announcement) => ({
       id: announcement.id,
       offeringId: row.offeringId,
-      courseCode: row.offering.course.code,
+      courseCode: row.officialCode,
       courseTitle: row.offering.course.title,
       sectionCode: row.offering.sectionCode,
       title: announcement.title,
@@ -631,6 +636,7 @@ export const studentPortalService = {
       orderBy: [{ term: "desc" }, { course: { code: "asc" } }, { sectionCode: "asc" }],
     });
 
+    const officialCodes = await loadOfferingOfficialCodes(offerings.map((offering) => offering.id));
     return offerings.map((offering) => {
       const spec = offering.courseSpec ?? null;
       const deadlines = new Map(
@@ -641,7 +647,7 @@ export const studentPortalService = {
       return {
         offeringId: offering.id,
         courseId: offering.courseId,
-        code: offering.course.code,
+        code: officialCodes.get(offering.id) ?? offering.course.code,
         title: offering.course.title,
         term: offering.term,
         sectionCode: offering.sectionCode,

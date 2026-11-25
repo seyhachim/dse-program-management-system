@@ -25,6 +25,14 @@ Draft implementation; no release or production import is authorized.
 - Comparison covers all pathways, deduplicates the default route by course identity, and displays code-only changes with old/new codes.
 - Phase 2 CI: 16/17 workflows passed; import suite failed because Bun expected a native Promise rather than PrismaPromise for the duplicate assertion. Fixed to execute the real rejection and check the constraint name. Fresh CI required.
 
+## Phase 4: contextual offering and curriculum projections (first integration slice)
+
+- Shared server-only offering code resolver batches exact offering binding, placement, canonical course identity, allowed version status, and immutable snapshot. Unbound historical offerings retain catalogue code; no cohort inference. Used for portal summaries/home/announcements/assessments/downloadable approved CourseSpec document, delivery lists, result review, offering views and pending attendance permissions.
+- Curriculum competency map and missing CourseSpec-binding diagnostics use exact version codes; new competency audit records retain both official and catalogue codes.
+- QA lecturer assignment and weekly workload candidate reads use exact offering labels; historical evidence and aggregated result sets remain unchanged. Standalone CourseSpec, rubric and catalogue evidence with no exact context keep catalogue labels rather than guessing.
+- Existing approved course documents served through the portal inherit the contextual summary code; staff standalone CourseSpec printing, transcript/report inventory and all other direct SQL/export paths still need audit and explicit context handling.
+- Correct Phase 3 duplicate test assertion to SQLSTATE 23505. Prior CI showed the database really rejected the duplicate and Phase 3 editor/clone comparison passed. New CI required.
+
 ## Remaining merge blockers
 
 1. Validate the new version-wide constraint and duplicate preflight on isolated staging, including detached legacy snapshots. No production migration or data correction authorized.

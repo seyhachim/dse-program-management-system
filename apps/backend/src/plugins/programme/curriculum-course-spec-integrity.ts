@@ -5,9 +5,13 @@ export async function findInvalidCurriculumCourseSpecBindings(
   versionId: string,
 ): Promise<string[]> {
   const rows = await prisma.$queryRaw<Array<{ courseCode: string }>>(Prisma.sql`
-    SELECT course."code" AS "courseCode"
+    SELECT COALESCE(snapshot."courseCodeSnapshot", course."code") AS "courseCode"
     FROM "ProgrammeCurriculumCourse" placement
     INNER JOIN "Course" course ON course."id" = placement."courseId"
+    LEFT JOIN curriculum_artifact."CourseSnapshot" snapshot
+      ON snapshot."placementId" = placement."id"
+      AND snapshot."curriculumVersionId" = placement."curriculumVersionId"
+      AND snapshot."courseId" = placement."courseId"
     LEFT JOIN "CourseSpec" spec ON spec."id" = placement."courseSpecVersionId"
     WHERE placement."curriculumVersionId" = ${versionId}
       AND (
@@ -16,7 +20,7 @@ export async function findInvalidCurriculumCourseSpecBindings(
         OR spec."courseId" <> placement."courseId"
         OR spec."reviewStatus" <> 'Approved'::"CourseSpecReviewStatus"
       )
-    ORDER BY course."code"
+    ORDER BY "courseCode"
   `);
   return rows.map((row) => row.courseCode);
 }
