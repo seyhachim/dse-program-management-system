@@ -4,6 +4,7 @@ import {
   ListRubricsQuery,
   UpdateRubricInput,
 } from "@dse-pms/shared-types";
+import { createInstitutionalPolicyRouter } from "./institutional-policy-router.ts";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import {
@@ -35,6 +36,7 @@ export function createRubricRouter(): Router {
   });
 
   router.use(requireAuth);
+  router.use("/institutional-policies", createInstitutionalPolicyRouter());
 
   // GET /api/rubrics?search=&status=
   // Active rubrics are shared. Draft/Archived visibility is owner/elevated-role scoped in the service.

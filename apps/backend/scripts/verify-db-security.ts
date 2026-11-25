@@ -117,6 +117,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "AssessmentMethod",
   "ActiveLearningCluster",
   "ActiveLearningStrategy",
+  "InstitutionalPolicyRevision",
   "Rubric",
   "RubricLevel",
   "RubricCriterion",
