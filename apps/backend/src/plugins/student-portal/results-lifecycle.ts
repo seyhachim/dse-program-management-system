@@ -402,7 +402,8 @@ export const resultsLifecycleService = {
       assessmentItemId: input.assessmentItemId,
     };
 
-    return prisma.$transaction(async (tx) => {
+    try {
+      return await prisma.$transaction(async (tx) => {
       const existing = await tx.assessmentResult.findUnique({
         where: { enrollmentId_courseSpecId_assessmentItemId: key },
         select: { id: true, publishedAt: true, finalizedAt: true },
@@ -428,7 +429,14 @@ export const resultsLifecycleService = {
         );
       }
       return tx.assessmentResult.findUniqueOrThrow({ where: { id: existing.id } });
-    });
+      });
+    } catch (error) {
+      // A concurrent first-time configuration can win after the preflight.
+      if (error instanceof Error && error.message.includes("Multi-variant exam requires variant-aware grading; legacy grading is disabled")) {
+        throw new PortalConflictError("Multi-variant exam requires variant-aware grading; legacy grading is disabled");
+      }
+      throw error;
+    }
   },
 
   async saveCriterionScores(
