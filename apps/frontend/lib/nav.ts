@@ -104,6 +104,13 @@ const qaNavigationManifest: PluginManifest = {
       group: "Quality Assurance",
     },
     {
+      label: "Assessment Evidence Review",
+      path: "/course-delivery/assessment-evidence",
+      icon: "file-check",
+      roles: ["admin", "program_coordinator"],
+      group: "Quality Assurance",
+    },
+    {
       label: "Review & Approval",
       path: "/aun-qa/review",
       icon: "clipboard-check",
