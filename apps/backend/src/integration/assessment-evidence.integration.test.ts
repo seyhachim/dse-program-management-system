@@ -3,6 +3,7 @@ import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { randomUUID } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { signToken, type AuthUser, type Role } from "../core/auth/token.ts";
 import { createApp } from "../core/app.ts";
 import { prisma } from "../core/db/prisma.ts";
@@ -140,5 +141,30 @@ isolated("assessment evidence protected API and immutable history", () => {
     expect((await request(base, coordinator)).body.evidence[0].effectiveStatus).toBe("stale");
     expect((await request(url, lecturer, { action: "revise", expectedRevision: 6, selectionReason: "New work", workReference: ref })).status).toBe(201);
     expect((await request(base, coordinator)).body.evidence[0].effectiveStatus).toBe("draft");
+    // Metadata-only fixture: no cloud file exists, no live storage or scanner is used.
+    const previous = await prisma.assessmentEvidenceRevision.findFirstOrThrow({ where: { resultId: sourceId }, orderBy: { revision: "desc" } });
+    const fakeAttachment = { objectKey: "v1/" + randomUUID() + ".pdf", filename: "synthetic.pdf", mimeType: "application/pdf", sizeBytes: 20, sha256: "a".repeat(64) };
+    await prisma.assessmentEvidenceRevision.create({ data: {
+      resultId: previous.resultId, offeringId: previous.offeringId, courseSpecId: previous.courseSpecId,
+      assessmentItemId: previous.assessmentItemId, revision: 8, action: "revise", status: "draft",
+      sourceHash: previous.sourceHash, score: previous.score, maxScore: previous.maxScore,
+      sourceSnapshot: previous.sourceSnapshot as Prisma.InputJsonObject,
+      workReference: null, attachment: fakeAttachment, selectionReason: "Synthetic metadata fixture", actorId: lecturer.id,
+    } });
+    const fileView = (await request(base, lecturer)).body.evidence[0];
+    expect(fileView.attachment.filename).toBe("synthetic.pdf");
+    expect(fileView.attachment.objectKey).toBeUndefined();
+    const downloadPath = base + "/results/" + sourceId + "/revisions/8/download";
+    expect((await request(downloadPath, student)).status).toBe(404);
+    expect((await request(downloadPath, unrelated)).status).toBe(404);
+    expect((await request(url, lecturer, { action: "submit", expectedRevision: 8, confirmedMarkedWork: true })).status).toBe(201);
+    expect((await request(url, coordinator, { ...verify, expectedRevision: 9 })).status).toBe(201);
+    const storedAttachment = await prisma.assessmentEvidenceRevision.findFirstOrThrow({ where: { resultId: sourceId, revision: 10 } });
+    expect(storedAttachment.attachment).toEqual(fakeAttachment);
+    expect((await request(url, lecturer, { action: "revise", expectedRevision: 10, selectionReason: "Retain file in new draft", workReference: null, keepAttachment: true })).status).toBe(201);
+    const retained = (await request(base, coordinator)).body.evidence[0];
+    expect(retained.effectiveStatus).toBe("draft");
+    expect(retained.attachment.filename).toBe("synthetic.pdf");
+    expect(retained.attachment.objectKey).toBeUndefined();
   }, 30000);
 });
