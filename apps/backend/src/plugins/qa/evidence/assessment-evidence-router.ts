@@ -1,10 +1,11 @@
-import { Router, type Request, type Response } from "express";
+import express, { Router, type Request, type Response } from "express";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { requireAuth } from "../../../core/auth/middleware.ts";
 import { type AuthUser } from "../../../core/auth/token.ts";
 import { roleHasPermission } from "../../../core/permissions/index.ts";
 import { prisma } from "../../../core/db/prisma.ts";
+import { EvidenceStorageError, MAX_EVIDENCE_BYTES, parseEvidenceAttachment, publicAttachment, validateEvidenceFile, storeEvidenceFile, removeUnlinkedEvidence, signEvidenceDownload, type EvidenceAttachment } from "./assessment-evidence-storage.ts";
 import { suggestAssessmentSamples } from "./assessment-sampling.ts";
 import { evidenceAccess, evidenceSourceHash, isSupportedWorkReference, transitionEvidence } from "./assessment-evidence-policy.ts";
 
@@ -25,7 +26,7 @@ const Reference = z.string().trim().max(1000).refine(isSupportedWorkReference).n
 const Reason = z.string().trim().min(1).max(500);
 const Mutation = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create"), expectedRevision: z.literal(0), selectionReason: Reason, workReference: Reference }).strict(),
-  z.object({ action: z.literal("revise"), expectedRevision: z.number().int().positive(), selectionReason: Reason, workReference: Reference }).strict(),
+  z.object({ action: z.literal("revise"), expectedRevision: z.number().int().positive(), selectionReason: Reason, workReference: Reference, keepAttachment: z.boolean().optional() }).strict(),
   z.object({ action: z.literal("submit"), expectedRevision: z.number().int().positive(), confirmedMarkedWork: z.literal(true) }).strict(),
   z.object({ action: z.literal("verify"), expectedRevision: z.number().int().positive(), reviewReason: Reason, confirmedRestrictedWorkAndMarks: z.literal(true) }).strict(),
   z.object({ action: z.literal("request_changes"), expectedRevision: z.number().int().positive(), reviewReason: Reason }).strict(),
@@ -104,12 +105,16 @@ function parseResult(req: Request): string {
   return parsed.data;
 }
 function sendError(res: Response, error: unknown) {
-  if (error instanceof EvidenceError) { res.status(error.status).json({ error: error.message }); return; }
+  if (error instanceof EvidenceError || error instanceof EvidenceStorageError) { res.status(error.status).json({ error: error.message }); return; }
   if (error instanceof Prisma.PrismaClientKnownRequestError && ["P2002", "P2003", "P2034"].includes(error.code)) {
     res.status(409).json({ error: "Evidence or source changed; reload before retrying" }); return;
   }
   // Never log source snapshots, work references, student data or database exception text.
   res.status(500).json({ error: "Assessment evidence operation failed" });
+}
+
+function viewRevision<T extends { attachment: unknown }>(row: T) {
+  return { ...row, attachment: publicAttachment(row.attachment) };
 }
 
 const base = "/assessment-evidence/offerings/:offeringId/specs/:courseSpecId/assessments/:assessmentItemId";
@@ -143,10 +148,11 @@ export function createAssessmentEvidenceRouter(): Router {
         })));
         return {
           context, access, suggestions: { ...suggestions, submissionStatus: "unknown" },
+          eligibleResults: sources.filter(eligible).map(s => ({ resultId: s.id, enrollmentId: s.enrollmentId, score: s.score, maxScore: s.maxScore, feedbackAvailable: !!s.feedback.trim() })),
           evidence: latest.map(row => {
             const source = byId.get(row.resultId);
             const stale = !source || !eligible(source) || provenance(source, item.rubricId).hash !== row.sourceHash;
-            return { ...row, effectiveStatus: stale ? "stale" : row.status };
+            return { ...viewRevision(row), effectiveStatus: stale ? "stale" : row.status };
           }),
         };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
@@ -168,7 +174,7 @@ export function createAssessmentEvidenceRouter(): Router {
           orderBy: { revision: "desc" }, take: 51,
         });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
-      res.json({ revisions: rows.slice(0, 50), nextBeforeRevision: rows.length > 50 ? rows[49]!.revision : null });
+      res.json({ revisions: rows.slice(0, 50).map(viewRevision), nextBeforeRevision: rows.length > 50 ? rows[49]!.revision : null });
     } catch (error) { sendError(res, error); }
   });
 
@@ -198,8 +204,11 @@ export function createAssessmentEvidenceRouter(): Router {
         const contentEdit = input.action === "create" || input.action === "revise";
         const reference = contentEdit ? input.workReference : previous?.workReference ?? null;
         const reason = contentEdit ? input.selectionReason : previous?.selectionReason;
+        const attachment = contentEdit && !(input.action === "revise" && input.keepAttachment) ? null : parseEvidenceAttachment(previous?.attachment);
+        if (reference && attachment) throw new EvidenceError(400, "Choose either a file or an external reference");
+        if (input.action === "revise" && input.keepAttachment && !attachment) throw new EvidenceError(409, "No existing attachment to retain");
         const { snapshot, hash } = provenance(source, item.rubricId);
-        const status = transitionEvidence(previous, input.action, hash, access.review, access.contribute, !!reference);
+        const status = transitionEvidence(previous, input.action, hash, access.review, access.contribute, !!reference || !!attachment);
         if (!status || !reason) throw new EvidenceError(409, "Invalid or stale evidence transition; revise and resubmit");
         // Never mutate an official result. The database independently checks
         // canonical context, current score, append-only history and self-review.
@@ -207,12 +216,90 @@ export function createAssessmentEvidenceRouter(): Router {
           ...context, resultId, revision: input.expectedRevision + 1,
           status, action: input.action, sourceHash: hash, sourceSnapshot: snapshot,
           score: source.score, maxScore: source.maxScore,
-          workReference: reference, selectionReason: reason,
+          workReference: reference, attachment: attachment ?? Prisma.DbNull, selectionReason: reason,
           reviewReason: "reviewReason" in input ? input.reviewReason : null,
           actorId: user.id,
         } });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-      res.status(201).json({ ...row, effectiveStatus: row.status });
+      res.status(201).json({ ...viewRevision(row), effectiveStatus: row.status });
+    } catch (error) { sendError(res, error); }
+  });
+
+  // Authorization and current revision checks precede scanning and any storage write.
+  router.post(base + "/results/:resultId/attachment",
+    async (req, res, next) => {
+      try {
+        const context = parseContext(req), resultId = parseResult(req);
+        const header = req.header("x-evidence-revision");
+        const revision = header !== undefined && /^\d+$/.test(header) ? Number(header) : -1;
+        if (!Number.isSafeInteger(revision) || revision < 0) throw new EvidenceError(400, "Invalid expected revision");
+        await prisma.$transaction(async db => {
+          const { access } = await contextFor(db, req.user!, context);
+          if (!access.contribute) throw new EvidenceError(403, "Evidence action not permitted");
+          const source = await db.assessmentResult.findFirst({ where: { ...sourceWhere(context), id: resultId }, select: resultSelect });
+          if (!source || !eligible(source)) throw new EvidenceError(404, "Eligible result not found");
+          const previous = await db.assessmentEvidenceRevision.findFirst({ where: { ...context, resultId }, orderBy: { revision: "desc" } });
+          if ((previous?.revision ?? 0) !== revision) throw new EvidenceError(409, "Evidence revision changed; reload");
+        });
+        next();
+      } catch (error) { sendError(res, error); }
+    },
+    express.raw({ type: "application/octet-stream", limit: MAX_EVIDENCE_BYTES }),
+    async (req, res) => {
+      let uploaded: EvidenceAttachment | null = null;
+      try {
+        const context = parseContext(req), resultId = parseResult(req), user = req.user!;
+        const revision = Number(req.header("x-evidence-revision"));
+        let selectionReason = "";
+        try { selectionReason = decodeURIComponent(req.header("x-evidence-reason") ?? ""); } catch { /* invalid */ }
+        const reason = Reason.safeParse(selectionReason);
+        if (!reason.success) throw new EvidenceError(400, "Selection reason is required");
+        const file = validateEvidenceFile(req.header("x-evidence-filename"), req.header("x-evidence-mime"), req.body);
+        uploaded = await storeEvidenceFile(file);
+        const attachment = uploaded;
+        const row = await prisma.$transaction(async db => {
+          const { access, item } = await contextFor(db, user, context);
+          if (!access.contribute) throw new EvidenceError(403, "Evidence action not permitted");
+          const source = await db.assessmentResult.findFirst({ where: { ...sourceWhere(context), id: resultId }, select: resultSelect });
+          if (!source || !eligible(source)) throw new EvidenceError(404, "Eligible result not found");
+          const previous = await db.assessmentEvidenceRevision.findFirst({ where: { ...context, resultId }, orderBy: { revision: "desc" } });
+          if ((previous?.revision ?? 0) !== revision) throw new EvidenceError(409, "Evidence revision changed; reload");
+          const { snapshot, hash } = provenance(source, item.rubricId);
+          return db.assessmentEvidenceRevision.create({ data: {
+            ...context, resultId, revision: revision + 1, status: "draft", action: previous ? "revise" : "create",
+            sourceHash: hash, sourceSnapshot: snapshot, score: source.score, maxScore: source.maxScore,
+            workReference: null, attachment, selectionReason: reason.data, actorId: user.id,
+          } });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        res.status(201).json({ ...viewRevision(row), effectiveStatus: row.status });
+      } catch (error) {
+        // Only remove an object after a known rollback; an ambiguous commit is
+        // retained privately for operator reconciliation rather than deleting evidence.
+        if (uploaded && (error instanceof EvidenceError || (error instanceof Prisma.PrismaClientKnownRequestError && ["P2002","P2003","P2034"].includes(error.code)))) {
+          try { await removeUnlinkedEvidence(uploaded); } catch { /* private orphan reconciliation required */ }
+        }
+        sendError(res, error);
+      }
+    },
+    (error: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
+      if ((error as { type?: string }).type === "entity.too.large") { res.status(413).json({ error: "Evidence file exceeds 5 MiB" }); return; }
+      sendError(res, error);
+    },
+  );
+
+  router.get(base + "/results/:resultId/revisions/:revision/download", async (req, res) => {
+    try {
+      const context = parseContext(req), resultId = parseResult(req);
+      const revision = z.coerce.number().int().positive().safeParse(req.params.revision);
+      if (!revision.success) throw new EvidenceError(400, "Invalid revision");
+      const attachment = await prisma.$transaction(async db => {
+        await contextFor(db, req.user!, context);
+        const row = await db.assessmentEvidenceRevision.findFirst({ where: { ...context, resultId, revision: revision.data } });
+        const file = parseEvidenceAttachment(row?.attachment);
+        if (!file) throw new EvidenceError(404, "Evidence attachment not found");
+        return file;
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+      res.json(await signEvidenceDownload(attachment));
     } catch (error) { sendError(res, error); }
   });
 
