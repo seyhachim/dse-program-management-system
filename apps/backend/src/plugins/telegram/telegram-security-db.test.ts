@@ -173,7 +173,7 @@ describeDb("Telegram student registration — isolated verification and activati
       TELEGRAM_PMS_BOT_TOKEN:botToken, TELEGRAM_PMS_BOT_USERNAME:"synthetic_registration_bot",
       TELEGRAM_PMS_WEBHOOK_SECRET:"synthetic-webhook-secret", TELEGRAM_MINI_APP_URL:"https://example.invalid/telegram",
       TELEGRAM_MINI_APP_SHORT_NAME:"pms", TELEGRAM_REGISTRATION_EMAIL_OTP_SECRET:"isolated-registration-test-secret-not-for-production",
-      TELEGRAM_REGISTRATION_RESEND_API_KEY:"synthetic-resend-key", TELEGRAM_REGISTRATION_EMAIL_FROM:"DSE Test <test@example.invalid>",
+      PMS_EMAIL_PROVIDER:"resend", PMS_EMAIL_RESEND_API_KEY:"synthetic-resend-key", PMS_EMAIL_FROM:"test@example.invalid", PMS_EMAIL_FROM_NAME:"DSE Test",
     };
     const previous = Object.fromEntries(Object.keys(settings).map(k=>[k,process.env[k]]));
     Object.assign(process.env,settings);

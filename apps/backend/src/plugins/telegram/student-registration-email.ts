@@ -2,6 +2,7 @@ import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto"
 import { UniversityEmailSchema } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
+import { deliverEmail, readEmailDeliveryConfig } from "../../core/email/delivery.ts";
 
 export class RegistrationEmailError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
@@ -18,10 +19,8 @@ function secret(): string {
   return value;
 }
 function mailConfig() {
-  const key = process.env.TELEGRAM_REGISTRATION_RESEND_API_KEY;
-  const from = process.env.TELEGRAM_REGISTRATION_EMAIL_FROM;
-  if (!key || !from) throw new RegistrationEmailError(503,"Email verification is unavailable");
-  return {key,from};
+  try { return readEmailDeliveryConfig(); }
+  catch { throw new RegistrationEmailError(503,"Email verification is unavailable"); }
 }
 async function requestForSession(tx: Prisma.TransactionClient, verificationId: string): Promise<RequestRow> {
   const rows = await tx.$queryRaw<RequestRow[]>`
@@ -71,12 +70,7 @@ export async function sendRegistrationEmail(verificationId: string, rawEmail: st
   if(!challenge)return {verified:true,sent:false};
   // An email provider acceptance is not proof of delivery or ownership.
   try {
-    const response=await fetch("https://api.resend.com/emails",{
-      method:"POST",headers:{Authorization:`Bearer ${config.key}`,"Content-Type":"application/json","Idempotency-Key":id},
-      body:JSON.stringify({from:config.from,to:[email],subject:"DSE PMS university email verification",text:`Your DSE PMS registration code is ${code}. It expires in 10 minutes. Do not share it. If you did not request this code, ignore this email.`}),
-      signal:AbortSignal.timeout(10000),
-    });
-    if(!response.ok)throw new Error("Email provider rejected the request");
+    await deliverEmail(config,{id,to:email,subject:"DSE PMS university email verification",text:`Your DSE PMS registration code is ${code}. It expires in 10 minutes. Do not share it. If you did not request this code, ignore this email.`});
     await prisma.$executeRaw`UPDATE "telegram_security"."StudentRegistrationEmailChallenge" SET "deliveryAcceptedAt"=CURRENT_TIMESTAMP WHERE "id"=${id} AND "consumedAt" IS NULL`;
     return {verified:false,sent:true};
   } catch {
