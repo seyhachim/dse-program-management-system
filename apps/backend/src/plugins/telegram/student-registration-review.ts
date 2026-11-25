@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { UniversityEmailSchema, StudentCareerProfileSchema } from "@dse-pms/shared-types";
 import type { TelegramRegistrationStaffRow, TelegramRegistrationReviewInput, TelegramRegistrationRosterCandidate, TelegramRegistrationStatus } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { hasAnyRoleInProgramme, type AuthUser } from "../../core/auth/token.ts";
@@ -14,7 +15,7 @@ function assertReviewer(user: AuthUser) {
   if (!canReviewRegistration(user)) throw new RegistrationReviewError(403, "Programme registration access denied");
 }
 function eligibleRosterEmail(email: string | null): email is string {
-  return Boolean(email && /^[^\s@]+@rupp\.edu\.kh$/i.test(email));
+  return UniversityEmailSchema.safeParse(email).success;
 }
 type Row = Omit<TelegramRegistrationStaffRow, "createdAt" | "updatedAt"> & { createdAt: Date; updatedAt: Date };
 
@@ -35,8 +36,8 @@ export async function listRegistrationRequests(user: AuthUser, status: TelegramR
 
 export async function registrationRosterCandidates(user: AuthUser, requestId: string, search: string): Promise<TelegramRegistrationRosterCandidate[]> {
   assertReviewer(user);
-  const rows = await prisma.$queryRaw<Array<{ id: string; name: string; studentId: string | null; email: string | null; userId: string | null }>>`
-    SELECT st."id", st."name", st."studentId", st."email", st."userId"
+  const rows = await prisma.$queryRaw<Array<{ id: string; name: string; studentId: string | null; email: string | null; userId: string | null; applicantEmail: string }>>`
+    SELECT st."id", st."name", st."studentId", st."email", st."userId", r."email" AS "applicantEmail"
     FROM "telegram_security"."StudentRegistrationRequest" r
     JOIN "StudentCohortMembership" cm ON cm."cohortId"=r."cohortId" AND cm."exitedAt" IS NULL
     JOIN "StudentCohortSectionMembership" sm ON sm."studentId"=cm."studentId"
@@ -50,7 +51,7 @@ export async function registrationRosterCandidates(user: AuthUser, requestId: st
     )
     ORDER BY st."name", st."id" LIMIT 50
   `;
-  return rows.map(({ userId, ...row }) => ({ ...row, hasAccount: Boolean(userId), canActivate: !userId && Boolean(row.studentId) && eligibleRosterEmail(row.email) }));
+  return rows.map(({ userId, applicantEmail, ...row }) => ({ ...row, hasAccount: Boolean(userId), canActivate: !userId && Boolean(row.studentId) && eligibleRosterEmail(row.email) && row.email.toLowerCase() === applicantEmail.toLowerCase() }));
 }
 
 /** Approve only a staff-verified, already imported roster record without an existing account.
@@ -59,8 +60,8 @@ export async function registrationRosterCandidates(user: AuthUser, requestId: st
 export async function reviewRegistration(user: AuthUser, requestId: string, input: TelegramRegistrationReviewInput) {
   assertReviewer(user);
   return prisma.$transaction(async tx => {
-    const requests = await tx.$queryRaw<Array<{ telegramUserId: string; status: string; cohortId: string; sectionId: string }>>`
-      SELECT "telegramUserId", "status", "cohortId", "sectionId"
+    const requests = await tx.$queryRaw<Array<{ telegramUserId: string; status: string; cohortId: string; sectionId: string; email: string; careerProfile: unknown }>>`
+      SELECT "telegramUserId", "status", "cohortId", "sectionId", "email", "careerProfile"
       FROM "telegram_security"."StudentRegistrationRequest"
       WHERE "id"=${requestId} AND "programmeId"=${DEFAULT_PROGRAMME_ID} FOR UPDATE
     `;
@@ -81,8 +82,8 @@ export async function reviewRegistration(user: AuthUser, requestId: string, inpu
         FOR UPDATE OF st FOR SHARE OF cm,c,sm,s
       `;
       const student = candidates[0];
-      if (!student || student.userId || !student.studentId || !eligibleRosterEmail(student.email)) {
-        throw new RegistrationReviewError(409, "Approval requires an active matching roster record, official ID, verified institutional email and no existing account");
+      if (!student || student.userId || !student.studentId || !eligibleRosterEmail(student.email) || student.email.toLowerCase() !== request.email.toLowerCase()) {
+        throw new RegistrationReviewError(409, "Approval requires an active matching roster record, official ID, matching verified institutional email and no existing account");
       }
       const conflict = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "telegram_security"."TelegramIdentity" WHERE "telegramUserId"=${request.telegramUserId}
@@ -102,6 +103,14 @@ export async function reviewRegistration(user: AuthUser, requestId: string, inpu
         INSERT INTO "telegram_security"."TelegramIdentity" ("id","userId","telegramUserId","linkedAt","lastVerifiedAt","updatedAt")
         VALUES (${randomUUID()},${account.id},${request.telegramUserId},CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
       `;
+      if (request.careerProfile !== null) {
+        const profile = StudentCareerProfileSchema.parse(request.careerProfile);
+        await tx.$executeRaw`
+          INSERT INTO "StudentCareerProfile" ("studentId","preferences")
+          VALUES (${student.id},${JSON.stringify(profile)}::jsonb)
+          ON CONFLICT ("studentId") DO NOTHING
+        `;
+      }
       approvedStudentId = student.id;
     }
     const status = input.decision === "APPROVE" ? "APPROVED" : input.decision === "REJECT" ? "REJECTED" : "NEEDS_CORRECTION";
