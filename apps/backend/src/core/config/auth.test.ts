@@ -86,11 +86,11 @@ const neonStaging = {
   NODE_ENV: "production",
   AUTH_MODE: "neon-staging",
   DSE_STAGING_ENVIRONMENT: "true",
-  DSE_STAGING_DB_HOST: "ep-purple-scene-a1py5uzt.ap-southeast-1.aws.neon.tech",
+  DSE_STAGING_DB_HOST: "ep-solitary-block-a1hm2c16.ap-southeast-1.aws.neon.tech",
   DSE_STAGING_DB_NAME: "neondb",
-  DSE_STAGING_DB_MARKER: "DSE-PMS-STAGING:20261107-neon-verified-01",
-  DATABASE_URL: "postgresql://test:synthetic@ep-purple-scene-a1py5uzt.ap-southeast-1.aws.neon.tech/neondb?sslmode=require",
-  NEON_AUTH_BASE_URL: "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth",
+  DSE_STAGING_DB_MARKER: "DSE-PMS-STAGING:pr1364-registration-icy-block-a1d1j63q",
+  DATABASE_URL: "postgresql://test:synthetic@ep-solitary-block-a1hm2c16.ap-southeast-1.aws.neon.tech/neondb?sslmode=require",
+  NEON_AUTH_BASE_URL: "https://ep-solitary-block-a1hm2c16.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth",
   CORS_ORIGIN: "https://staging-preview.example.com",
 };
 
