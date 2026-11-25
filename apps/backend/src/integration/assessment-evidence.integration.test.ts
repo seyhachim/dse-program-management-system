@@ -28,6 +28,7 @@ isolated("assessment evidence protected API and immutable history", () => {
   }
   type TestBody = {
     id: string; status: string;
+    students: { enrollmentId: string; studentName: string; studentCode: string | null }[];
     suggestions: { eligibleCount: number };
     evidence: { effectiveStatus: string; attachment: { filename: string; objectKey?: string } | null }[];
     revisions: { revision: number }[];
@@ -104,6 +105,15 @@ isolated("assessment evidence protected API and immutable history", () => {
     const url = base + "/results/" + sourceId + "/revisions";
     const draft = { action: "create", expectedRevision: 0, selectionReason: "Representative sample", workReference: ref };
     expect((await request(base, null)).status).toBe(401);
+    const contextUrl = base.split("/specs/")[0] + "/context";
+    expect((await request(contextUrl, null)).status).toBe(401);
+    for (const actor of [student, unrelated, wrongProgramme]) expect((await request(contextUrl, actor)).status).toBe(404);
+    for (const actor of [lecturer, coordinator]) {
+      const scoped = await request(contextUrl, actor);
+      expect(scoped.status).toBe(200);
+      expect(scoped.body.students).toHaveLength(1);
+      expect(first(scoped.body.students).studentName).toBe("Synthetic evidence student");
+    }
     for (const actor of [student, unrelated, wrongProgramme]) expect((await request(base, actor)).status).toBe(404);
     expect((await request(base + "/results/" + otherResultId + "/revisions", lecturer, draft)).status).toBe(404);
     const overview = await request(base, lecturer);
