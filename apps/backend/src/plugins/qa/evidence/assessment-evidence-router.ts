@@ -297,7 +297,13 @@ export function createAssessmentEvidenceRouter(): Router {
       const spec = offering.courseSpec;
       if (!spec || spec.courseId !== offering.courseId || spec.reviewStatus !== "Approved")
         throw new EvidenceError(409, "Offering must use the exact approved course specification");
-      res.json({ courseSpecId: spec.id, assessments: spec.assessmentItems });
+      // Only return the roster after the evidence-specific offering authorization.
+      const students = await prisma.enrollment.findMany({ where: { offeringId: id.data },
+        orderBy: { student: { name: "asc" } }, take: 501,
+        select: { id: true, student: { select: { name: true, studentId: true } } } });
+      if (students.length > 500) throw new EvidenceError(409, "Offering exceeds the pilot cohort limit");
+      res.json({ courseSpecId: spec.id, assessments: spec.assessmentItems,
+        students: students.map(s => ({ enrollmentId: s.id, studentName: s.student.name, studentCode: s.student.studentId })) });
     } catch (error) { sendError(res, error); }
   });
 
