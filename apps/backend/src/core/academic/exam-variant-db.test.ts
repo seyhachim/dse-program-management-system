@@ -16,14 +16,21 @@ function assertCiDatabase() {
   }
 }
 
-async function rejected(tx: Prisma.TransactionClient, operation: () => Promise<unknown>, message: RegExp) {
+async function rejected(tx: Prisma.TransactionClient, operation: () => Promise<unknown>, expected: RegExp | "23503" | "23505" | "23514") {
   await tx.$executeRawUnsafe("SAVEPOINT exam_rejection");
   let failure: unknown;
   try { await operation(); } catch (error) { failure = error; }
   await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT exam_rejection");
   await tx.$executeRawUnsafe("RELEASE SAVEPOINT exam_rejection");
   expect(failure).toBeDefined();
-  expect(String(failure)).toMatch(message);
+  if (typeof expected === "string") {
+    // Prisma P2010 exposes PostgreSQL SQLSTATE in meta.code; its text may contain only DETAIL.
+    const rawFailure = failure as { code?: string; meta?: { code?: string } } | undefined;
+    expect(rawFailure?.code).toBe("P2010");
+    expect(rawFailure?.meta?.code).toBe(expected);
+  } else {
+    expect(String(failure)).toMatch(expected);
+  }
 }
 
 dbDescribe("exam variant persistence (#1371 Phase 2A)", () => {
@@ -58,9 +65,9 @@ dbDescribe("exam variant persistence (#1371 Phase 2A)", () => {
           VALUES (${specId},${assessmentId},${course.id},${programmeId},100,${maker.id})`;
         await rejected(tx, () => configure(draft.id, "exam"), /approved active individual/);
         await rejected(tx, () => configure(spec.id, "legacy"), /historical reconciliation/);
-        await rejected(tx, () => configure(spec.id, "exam", "unrelated-programme"), /foreign key constraint/);
+        await rejected(tx, () => configure(spec.id, "exam", "unrelated-programme"), "23503");
         await configure(spec.id, "exam");
-        await rejected(tx, () => configure(spec.id, "exam"), /duplicate key/);
+        await rejected(tx, () => configure(spec.id, "exam"), "23505");
 
         const instrument = await tx.rubric.create({ data: {
           name: "Synthetic scheme", type: "assessment", instrumentKind: "marking_scheme", status: "Draft", ownerId: maker.id,
@@ -77,30 +84,30 @@ dbDescribe("exam variant persistence (#1371 Phase 2A)", () => {
         const insertPaper = (v: typeof a, qs: unknown = v.questions, approver = reviewer.id) => tx.$executeRaw`
           INSERT INTO exam_variant."ExamPaperVersion" ("courseSpecId","assessmentItemId","variantId","revision","variantHash","instrumentId","instrumentHash","questions","preparedById","approvedById","moderationRef")
           VALUES (${spec.id},'exam',${v.variantId},${v.revision},${v.variantHash},${v.instrumentId},${v.instrumentHash},${JSON.stringify(qs)}::jsonb,${maker.id},${approver},'synthetic-moderation')`;
-        await rejected(tx, () => insertPaper(a, a.questions, maker.id), /check constraint/);
+        await rejected(tx, () => insertPaper(a, a.questions, maker.id), "23514");
         await rejected(tx, () => insertPaper(a, [{ ...questions[0], maxPoints: 69 }, questions[1]]), /differs from instrument/);
         await rejected(tx, () => insertPaper(a, [{ ...questions[0], cloCode: "CLO9" }, questions[1]]), /active assessment CLO/);
         await rejected(tx, () => insertPaper(a, [questions[0], questions[0]]), /Duplicate or missing/);
         await rejected(tx, () => insertPaper(a, [{ ...questions[0], answer: "not allowed" }, questions[1]]), /Invalid question metadata/);
         await insertPaper(a); await insertPaper(b);
-        await rejected(tx, () => insertPaper(a), /duplicate key/);
+        await rejected(tx, () => insertPaper(a), "23505");
         await rejected(tx, () => tx.$executeRaw`UPDATE exam_variant."ExamPaperVersion" SET questions='[]'::jsonb WHERE "courseSpecId"=${spec.id}`, /immutable/);
         await rejected(tx, () => tx.$executeRaw`DELETE FROM exam_variant."ExamPaperVersion" WHERE "courseSpecId"=${spec.id}`, /immutable/);
 
         const permit = (offeringId: string, v: typeof a) => tx.$executeRaw`
           INSERT INTO exam_variant."ExamOfferingPermission" ("courseSpecId","assessmentItemId","courseId","programmeId","offeringId","variantId","variantHash","createdById")
           VALUES (${spec.id},'exam',${course.id},${programme.id},${offeringId},${v.variantId},${v.variantHash},${maker.id})`;
-        await rejected(tx, () => permit(unbound.id, a), /foreign key constraint/);
+        await rejected(tx, () => permit(unbound.id, a), "23503");
         await permit(offering.id, a); await permit(offering.id, b);
         await permit(other.id, b);
         const assign = (id: string, enrollmentId: string, offeringId: string, v: typeof a) => tx.$executeRaw`
           INSERT INTO exam_variant."ExamPaperAssignment" (id,"enrollmentId","offeringId","courseSpecId","assessmentItemId","variantId","variantHash","actorId",reason,"evidenceRef")
           VALUES (${id},${enrollmentId},${offeringId},${spec.id},'exam',${v.variantId},${v.variantHash},${maker.id},'Actual paper confirmed','synthetic-script')`;
         const assignmentId = randomUUID();
-        await rejected(tx, () => assign(randomUUID(), foreignEnrollment.id, offering.id, a), /foreign key constraint/);
-        await rejected(tx, () => assign(randomUUID(), foreignEnrollment.id, other.id, a), /foreign key constraint/);
+        await rejected(tx, () => assign(randomUUID(), foreignEnrollment.id, offering.id, a), "23503");
+        await rejected(tx, () => assign(randomUUID(), foreignEnrollment.id, other.id, a), "23503");
         await assign(assignmentId, enrollment.id, offering.id, a);
-        await rejected(tx, () => assign(randomUUID(), enrollment.id, offering.id, a), /duplicate key/);
+        await rejected(tx, () => assign(randomUUID(), enrollment.id, offering.id, a), "23505");
         await rejected(tx, () => tx.$executeRaw`UPDATE exam_variant."ExamPaperAssignment" SET revision=3,"variantId"=${b.variantId},"variantHash"=${b.variantHash} WHERE id=${assignmentId}`, /revision or variant change/);
         await tx.$executeRaw`UPDATE exam_variant."ExamPaperAssignment" SET revision=2,"variantId"=${b.variantId},"variantHash"=${b.variantHash},"actorId"=${reviewer.id},reason='Corrected actual paper' WHERE id=${assignmentId}`;
         const events = await tx.$queryRaw<Array<{ revision: number; previousVariantId: string | null; variantId: string; actorId: string }>>`
@@ -112,8 +119,8 @@ dbDescribe("exam variant persistence (#1371 Phase 2A)", () => {
         await rejected(tx, () => tx.$executeRaw`UPDATE exam_variant."ExamAssignmentEvent" SET reason='forged' WHERE "assignmentId"=${assignmentId}`, /immutable/);
         await rejected(tx, () => tx.$executeRaw`DELETE FROM exam_variant."ExamAssignmentEvent" WHERE "assignmentId"=${assignmentId}`, /immutable/);
         await rejected(tx, () => tx.$executeRaw`INSERT INTO exam_variant."ExamAssignmentEvent" SELECT * FROM exam_variant."ExamAssignmentEvent" WHERE "assignmentId"=${assignmentId} AND revision=1`, /generated by assignment changes/);
-        await rejected(tx, () => tx.$executeRaw`UPDATE public."Enrollment" SET "offeringId"=${unbound.id} WHERE id=${enrollment.id}`, /foreign key constraint/);
-        await rejected(tx, () => tx.$executeRaw`UPDATE public."Offering" SET "courseSpecId"=NULL WHERE id=${offering.id}`, /foreign key constraint/);
+        await rejected(tx, () => tx.$executeRaw`UPDATE public."Enrollment" SET "offeringId"=${unbound.id} WHERE id=${enrollment.id}`, "23503");
+        await rejected(tx, () => tx.$executeRaw`UPDATE public."Offering" SET "courseSpecId"=NULL WHERE id=${offering.id}`, "23503");
 
         const result = await tx.assessmentResult.create({ data: { enrollmentId: enrollment.id, courseSpecId: spec.id, assessmentItemId: "exam", score: 80, maxScore: 100 } });
         await rejected(tx, () => tx.$executeRaw`UPDATE exam_variant."ExamPaperAssignment" SET revision=3,"variantId"=${a.variantId},"variantHash"=${a.variantHash} WHERE id=${assignmentId}`, /Existing result blocks/);
