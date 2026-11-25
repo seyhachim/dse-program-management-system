@@ -398,7 +398,7 @@ export function createAssessmentEvidenceRouter(): Router {
 
   // Authorization and current revision checks precede scanning and any storage write.
   router.post([base + "/results/:resultId/attachment", base + "/populations/:population/results/:resultId/attachment"],
-    async (req, res, next) => {
+    async (req: Request, res: Response, next: express.NextFunction) => {
       try {
         const context = parseContext(req), resultId = parseResult(req), population = populationFor(req);
         const header = req.header("x-evidence-revision");
@@ -416,7 +416,7 @@ export function createAssessmentEvidenceRouter(): Router {
       } catch (error) { sendError(res, error); }
     },
     express.raw({ type: "application/octet-stream", limit: MAX_EVIDENCE_BYTES }),
-    async (req, res) => {
+    async (req: Request, res: Response) => {
       let uploaded: EvidenceAttachment | null = null;
       try {
         const context = parseContext(req), resultId = parseResult(req), population = populationFor(req), user = req.user!;
