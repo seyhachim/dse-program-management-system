@@ -30,7 +30,7 @@ export function AssessmentEvidenceDashboard({ userId, onOpen }: { userId: string
     <h2 className="text-lg font-semibold">Programme assessment evidence</h2>
     <p className="text-sm text-muted-foreground">Internal sample coverage, not an AUN-QA score. The proposed target is up to three verified samples per eligible assessment population. No finalized marks means not ready, not complete. Major-assessment applicability requires coordinator review.</p>
     {!selected ? <p>No authorised programme.</p> : <>
-      <label className="block text-sm font-medium">Programme<select className={selectStyle} value={selected.id} onChange={e => setProgramme(e.target.value)}>{programmes.data.map(p => <option value={p.id} key={p.id}>{p.code} — {p.name}</option>)}</select></label>
+      <label className="block text-sm font-medium">Programme<select aria-label="Programme" className={selectStyle} value={selected.id} onChange={e => setProgramme(e.target.value)}>{programmes.data.map(p => <option value={p.id} key={p.id}>{p.code} — {p.name}</option>)}</select></label>
       <ProgrammeCoverage key={selected.id} programmeId={selected.id} userId={userId} onOpen={onOpen} />
     </>}
   </section>;
@@ -44,7 +44,7 @@ function ProgrammeCoverage({ programmeId, userId, onOpen }: { programmeId: strin
   const selected = terms.data.includes(term) ? term : terms.data[0];
   if (!selected) return <p>No offerings recorded in this programme.</p>;
   return <>
-    <label className="block text-sm font-medium">Term<select className={selectStyle} value={selected} onChange={e => setTerm(e.target.value)}>{terms.data.map(t => <option key={t} value={t}>{t}</option>)}</select></label>
+    <label className="block text-sm font-medium">Term<select aria-label="Term" className={selectStyle} value={selected} onChange={e => setTerm(e.target.value)}>{terms.data.map(t => <option key={t} value={t}>{t}</option>)}</select></label>
     <CoveragePage key={selected} programmeId={programmeId} term={selected} userId={userId} onOpen={onOpen} />
   </>;
 }
