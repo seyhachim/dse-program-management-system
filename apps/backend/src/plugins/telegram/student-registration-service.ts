@@ -54,17 +54,29 @@ export async function submitTelegramStudentRegistration(
     `;
     if (!placement.length) throw new TelegramStudentRegistrationError("INVALID_PLACEMENT");
 
+    // A private bot consent step is required; declining contact sharing is valid.
+    // Lock the row and transfer phone data only for the same signed Telegram ID.
+    const consentRows = await tx.$queryRaw<Array<{ phone: string | null; consentAt: Date | null }>>`
+      SELECT "phone", "consentAt" FROM "telegram_security"."StudentRegistrationBotConsent"
+      WHERE "telegramUserId" = ${verification.telegramUserId}
+        AND "state" IN ('SHARED', 'SKIPPED') AND "expiresAt" > CURRENT_TIMESTAMP
+      FOR UPDATE
+    `;
+    const consent = consentRows[0];
+    if (!consent) throw new TelegramStudentRegistrationError("INVALID_VERIFICATION");
+
     const requestId = randomUUID();
     const inserted = await tx.$queryRaw<Array<{ id: string }>>`
       INSERT INTO "telegram_security"."StudentRegistrationRequest" (
         "id", "telegramUserId", "programmeId", "cohortId", "sectionId",
         "khmerFamilyName", "khmerGivenName", "latinFamilyName", "latinGivenName",
-        "officialStudentId", "email"
+        "officialStudentId", "email", "telegramPhone", "phoneConsentAt"
       ) VALUES (
         ${requestId}, ${verification.telegramUserId}, ${programmeId},
         ${input.cohortId}, ${input.sectionId}, ${input.khmerFamilyName},
         ${input.khmerGivenName}, ${input.latinFamilyName}, ${input.latinGivenName},
-        ${input.officialStudentId ?? null}, ${input.email ?? null}
+        ${input.officialStudentId ?? null}, ${input.email ?? null},
+        ${consent.phone}, ${consent.consentAt}
       )
       ON CONFLICT ("telegramUserId") DO NOTHING
       RETURNING "id"
@@ -78,6 +90,11 @@ export async function submitTelegramStudentRegistration(
         AND "expiresAt" > CURRENT_TIMESTAMP
     `;
     if (consumed !== 1) throw new TelegramStudentRegistrationError("INVALID_VERIFICATION");
+
+    await tx.$executeRaw`
+      DELETE FROM "telegram_security"."StudentRegistrationBotConsent"
+      WHERE "telegramUserId" = ${verification.telegramUserId}
+    `;
 
     return { requestId, status: "PENDING" as const };
   });
