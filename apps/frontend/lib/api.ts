@@ -132,6 +132,13 @@ export const api = {
         method: "POST", headers: { "Content-Type": file.type }, body: file,
       }),
     ),
+  uploadEvidenceFile: <T>(path: string, file: File, revision: number, reason: string) =>
+    runConfirmedMutation("POST", path, () => request<T>(path, {
+      method: "POST", body: file, headers: {
+        "Content-Type": "application/octet-stream", "x-evidence-filename": encodeURIComponent(file.name),
+        "x-evidence-mime": file.type, "x-evidence-revision": String(revision), "x-evidence-reason": encodeURIComponent(reason),
+      },
+    })),
   delete: <T>(path: string, body?: unknown) =>
     runConfirmedMutation("DELETE", path, () =>
       request<T>(path, {
