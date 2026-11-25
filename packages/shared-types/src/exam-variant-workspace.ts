@@ -17,5 +17,5 @@ export type ExamWorkspaceDecision = ExamWorkspaceScope & { submissionId: string;
 export type ExamWorkspaceAssignmentEntry = { enrollmentId: string; variantId: string; variantHash: string; expectedRevision: number; reason: string; evidenceRef: string };
 
 export type ExamGradeMark = { questionId: string; maxPoints: number; score: number | null };
-export type ExamGradeWorkspace = { assignment: ExamWorkspaceAssignment; snapshot: ExamWorkspaceSnapshot; canEdit: boolean; gradeRevision: number; complete: boolean; earnedPoints: number | null; maximumPoints: number; marks: ExamGradeMark[]; savedAt: string | null };
+export type ExamGradeWorkspace = { assignment: ExamWorkspaceAssignment; snapshot: ExamWorkspaceSnapshot; canEdit: boolean; gradeRevision: number; complete: boolean; questionLabels: Record<string,string>; earnedPoints: number | null; maximumPoints: number; marks: ExamGradeMark[]; savedAt: string | null };
 export type SaveExamGradeDraft = ExamWorkspaceScope & { enrollmentId: string; assignmentId: string; assignmentRevision: number; variantHash: string; expectedGradeRevision: number; marks: { questionId: string; score: number | null }[] };
