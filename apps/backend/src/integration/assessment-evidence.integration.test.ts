@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { signToken, type AuthUser, type Role } from "../core/auth/token.ts";
 import { createApp } from "../core/app.ts";
 import { prisma } from "../core/db/prisma.ts";
+import { resultsLifecycleService } from "../plugins/student-portal/results-lifecycle.ts";
 
 const isolated = process.env.BACKEND_INTEGRATION_TESTS === "1" ? describe : describe.skip;
 isolated("assessment evidence protected API and immutable history", () => {
@@ -31,8 +32,8 @@ isolated("assessment evidence protected API and immutable history", () => {
     process.env.AUTH_MODE = "dev";
     process.env.JWT_SECRET = "assessment-evidence-isolated-ci-secret-at-least-32-characters";
     const spec = await prisma.courseSpec.findFirstOrThrow({
-      where: { reviewStatus: "Approved", course: { programmeId: "dse" }, assessmentItems: { some: { status: "Active", mode: "Individual" } } },
-      include: { assessmentItems: { where: { status: "Active", mode: "Individual" } } },
+      where: { reviewStatus: "Approved", course: { programmeId: "dse" }, assessmentItems: { some: { id: "seed-assessment-1", status: "Active", mode: "Individual" } } },
+      include: { assessmentItems: { where: { id: "seed-assessment-1", status: "Active", mode: "Individual" } } },
     });
     const item = spec.assessmentItems[0]!;
     [lecturer, coordinator, student, unrelated] = await Promise.all([
@@ -108,7 +109,13 @@ isolated("assessment evidence protected API and immutable history", () => {
     expect((await request(base, coordinator)).body.evidence[0].effectiveStatus).toBe("verified");
     await expect(prisma.assessmentEvidenceRevision.update({ where: { id: created.body.id }, data: { selectionReason: "tamper" } })).rejects.toThrow();
     await expect(prisma.assessmentEvidenceRevision.delete({ where: { id: created.body.id } })).rejects.toThrow();
-    expect(await prisma.assessmentResult.findUniqueOrThrow({ where: { id: sourceId } })).toMatchObject({ score: 7, maxScore: 10, feedback: "Synthetic feedback" });
+    const official = await prisma.assessmentResult.findUniqueOrThrow({ where: { id: sourceId } });
+    expect(official).toMatchObject({ score: 7, maxScore: 10, feedback: "Synthetic feedback" });
+    await resultsLifecycleService.correctFinalized(lecturer.id, false, {
+      assessmentResultId: sourceId, score: 8, maxScore: 10, feedback: "Corrected synthetic feedback",
+      reason: "Synthetic moderation correction", expectedUpdatedAt: official.updatedAt.toISOString(),
+    });
+    expect((await request(base, coordinator)).body.evidence[0].effectiveStatus).toBe("stale");
     expect((await request(url, lecturer, { action: "revise", expectedRevision: 6, selectionReason: "New work", workReference: ref })).status).toBe(201);
     expect((await request(base, coordinator)).body.evidence[0].effectiveStatus).toBe("draft");
   }, 30000);
