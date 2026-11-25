@@ -2,6 +2,7 @@ import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto"
 import { UniversityEmailSchema } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
+import { deliverEmail, readEmailDeliveryConfig } from "../../core/email/delivery.ts";
 
 export class RegistrationEmailError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
@@ -18,10 +19,8 @@ function secret(): string {
   return value;
 }
 function mailConfig() {
-  const key = process.env.TELEGRAM_REGISTRATION_RESEND_API_KEY;
-  const from = process.env.TELEGRAM_REGISTRATION_EMAIL_FROM;
-  if (!key || !from) throw new RegistrationEmailError(503,"Email verification is unavailable");
-  return {key,from};
+  try { return readEmailDeliveryConfig(); }
+  catch { throw new RegistrationEmailError(503,"Email verification is unavailable"); }
 }
 async function requestForSession(tx: Prisma.TransactionClient, verificationId: string): Promise<RequestRow> {
   const rows = await tx.$queryRaw<RequestRow[]>`
@@ -48,8 +47,14 @@ export async function sendRegistrationEmail(verificationId: string, rawEmail: st
     const request=await requestForSession(tx,verificationId);
     if (request.emailVerifiedAt) return false;
     if (request.email && request.email!==email) throw new RegistrationEmailError(409,"Request a correction to change your submitted email");
-    // Lock the recipient across different Telegram identities, not only this application.
-    await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(${"registration-email:"+email},0))) locked`;
+    // Serialize challenge reservation globally for the pilot, preventing multiple
+    // Telegram identities from exhausting the shared sender quota concurrently.
+    await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended('registration-email-global',0))) locked`;
+    const quota=await tx.$queryRaw<Array<{hourly:number;daily:number}>>`
+      SELECT COUNT(*) FILTER (WHERE "createdAt">CURRENT_TIMESTAMP-INTERVAL '1 hour')::int AS "hourly", COUNT(*)::int AS "daily"
+      FROM "telegram_security"."StudentRegistrationEmailChallenge" WHERE "createdAt">CURRENT_TIMESTAMP-INTERVAL '1 day'
+    `;
+    if(quota[0]!.hourly>=30||quota[0]!.daily>=100) throw new RegistrationEmailError(429,"Verification email capacity reached. Please try again later.");
     const counts=await tx.$queryRaw<Array<{ perEmail: number; perRequest: number; recent: number }>>`
       SELECT
         COUNT(*) FILTER (WHERE "email"=${email} AND "createdAt">CURRENT_TIMESTAMP-INTERVAL '1 hour')::int AS "perEmail",
@@ -71,12 +76,7 @@ export async function sendRegistrationEmail(verificationId: string, rawEmail: st
   if(!challenge)return {verified:true,sent:false};
   // An email provider acceptance is not proof of delivery or ownership.
   try {
-    const response=await fetch("https://api.resend.com/emails",{
-      method:"POST",headers:{Authorization:`Bearer ${config.key}`,"Content-Type":"application/json","Idempotency-Key":id},
-      body:JSON.stringify({from:config.from,to:[email],subject:"DSE PMS university email verification",text:`Your DSE PMS registration code is ${code}. It expires in 10 minutes. Do not share it. If you did not request this code, ignore this email.`}),
-      signal:AbortSignal.timeout(10000),
-    });
-    if(!response.ok)throw new Error("Email provider rejected the request");
+    await deliverEmail(config,{id,to:email,subject:"DSE PMS university email verification",text:`Your DSE PMS registration code is ${code}. It expires in 10 minutes. Do not share it. If you did not request this code, ignore this email.`});
     await prisma.$executeRaw`UPDATE "telegram_security"."StudentRegistrationEmailChallenge" SET "deliveryAcceptedAt"=CURRENT_TIMESTAMP WHERE "id"=${id} AND "consumedAt" IS NULL`;
     return {verified:false,sent:true};
   } catch {
