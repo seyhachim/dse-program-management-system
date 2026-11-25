@@ -66,7 +66,7 @@ function StudentProjectGroupRegistration({ offeringId, assessmentItemId }: Conte
   return <div className={cardClass}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><h3 className="font-semibold">Project groups</h3><p className="text-sm text-muted-foreground">{data.officialGroup ? "Official membership confirmed" : data.registrationOpen ? "Registration open" : data.membershipLocked ? "Academic membership locked" : "Registration is closed"}</p></div>
-      <Button variant="outline" size="sm" onClick={load} disabled={busy || loading}>Refresh</Button>
+      <Button aria-label="Refresh project groups" variant="outline" size="sm" onClick={load} disabled={busy || loading}>Refresh</Button>
     </div>
     {data.policy ? <p className="text-xs text-muted-foreground">{data.policy.minMembers}–{data.policy.maxMembers} members per group · Deadline {formatDeadline(data.policy.deadlineAt)}</p> : null}
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
@@ -129,7 +129,7 @@ export function LecturerProjectGroupRegistration({ offeringId, assessmentItemId,
   return <div className={cardClass}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><h3 className="font-semibold">Student group registration</h3><p className="text-sm text-muted-foreground">Students propose teams; you approve official membership.</p></div>
-      <Button size="sm" variant="outline" disabled={busy || loading} onClick={load}>Refresh</Button>
+      <Button aria-label="Refresh student group registration" size="sm" variant="outline" disabled={busy || loading} onClick={load}>Refresh</Button>
     </div>
     <p className="text-sm">{data.registrationOpen ? "Registration open" : data.membershipLocked ? "Academic membership locked" : "Registration closed"} · {data.officialGroupCount} official groups · {submitted.length} awaiting review · {pending} pending invitations · {data.unassignedCount} unassigned</p>
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
