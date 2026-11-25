@@ -6,6 +6,7 @@ import { curriculumImportService } from "./curriculum-import-service.ts";
 import { curriculumService } from "./curriculum-service.ts";
 import { curriculumDraftService, CurriculumDraftConflictError } from "./curriculum-draft-service.ts";
 import { curriculumHistoryService } from "./curriculum-history-service.ts";
+import { curriculumWorkflowService } from "./curriculum-workflow-service.ts";
 import { curriculumCourseSpecService } from "./curriculum-course-spec-service.ts";
 import { offeringCurriculumService } from "./offering-curriculum-service.ts";
 import { loadOfferingOfficialCodes } from "../../core/academic/offering-official-code.ts";
@@ -218,6 +219,98 @@ describeDb("curriculum JSON import and artifact persistence", () => {
     expect(await prisma.programmeCurriculumCourse.count({ where: { curriculumVersionId: g6.id } })).toBe(0);
     expect(await prisma.programmeCurriculumAuditAction.count({ where: { curriculumVersionId: g6.id } })).toBe(before);
     expect((await prisma.programmeCurriculumVersion.findUniqueOrThrow({ where: { id: g6.id } })).status).toBe("Draft");
+  });
+
+  test("full G6 corrective revision preserves approved G5 and G6 and leaves v3.1 Draft", async () => {
+    const f = await fixture();
+    const source = DseCurriculumImportSchema.parse(JSON.parse(await readFile(
+      new URL("../../../../../docs/curriculum/fixtures/g6-v3-preview-redacted.json", import.meta.url), "utf8",
+    )));
+    const courses = source.courses.map((row) => ({
+      ...row, catalogueCode: `${row.catalogueCode ?? row.code}-${f.token}`,
+    }));
+    await prisma.course.createMany({ data: courses.map((row) => ({
+      programmeId: f.programme.id, code: row.catalogueCode, title: row.title,
+      credits: row.credits.total, courseType: row.courseType ?? "Core",
+    })) });
+    const agent = courses.find((row) => row.code === "AAI302")!;
+    const newCourse = await prisma.course.findUniqueOrThrow({ where: { code: agent.catalogueCode } });
+    const oldCourse = await prisma.course.create({ data: {
+      programmeId: f.programme.id, code: `AAI302-${f.token}`,
+      title: "Applied AI and Deep Learning", credits: 3, courseType: "Core",
+    } });
+    const g5Payload = JSON.parse(uploadFor(f).jsonText);
+    g5Payload.courses[0] = { ...g5Payload.courses[0], code: "AAI302",
+      catalogueCode: oldCourse.code, title: oldCourse.title };
+    await curriculumImportService.apply(f.version.id, f.user.id, {
+      fileName: "synthetic-g5.json", jsonText: JSON.stringify(g5Payload), decisions: [],
+    });
+    await prisma.programmeCurriculumVersion.update({ where: { id: f.version.id }, data: { intakeYear: 2025 } });
+    await curriculumWorkflowService.submit(f.version.id, f.user.id, "Synthetic G5 only");
+    await curriculumWorkflowService.approve(f.version.id, f.user.id, "Synthetic G5 only");
+    const g6 = await prisma.programmeCurriculumVersion.create({ data: {
+      curriculumId: f.curriculum.id, versionMajor: 3, versionMinor: 0,
+      cohortLabel: "G6", intakeYear: 2026, academicYear: "2026-2027", createdById: f.user.id,
+    } });
+    const legacy = { ...source, programmeCode: f.programme.code, curriculum: {
+      ...source.curriculum, code: f.curriculum.code, name: f.curriculum.name,
+    }, courses: courses.map((row) => row.code === "AAI302" ? { ...row, code: "AAI302-G6" } : row) };
+    await curriculumImportService.apply(g6.id, f.user.id, {
+      fileName: "synthetic-g6-v3.0.json", jsonText: JSON.stringify(legacy), decisions: [],
+    });
+    await curriculumWorkflowService.submit(g6.id, f.user.id, "Synthetic G6 predecessor only");
+    await curriculumWorkflowService.approve(g6.id, f.user.id, "Synthetic G6 predecessor only");
+
+    const snapshot = async (id: string) => ({
+      version: await prisma.programmeCurriculumVersion.findUniqueOrThrow({ where: { id } }),
+      placements: await prisma.programmeCurriculumCourse.findMany({ where: { curriculumVersionId: id }, orderBy: { id: "asc" } }),
+      audits: await prisma.programmeCurriculumAuditAction.findMany({ where: { curriculumVersionId: id }, orderBy: { id: "asc" } }),
+      artifact: await curriculumImportService.artifact(id),
+    });
+    const beforeG5 = await snapshot(f.version.id);
+    const beforeG6 = await snapshot(g6.id);
+    expect(beforeG5.artifact.courses.find((row) => row.code === "AAI302")?.courseId).toBe(oldCourse.id);
+    expect(beforeG6.artifact.courses.find((row) => row.code === "AAI302-G6")?.courseId).toBe(newCourse.id);
+    const revision = await curriculumService.createRevision(f.curriculum.id, g6.id, f.user.id, {
+      revisionType: "Minor", revisionTriggers: ["ProgrammeCoordinator"],
+      revisionReason: "Correct official course code while preserving catalogue identity",
+      changeSummary: "AAI302-G6 to AAI302",
+    });
+    const id = revision.selectedVersion.id;
+    const draft = await prisma.programmeCurriculumVersion.findUniqueOrThrow({ where: { id } });
+    expect(draft).toMatchObject({ versionMajor: 3, versionMinor: 1, status: "Draft", basedOnVersionId: g6.id });
+    const placement = await prisma.programmeCurriculumCourse.findFirstOrThrow({
+      where: { curriculumVersionId: id, courseId: newCourse.id },
+    });
+    expect((await curriculumImportService.artifact(id)).courses).toHaveLength(44);
+    await curriculumDraftService.updateCourse(placement.id, f.user.id, {
+      yearLevel: placement.yearLevel, semester: placement.semester, sortOrder: placement.sortOrder,
+      officialCode: "AAI302", officialCodeReason: "Correct G6 official code",
+    });
+    const comparison = await curriculumHistoryService.compare(f.curriculum.id, g6.id, id);
+    expect(comparison.changes).toHaveLength(1);
+    expect(comparison.changes[0]).toMatchObject({
+      courseId: newCourse.id, changes: ["CodeChanged"], before: { code: "AAI302-G6" }, after: { code: "AAI302" },
+    });
+    const corrected = { ...legacy, curriculum: { ...legacy.curriculum, version: "3.1" }, courses };
+    const beforePreview = await snapshot(id);
+    const preview = await curriculumImportService.preview(id, {
+      fileName: "synthetic-g6-v3.1.json", jsonText: JSON.stringify(corrected),
+    });
+    expect(preview.canApply).toBe(true);
+    expect(preview.target.status).toBe("Draft");
+    expect(preview.courses).toHaveLength(44);
+    expect(preview.courses.every((row) => row.matchStatus === "matched")).toBe(true);
+    expect(preview.courses.find((row) => row.code === "AAI302")?.existingCourseId).toBe(newCourse.id);
+    expect(preview.totals.computedSelectedRouteCredits).toBe(126);
+    for (const code of ["RESEARCH", "INDUSTRY"]) {
+      expect(preview.totals.commonCredits + (preview.totals.pathways.find((row) => row.code === code)?.credits ?? 0)).toBe(132);
+    }
+    expect(await snapshot(id)).toEqual(beforePreview);
+    expect(await snapshot(f.version.id)).toEqual(beforeG5);
+    expect(await snapshot(g6.id)).toEqual(beforeG6);
+    expect((await prisma.course.findUniqueOrThrow({ where: { id: newCourse.id } })).code).toBe(agent.catalogueCode);
+    expect((await curriculumWorkflowService.state(id)).status).toBe("Draft");
   });
 
   test("preview is read-only and all alternatives become canonical pathway placements", async () => {

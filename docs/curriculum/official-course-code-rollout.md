@@ -58,13 +58,21 @@ Draft implementation; no release or production import is authorized.
 - New smoke fixture script is restricted to the local disposable dse_browser database and creates a distinct synthetic Draft CourseSpec, binds an approved policy, saves its theme and course-info snapshot, then locks only that fixture. It never changes existing Approved specs. The test verifies the theme and grading APIs before navigation, requires the official code inside a real document page, retains download signature/filename checks and asserts Draft/invalid placement hides downloads. Fresh CI required.
 - No production code, schema, seed, real academic records, or deployment changes in this correction.
 
+## Dedicated staging acceptance (2026-11-25)
+
+- Actual live catalogue inspection found v3.0 already Approved on November 24. Preserve it; do not unlock or rewrite history. G5 v1.0 remains Approved. 140 live snapshots / zero duplicate groups. Corrected source matched all 44 live catalogue entries; only code differs from the checked v3.0 snapshot. No live writes.
+- Dedicated Neon branch uat-pr1365-curriculum-official-codes, database dse_pr1365, identity marker DSE-PMS-STAGING:pr1365-isolated-20261125; direct endpoint ep-lively-bonus-a1lpsxjs.ap-southeast-1.aws.neon.tech. Fresh database, not the inherited neondb with #1362's migration. No shared or production credential reuse.
+- New test reproduces full synthetic G5 and G6 v3.0 approval, uses the normal revision and Draft edit services to create v3.1, checks exact one-code comparison, preserved predecessor artifacts/placements/audits, 44 matched preview rows, 126/132/132 credits, immutable catalogue code and Draft status. Redacted source fixture only.
+- Guarded local runner: after checkout and dependency install, configure DATABASE_URL privately for the direct endpoint and the five existing DSE_STAGING_* variables (true, exact host, database, marker, forbidden production host list). Run `bun apps/backend/scripts/verify-pr1365-staging.ts`. It pins the target, invokes the existing guard, checks duplicates, applies reviewed Prisma migrations, verifies recorded migration and deferrable unique constraint, runs security verifier, runs only the corrective revision test, then rechecks security. Do not run with production credentials. No server, seed, notifications or deployments.
+- Hosted runner execution remains unverified. Exact-head 9e783bc CI previously 17/17, Chromium 37/37. New regression requires fresh CI. The current live v3.0 cannot receive a Draft import; only a governed corrective revision after release can do so.
+
 ## Remaining merge blockers
 
 1. Validate the new version-wide constraint and duplicate preflight on isolated staging, including detached legacy snapshots. No production migration or data correction authorized.
 2. Verify import/export round trip and error UI, additional conflict/concurrency cases and browser smoke; official document export must not display internal aliases.
 3. Verify Phase 4B CI, staff contextual PDF/Word browser output and authorization, and remaining direct reports. Coordinate annual lecturer export #1299; no dedicated transcript implementation was found.
 4. Run cross-generation synthetic regressions and duplicate/rollback/security cases, then isolated staging and browser verification before any release.
-5. Keep G6 v3.0 Draft until academic review resolves 132-credit research/industry routes against 130-credit limit. No import or approval in this PR until the full feature is verified.
+5. Preserve already Approved G6 v3.0. Keep a future corrective v3.1 Draft until academic review resolves 132-credit research/industry routes against 130-credit limit. No live import or approval in this PR.
 6. Coordinate additive migration ordering and rebase with #1354, #1362, #1299, #1364 and #1352. This initial slice intentionally avoids their changed files. No Vercel configuration changes; retain existing preview/deployment policy.
 
 Verification required: prisma validate, typecheck, lint, test, test:backend, build, fresh database migrate/seed/security verification and curriculum DB tests.
