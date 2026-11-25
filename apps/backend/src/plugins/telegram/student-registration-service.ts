@@ -70,13 +70,13 @@ export async function submitTelegramStudentRegistration(
       INSERT INTO "telegram_security"."StudentRegistrationRequest" (
         "id", "telegramUserId", "programmeId", "cohortId", "sectionId",
         "khmerFamilyName", "khmerGivenName", "latinFamilyName", "latinGivenName",
-        "officialStudentId", "email", "telegramPhone", "phoneConsentAt"
+        "officialStudentId", "email", "telegramPhone", "phoneConsentAt", "careerProfile"
       ) VALUES (
         ${requestId}, ${verification.telegramUserId}, ${programmeId},
         ${input.cohortId}, ${input.sectionId}, ${input.khmerFamilyName},
         ${input.khmerGivenName}, ${input.latinFamilyName}, ${input.latinGivenName},
-        ${input.officialStudentId ?? null}, ${input.email ?? null},
-        ${consent.phone}, ${consent.consentAt}
+        ${input.officialStudentId ?? null}, ${input.email},
+        ${consent.phone}, ${consent.consentAt}, ${input.careerProfile ? JSON.stringify(input.careerProfile) : null}::jsonb
       )
       ON CONFLICT ("telegramUserId") DO UPDATE SET
         "khmerFamilyName"=EXCLUDED."khmerFamilyName", "khmerGivenName"=EXCLUDED."khmerGivenName",
@@ -84,6 +84,7 @@ export async function submitTelegramStudentRegistration(
         "cohortId"=EXCLUDED."cohortId", "sectionId"=EXCLUDED."sectionId",
         "officialStudentId"=EXCLUDED."officialStudentId", "email"=EXCLUDED."email",
         "telegramPhone"=EXCLUDED."telegramPhone", "phoneConsentAt"=EXCLUDED."phoneConsentAt",
+        "careerProfile"=EXCLUDED."careerProfile",
         "status"='PENDING', "updatedAt"=CURRENT_TIMESTAMP
       WHERE "StudentRegistrationRequest"."status"='NEEDS_CORRECTION'
         AND "StudentRegistrationRequest"."programmeId"=EXCLUDED."programmeId"
