@@ -10,7 +10,7 @@ export async function verifyUatBrevoOnce(){
     process.env.TELEGRAM_STUDENT_REGISTRATION_ENABLED!=="false"||
     process.env.TELEGRAM_PMS_ENABLED!=="false"||
     process.env.PMS_EMAIL_PROVIDER!=="brevo")return;
-  const id="pr1364-brevo-sandbox-diagnostic-02";
+  const id="pr1364-brevo-sandbox-diagnostic-03";
   try {
     const config=readEmailDeliveryConfig();
     if(config.provider!=="brevo"||config.from!=="seyhachim@gmail.com")return;
