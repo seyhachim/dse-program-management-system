@@ -264,9 +264,10 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
   }
   return {
     async submit(actor: AuthUser, input: unknown) {
-      const request = prepareSchema.parse(input);
+      const request = prepareSchema.extend({ expectedHash: hash }).parse(input);
       return transact(async (tx) => {
         const { ctx, snapshot } = await prepareSnapshot(tx, actor, request);
+        if (request.expectedHash !== snapshot.variantHash) conflict("Preview changed; verify again before submission");
         const { courseSpecId, assessmentItemId, programmeId } = ctx.scope;
         const latest = await tx.$queryRaw<Array<{ revision: number }>>`SELECT revision FROM exam_variant."ExamPaperVersion"
           WHERE "courseSpecId"=${courseSpecId} AND "assessmentItemId"=${assessmentItemId} AND "variantId"=${snapshot.variantId} ORDER BY revision DESC LIMIT 1`;
