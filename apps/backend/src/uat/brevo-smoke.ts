@@ -1,7 +1,7 @@
 import { prisma } from "../core/db/prisma.ts";
 import { readEmailDeliveryConfig } from "../core/email/delivery.ts";
 
-// UAT-only diagnostic. Brevo sandbox drop validates the request without sending.
+// UAT-only, operator-authorized single real self-addressed delivery test.
 export async function verifyUatBrevoOnce(){
   if(process.env.AUTH_MODE!=="neon-staging"||
     process.env.DSE_STAGING_ENVIRONMENT!=="true"||
@@ -10,7 +10,7 @@ export async function verifyUatBrevoOnce(){
     process.env.TELEGRAM_STUDENT_REGISTRATION_ENABLED!=="false"||
     process.env.TELEGRAM_PMS_ENABLED!=="false"||
     process.env.PMS_EMAIL_PROVIDER!=="brevo")return;
-  const id="pr1364-brevo-sandbox-diagnostic-03";
+  const id="pr1364-brevo-real-delivery-04";
   try {
     const config=readEmailDeliveryConfig();
     if(config.provider!=="brevo"||config.from!=="seyhachim@gmail.com")return;
@@ -21,11 +21,11 @@ export async function verifyUatBrevoOnce(){
       const response=await fetch("https://api.brevo.com/v3/smtp/email",{
         method:"POST",redirect:"error",signal:AbortSignal.timeout(10000),
         headers:{"api-key":config.key,"Content-Type":"application/json",accept:"application/json"},
-        body:JSON.stringify({sender:{name:config.name,email:config.from},to:[{email:config.from}],subject:"DSE PMS sandbox validation",textContent:"Synthetic validation only",headers:{"X-Sib-Sandbox":"drop"}})
+        body:JSON.stringify({sender:{name:config.name,email:config.from},to:[{email:config.from}],subject:"DSE PMS staging email delivery test",textContent:"This is the authorized single test email from DSE PMS staging. No student account was created. Please confirm receipt."})
       });
       accepted=response.ok;
       let category="unknown";
-      if(accepted){category="sandbox-accepted";await response.body?.cancel();}
+      if(accepted){category="provider-accepted";await response.body?.cancel();}
       else {
         const body=await response.json().catch(()=>null) as {code?:unknown;message?:unknown}|null;
         const msg=(typeof body?.message==="string"?body.message:"").toLowerCase();
@@ -40,8 +40,8 @@ export async function verifyUatBrevoOnce(){
         else if(response.status===400)category="invalid-request";
         else if(response.status>=500)category="provider-error";
       }
-      console.log("Registration UAT Brevo sandbox: HTTP "+response.status+"; category="+category);
-    }catch{console.log("Registration UAT Brevo sandbox: network-or-timeout");}
+      console.log("Registration UAT Brevo real delivery: HTTP "+response.status+"; category="+category);
+    }catch{console.log("Registration UAT Brevo real delivery: network-or-timeout");}
     await prisma.$executeRaw`UPDATE registration_uat_private.email_smoke SET state=${accepted?"accepted":"failed"},updated_at=now() WHERE id=${id}`;
-  }catch{console.log("Registration UAT Brevo sandbox unavailable; check configuration.");}
+  }catch{console.log("Registration UAT Brevo real delivery unavailable; check configuration.");}
 }
