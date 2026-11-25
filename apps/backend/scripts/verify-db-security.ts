@@ -250,6 +250,14 @@ const EXPECTED_LECTURER_ANNUAL_TABLES = [
   "AnnualStaffReviewEvent",
 ] as const;
 
+const EXPECTED_EXAM_VARIANT_TABLES = [
+  "ExamConfiguration",
+  "ExamPaperVersion",
+  "ExamOfferingPermission",
+  "ExamPaperAssignment",
+  "ExamAssignmentEvent",
+] as const;
+
 const FORBIDDEN_GRANTEES = new Set([
   "PUBLIC",
   "anon",
@@ -267,6 +275,7 @@ const PROTECTED_SCHEMAS = [
   "student_handbook",
   "lecturer_portfolio",
   "lecturer_annual",
+  "exam_variant",
 ] as const;
 
 const ALL_VERIFIED_SCHEMAS = ["public", ...PROTECTED_SCHEMAS] as const;
@@ -348,6 +357,7 @@ async function main(): Promise<void> {
     studentHandbookTables,
     lecturerPortfolioTables,
     lecturerAnnualTables,
+    examVariantTables,
   ] = await Promise.all([
     tablesForSchema("public"),
     tablesForSchema("pms_attendance"),
@@ -359,6 +369,7 @@ async function main(): Promise<void> {
     tablesForSchema("student_handbook"),
     tablesForSchema("lecturer_portfolio"),
     tablesForSchema("lecturer_annual"),
+    tablesForSchema("exam_variant"),
   ]);
 
   errors.push(
@@ -412,6 +423,7 @@ async function main(): Promise<void> {
       EXPECTED_LECTURER_ANNUAL_TABLES,
       lecturerAnnualTables.map((table) => table.table_name),
     ),
+    ...compareInventory("exam_variant schema", EXPECTED_EXAM_VARIANT_TABLES, examVariantTables.map((table) => table.table_name)),
   );
 
   for (const table of [
@@ -425,6 +437,7 @@ async function main(): Promise<void> {
     ...studentHandbookTables,
     ...lecturerPortfolioTables,
     ...lecturerAnnualTables,
+    ...examVariantTables,
   ]) {
     if (!table.rls_enabled) {
       errors.push(`RLS disabled: ${table.schema_name}.${table.table_name}`);
@@ -524,6 +537,19 @@ async function main(): Promise<void> {
     }
   }
 
+  const examFunctionGrants = await prisma.$queryRaw<GrantRow[]>`
+    SELECT n.nspname::text AS schema_name, p.proname::text AS object_name,
+      CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE r.rolname::text END AS grantee,
+      acl.privilege_type::text AS privilege_type
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) acl
+    LEFT JOIN pg_roles r ON r.oid = acl.grantee
+    WHERE n.nspname = 'exam_variant' AND (acl.grantee = 0 OR r.rolname IN ('anon','authenticated','service_role'))
+  `;
+  for (const grant of examFunctionGrants) {
+    errors.push(`Forbidden exam function grant: ${grant.grantee} has ${grant.privilege_type} on ${grant.object_name}`);
+  }
+
   if (errors.length > 0) {
     console.error("Database security verification failed:\n");
     for (const error of errors) {
@@ -534,7 +560,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, ${courseSpecGovernanceTables.length} course-spec governance tables, ${publicAnalyticsTables.length} public-analytics tables, ${studentHandbookTables.length} student-handbook tables, ${lecturerPortfolioTables.length} lecturer-portfolio tables, and ${lecturerAnnualTables.length} lecturer-annual tables are classified, RLS-protected, and not granted to Data API roles.`,
+    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, ${courseSpecGovernanceTables.length} course-spec governance tables, ${publicAnalyticsTables.length} public-analytics tables, ${studentHandbookTables.length} student-handbook tables, ${lecturerPortfolioTables.length} lecturer-portfolio tables, ${lecturerAnnualTables.length} lecturer-annual tables, and ${examVariantTables.length} exam-variant tables are classified, RLS-protected, and not granted to Data API roles.`,
   );
 }
 
