@@ -24,7 +24,7 @@ describe("public Telegram typed menu configuration", () => {
   test("persistent reply keyboard contains only global navigation utilities", () => {
     expect(MAIN_REPLY_KEYBOARD.flat().map((button) => button.text)).toEqual([
       "🏠 Home",
-      "❓ Ask DSE",
+      "❓ Ask a Question",
     ]);
   });
 
@@ -34,6 +34,7 @@ describe("public Telegram typed menu configuration", () => {
     for (const button of buttons) {
       expect(routeForReplyText(button.text)).toBe(button.route);
     }
+    expect(routeForReplyText("❓ Ask DSE")).toBe("ask");
     expect(routeForReplyText("Unknown reply")).toBeNull();
   });
 
@@ -44,7 +45,7 @@ describe("public Telegram typed menu configuration", () => {
       "📚 Study & Curriculum",
       "💼 Careers",
       "💰 Fees & Scholarships",
-      "❓ Ask DSE",
+      "❓ Ask a Question",
       "☰ More",
     ]);
   });
