@@ -2,7 +2,7 @@ import express, { Router, type Request, type Response } from "express";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { requireAuth } from "../../../core/auth/middleware.ts";
-import { type AuthUser } from "../../../core/auth/token.ts";
+import { hasAnyRoleInProgramme, type AuthUser } from "../../../core/auth/token.ts";
 import { roleHasPermission } from "../../../core/permissions/index.ts";
 import { prisma } from "../../../core/db/prisma.ts";
 import { EvidenceStorageError, MAX_EVIDENCE_BYTES, parseEvidenceAttachment, publicAttachment, validateEvidenceFile, storeEvidenceFile, removeUnlinkedEvidence, signEvidenceDownload, type EvidenceAttachment } from "./assessment-evidence-storage.ts";
@@ -22,6 +22,24 @@ const ContextSchema = z.object({
 });
 type Context = z.infer<typeof ContextSchema>;
 const ResultId = z.string().uuid();
+type Population = "individual" | "group" | "component";
+function populationFor(req: Request): Population {
+  const p = req.params.population ?? "individual";
+  if (p !== "individual" && p !== "group" && p !== "component") throw new EvidenceError(400, "Invalid assessment evidence population");
+  return p;
+}
+function populationAllowed(mode: string, p: Population) {
+  return mode === "Individual" ? p === "individual" : mode === "Group" ? p === "group" : mode === "GroupIndividual" && (p === "group" || p === "component");
+}
+function populationFilter(p: Population) {
+  return p === "individual" ? { resultId: { not: null } } : p === "group" ? { groupScoreId: { not: null } } : { componentId: { not: null } };
+}
+function sourceIdentity(p: Population, id: string) {
+  return p === "individual" ? { resultId: id } : p === "group" ? { groupScoreId: id } : { componentId: id };
+}
+function revisionSourceId(row: { resultId: string | null; groupScoreId: string | null; componentId: string | null }) {
+  return row.resultId ?? row.groupScoreId ?? row.componentId ?? "";
+}
 const Reference = z.string().trim().max(1000).refine(isSupportedWorkReference).nullable();
 const Reason = z.string().trim().min(1).max(500);
 const Mutation = z.discriminatedUnion("action", [
@@ -32,7 +50,7 @@ const Mutation = z.discriminatedUnion("action", [
   z.object({ action: z.literal("request_changes"), expectedRevision: z.number().int().positive(), reviewReason: Reason }).strict(),
 ]);
 
-async function contextFor(db: Db, user: AuthUser, context: Context) {
+async function contextFor(db: Db, user: AuthUser, context: Context, population: Population = "individual") {
   const offering = await db.offering.findUnique({
     where: { id: context.offeringId },
     select: { id: true, courseId: true, courseSpecId: true, lecturerId: true,
@@ -57,7 +75,7 @@ async function contextFor(db: Db, user: AuthUser, context: Context) {
     select: { id: true, status: true, mode: true, rubricId: true },
   });
   if (!item || item.status !== "Active") throw new EvidenceError(404, "Assessment context not found");
-  if (item.mode !== "Individual") throw new EvidenceError(409, "Group evidence requires its own source workflow");
+  if (!populationAllowed(item.mode, population)) throw new EvidenceError(409, "Evidence population does not match assessment mode");
   return { access, item };
 }
 
@@ -69,10 +87,51 @@ const resultSelect = {
   } },
   corrections: { orderBy: { id: "asc" as const }, select: { id: true } },
 } satisfies Prisma.AssessmentResultSelect;
-type Source = Prisma.AssessmentResultGetPayload<{ select: typeof resultSelect }>;
+type Source = Prisma.AssessmentResultGetPayload<{ select: typeof resultSelect }> & { groupContext?: { groupId: string; memberEnrollmentIds: string[]; rawScore: number; adjustmentPoints: number; adjustmentReason: string; groupName: string; lockedAt: string }; label?: string };
 function sourceWhere(context: Context) {
   return { courseSpecId: context.courseSpecId, assessmentItemId: context.assessmentItemId,
     enrollment: { offeringId: context.offeringId } };
+}
+async function sourcesFor(db: Db, context: Context, population: Population, id?: string): Promise<Source[]> {
+  if (population === "individual") return db.assessmentResult.findMany({
+    where: { ...sourceWhere(context), ...(id ? { id } : {}) }, select: resultSelect, orderBy: { id: "asc" }, take: 501,
+  });
+  const criteria = resultSelect.criterionScores;
+  const corrections = resultSelect.corrections;
+  const groups = await db.assessmentGroup.findMany({
+    where: { ...context, membershipLockedAt: { not: null }, publishedAt: { not: null }, finalizedAt: { not: null },
+      ...(id ? population === "group" ? { score: { is: { id } } } : { individualComponents: { some: { id } } } : {}) },
+    orderBy: { id: "asc" }, take: 501,
+    select: { id: true, name: true, membershipLockedAt: true, publishedAt: true, finalizedAt: true,
+      members: { orderBy: { enrollmentId: "asc" }, select: { enrollmentId: true, enrollment: { select: { offeringId: true } } } },
+      score: { select: { id: true, score: true, maxScore: true, feedback: true, updatedAt: true, criterionScores: criteria, corrections } },
+      individualComponents: { where: id && population === "component" ? { id } : {}, orderBy: { id: "asc" },
+        select: { id: true, enrollmentId: true, score: true, maxScore: true, feedback: true, updatedAt: true,
+          adjustmentPoints: true, adjustmentReason: true, criterionScores: criteria, corrections, enrollment: { select: { offeringId: true } } } },
+    },
+  });
+  if (groups.length > 500) throw new EvidenceError(409, "Assessment exceeds the pilot cohort limit");
+  const out: Source[] = [];
+  for (const g of groups) {
+    if (!g.score || !g.members.length || g.members.some(m => m.enrollment.offeringId !== context.offeringId)) continue;
+    const memberEnrollmentIds = g.members.map(m => m.enrollmentId);
+    const shared = { publishedAt: g.publishedAt, finalizedAt: g.finalizedAt };
+    const groupContext = { groupId: g.id, memberEnrollmentIds, groupName: g.name, lockedAt: g.membershipLockedAt!.toISOString() };
+    if (population === "group" && (!id || g.score.id === id)) {
+      out.push({ ...g.score, ...shared, enrollmentId: "", label: g.name,
+        groupContext: { ...groupContext, rawScore: g.score.score, adjustmentPoints: 0, adjustmentReason: "" } });
+    }
+    if (population === "component") for (const x of g.individualComponents) {
+      if (x.enrollment.offeringId !== context.offeringId || !memberEnrollmentIds.includes(x.enrollmentId)) continue;
+      out.push({ id: x.id, enrollmentId: x.enrollmentId, score: x.score + x.adjustmentPoints, maxScore: x.maxScore,
+        feedback: x.feedback, updatedAt: x.updatedAt, criterionScores: x.criterionScores, corrections: x.corrections, ...shared,
+        groupContext: { ...groupContext, rawScore: x.score, adjustmentPoints: x.adjustmentPoints, adjustmentReason: x.adjustmentReason } });
+    }
+  }
+  return out;
+}
+async function sourceFor(db: Db, context: Context, population: Population, id: string) {
+  return (await sourcesFor(db, context, population, id))[0] ?? null;
 }
 function eligible(source: Source) {
   return !!source.publishedAt && !!source.finalizedAt && Number.isFinite(source.score) &&
@@ -88,6 +147,7 @@ function provenance(source: Source, rubricId: string | null) {
     criterionScores: source.criterionScores,
     correctionIds: source.corrections.map(x => x.id),
     feedbackAvailable: source.feedback.trim().length > 0,
+    ...(source.groupContext ? { groupContext: source.groupContext } : {}),
   };
   // Feedback stays in the authoritative result; its changes still invalidate verification.
   return { snapshot, hash: evidenceSourceHash({ ...snapshot, feedback: source.feedback }) };
@@ -113,8 +173,8 @@ function sendError(res: Response, error: unknown) {
   res.status(500).json({ error: "Assessment evidence operation failed" });
 }
 
-function viewRevision<T extends { attachment: unknown }>(row: T) {
-  return { ...row, attachment: publicAttachment(row.attachment) };
+function viewRevision<T extends { attachment: unknown; resultId: string | null; groupScoreId: string | null; componentId: string | null }>(row: T) {
+  return { ...row, resultId: revisionSourceId(row), attachment: publicAttachment(row.attachment) };
 }
 
 const base = "/assessment-evidence/offerings/:offeringId/specs/:courseSpecId/assessments/:assessmentItemId";
@@ -150,17 +210,15 @@ export function createAssessmentEvidenceRouter(): Router {
     } catch (error) { sendError(res, error); }
   });
 
-  router.get(base, async (req, res) => {
+  router.get([base, base + "/populations/:population"], async (req, res) => {
     try {
-      const context = parseContext(req);
+      const context = parseContext(req), population = populationFor(req);
       const response = await prisma.$transaction(async db => {
-        const { access, item } = await contextFor(db, req.user!, context);
-        const sources = await db.assessmentResult.findMany({
-          where: sourceWhere(context), select: resultSelect, orderBy: { id: "asc" }, take: 501,
-        });
+        const { access, item } = await contextFor(db, req.user!, context, population);
+        const sources = await sourcesFor(db, context, population);
         if (sources.length > 500) throw new EvidenceError(409, "Assessment exceeds the pilot cohort limit");
         const latest = await db.assessmentEvidenceRevision.findMany({
-          where: context, distinct: ["resultId"], orderBy: [{ resultId: "asc" }, { revision: "desc" }],
+          where: { ...context, ...populationFilter(population) }, distinct: ["resultId", "groupScoreId", "componentId"], orderBy: [{ revision: "desc" }],
         });
         const byId = new Map(sources.map(s => [s.id, s]));
         const suggestions = suggestAssessmentSamples(sources.map(s => ({
@@ -171,10 +229,10 @@ export function createAssessmentEvidenceRouter(): Router {
           knownNonSubmission: false,
         })));
         return {
-          context, access, suggestions: { ...suggestions, submissionStatus: "unknown" },
-          eligibleResults: sources.filter(eligible).map(s => ({ resultId: s.id, enrollmentId: s.enrollmentId, score: s.score, maxScore: s.maxScore, feedbackAvailable: !!s.feedback.trim() })),
+          context, population, access, suggestions: { ...suggestions, submissionStatus: "unknown" },
+          eligibleResults: sources.filter(eligible).map(s => ({ resultId: s.id, enrollmentId: s.enrollmentId, label: s.label ?? null, memberEnrollmentIds: s.groupContext?.memberEnrollmentIds ?? [], groupName: s.groupContext?.groupName ?? null, score: s.score, maxScore: s.maxScore, feedbackAvailable: !!s.feedback.trim() })),
           evidence: latest.map(row => {
-            const source = byId.get(row.resultId);
+            const source = byId.get(revisionSourceId(row));
             const stale = !source || !eligible(source) || provenance(source, item.rubricId).hash !== row.sourceHash;
             return { ...viewRevision(row), effectiveStatus: stale ? "stale" : row.status };
           }),
@@ -184,17 +242,17 @@ export function createAssessmentEvidenceRouter(): Router {
     } catch (error) { sendError(res, error); }
   });
 
-  router.get(base + "/results/:resultId/history", async (req, res) => {
+  router.get([base + "/results/:resultId/history", base + "/populations/:population/results/:resultId/history"], async (req, res) => {
     try {
-      const context = parseContext(req), resultId = parseResult(req);
+      const context = parseContext(req), resultId = parseResult(req), population = populationFor(req);
       const cursor = z.coerce.number().int().positive().optional().safeParse(req.query.beforeRevision);
       if (!cursor.success) throw new EvidenceError(400, "Invalid revision cursor");
       const rows = await prisma.$transaction(async db => {
-        await contextFor(db, req.user!, context);
-        const source = await db.assessmentResult.findFirst({ where: { ...sourceWhere(context), id: resultId }, select: { id: true } });
+        await contextFor(db, req.user!, context, population);
+        const source = await sourceFor(db, context, population, resultId);
         if (!source) throw new EvidenceError(404, "Result not found");
         return db.assessmentEvidenceRevision.findMany({
-          where: { ...context, resultId, ...(cursor.data ? { revision: { lt: cursor.data } } : {}) },
+          where: { ...context, ...sourceIdentity(population, resultId), ...(cursor.data ? { revision: { lt: cursor.data } } : {}) },
           orderBy: { revision: "desc" }, take: 51,
         });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
@@ -202,27 +260,25 @@ export function createAssessmentEvidenceRouter(): Router {
     } catch (error) { sendError(res, error); }
   });
 
-  router.post(base + "/results/:resultId/revisions", async (req, res) => {
+  router.post([base + "/results/:resultId/revisions", base + "/populations/:population/results/:resultId/revisions"], async (req, res) => {
     try {
-      const context = parseContext(req), resultId = parseResult(req);
+      const context = parseContext(req), resultId = parseResult(req), population = populationFor(req);
       const parsed = Mutation.safeParse(req.body);
       if (!parsed.success) throw new EvidenceError(400, "Invalid evidence revision input");
       const input = parsed.data, user = req.user!;
       const row = await prisma.$transaction(async db => {
-        const { access, item } = await contextFor(db, user, context);
+        const { access, item } = await contextFor(db, user, context, population);
         const reviewerAction = input.action === "verify" || input.action === "request_changes";
         if (reviewerAction ? !access.review : !access.contribute) throw new EvidenceError(403, "Evidence action not permitted");
-        const source = await db.assessmentResult.findFirst({
-          where: { ...sourceWhere(context), id: resultId }, select: resultSelect,
-        });
+        const source = await sourceFor(db, context, population, resultId);
         if (!source) throw new EvidenceError(404, "Result not found");
         if (!eligible(source)) throw new EvidenceError(409, "Evidence requires a valid finalized published result");
         const previous = await db.assessmentEvidenceRevision.findFirst({
-          where: { ...context, resultId }, orderBy: { revision: "desc" },
+          where: { ...context, ...sourceIdentity(population, resultId) }, orderBy: { revision: "desc" },
         });
         if ((previous?.revision ?? 0) !== input.expectedRevision) throw new EvidenceError(409, "Evidence revision changed; reload");
         if (reviewerAction && await db.assessmentEvidenceRevision.findFirst({
-          where: { resultId, actorId: user.id, action: { in: ["create", "revise", "submit"] } }, select: { id: true },
+          where: { ...sourceIdentity(population, resultId), actorId: user.id, action: { in: ["create", "revise", "submit"] } }, select: { id: true },
         })) throw new EvidenceError(403, "Contributors cannot review their own evidence");
 
         const contentEdit = input.action === "create" || input.action === "revise";
@@ -237,7 +293,7 @@ export function createAssessmentEvidenceRouter(): Router {
         // Never mutate an official result. The database independently checks
         // canonical context, current score, append-only history and self-review.
         return db.assessmentEvidenceRevision.create({ data: {
-          ...context, resultId, revision: input.expectedRevision + 1,
+          ...context, ...sourceIdentity(population, resultId), revision: input.expectedRevision + 1,
           status, action: input.action, sourceHash: hash, sourceSnapshot: snapshot,
           score: source.score, maxScore: source.maxScore,
           workReference: reference, attachment: attachment ?? Prisma.DbNull, selectionReason: reason,
@@ -250,19 +306,19 @@ export function createAssessmentEvidenceRouter(): Router {
   });
 
   // Authorization and current revision checks precede scanning and any storage write.
-  router.post(base + "/results/:resultId/attachment",
+  router.post([base + "/results/:resultId/attachment", base + "/populations/:population/results/:resultId/attachment"],
     async (req, res, next) => {
       try {
-        const context = parseContext(req), resultId = parseResult(req);
+        const context = parseContext(req), resultId = parseResult(req), population = populationFor(req);
         const header = req.header("x-evidence-revision");
         const revision = header !== undefined && /^\d+$/.test(header) ? Number(header) : -1;
         if (!Number.isSafeInteger(revision) || revision < 0) throw new EvidenceError(400, "Invalid expected revision");
         await prisma.$transaction(async db => {
-          const { access } = await contextFor(db, req.user!, context);
+          const { access } = await contextFor(db, req.user!, context, population);
           if (!access.contribute) throw new EvidenceError(403, "Evidence action not permitted");
-          const source = await db.assessmentResult.findFirst({ where: { ...sourceWhere(context), id: resultId }, select: resultSelect });
+          const source = await sourceFor(db, context, population, resultId);
           if (!source || !eligible(source)) throw new EvidenceError(404, "Eligible result not found");
-          const previous = await db.assessmentEvidenceRevision.findFirst({ where: { ...context, resultId }, orderBy: { revision: "desc" } });
+          const previous = await db.assessmentEvidenceRevision.findFirst({ where: { ...context, ...sourceIdentity(population, resultId) }, orderBy: { revision: "desc" } });
           if ((previous?.revision ?? 0) !== revision) throw new EvidenceError(409, "Evidence revision changed; reload");
         });
         next();
@@ -272,7 +328,7 @@ export function createAssessmentEvidenceRouter(): Router {
     async (req, res) => {
       let uploaded: EvidenceAttachment | null = null;
       try {
-        const context = parseContext(req), resultId = parseResult(req), user = req.user!;
+        const context = parseContext(req), resultId = parseResult(req), population = populationFor(req), user = req.user!;
         const revision = Number(req.header("x-evidence-revision"));
         let selectionReason = "";
         try { selectionReason = decodeURIComponent(req.header("x-evidence-reason") ?? ""); } catch { /* invalid */ }
@@ -282,15 +338,15 @@ export function createAssessmentEvidenceRouter(): Router {
         uploaded = await storeEvidenceFile(file);
         const attachment = uploaded;
         const row = await prisma.$transaction(async db => {
-          const { access, item } = await contextFor(db, user, context);
+          const { access, item } = await contextFor(db, user, context, population);
           if (!access.contribute) throw new EvidenceError(403, "Evidence action not permitted");
-          const source = await db.assessmentResult.findFirst({ where: { ...sourceWhere(context), id: resultId }, select: resultSelect });
+          const source = await sourceFor(db, context, population, resultId);
           if (!source || !eligible(source)) throw new EvidenceError(404, "Eligible result not found");
-          const previous = await db.assessmentEvidenceRevision.findFirst({ where: { ...context, resultId }, orderBy: { revision: "desc" } });
+          const previous = await db.assessmentEvidenceRevision.findFirst({ where: { ...context, ...sourceIdentity(population, resultId) }, orderBy: { revision: "desc" } });
           if ((previous?.revision ?? 0) !== revision) throw new EvidenceError(409, "Evidence revision changed; reload");
           const { snapshot, hash } = provenance(source, item.rubricId);
           return db.assessmentEvidenceRevision.create({ data: {
-            ...context, resultId, revision: revision + 1, status: "draft", action: previous ? "revise" : "create",
+            ...context, ...sourceIdentity(population, resultId), revision: revision + 1, status: "draft", action: previous ? "revise" : "create",
             sourceHash: hash, sourceSnapshot: snapshot, score: source.score, maxScore: source.maxScore,
             workReference: null, attachment, selectionReason: reason.data, actorId: user.id,
           } });
@@ -311,14 +367,14 @@ export function createAssessmentEvidenceRouter(): Router {
     },
   );
 
-  router.get(base + "/results/:resultId/revisions/:revision/download", async (req, res) => {
+  router.get([base + "/results/:resultId/revisions/:revision/download", base + "/populations/:population/results/:resultId/revisions/:revision/download"], async (req, res) => {
     try {
-      const context = parseContext(req), resultId = parseResult(req);
+      const context = parseContext(req), resultId = parseResult(req), population = populationFor(req);
       const revision = z.coerce.number().int().positive().safeParse(req.params.revision);
       if (!revision.success) throw new EvidenceError(400, "Invalid revision");
       const attachment = await prisma.$transaction(async db => {
-        await contextFor(db, req.user!, context);
-        const row = await db.assessmentEvidenceRevision.findFirst({ where: { ...context, resultId, revision: revision.data } });
+        await contextFor(db, req.user!, context, population);
+        const row = await db.assessmentEvidenceRevision.findFirst({ where: { ...context, ...sourceIdentity(population, resultId), revision: revision.data } });
         const file = parseEvidenceAttachment(row?.attachment);
         if (!file) throw new EvidenceError(404, "Evidence attachment not found");
         return file;
