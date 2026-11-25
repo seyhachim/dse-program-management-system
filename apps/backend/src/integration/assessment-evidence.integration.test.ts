@@ -4,6 +4,9 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
+import { EVIDENCE_BUCKET, parseEvidenceAttachment } from "../plugins/qa/evidence/assessment-evidence-storage.ts";
 import { signToken, type AuthUser, type Role } from "../core/auth/token.ts";
 import { createApp } from "../core/app.ts";
 import { prisma } from "../core/db/prisma.ts";
@@ -13,7 +16,7 @@ import { resultsLifecycleService } from "../plugins/student-portal/results-lifec
 const isolated = process.env.BACKEND_INTEGRATION_TESTS === "1" ? describe : describe.skip;
 isolated("assessment evidence protected API and immutable history", () => {
   let server: Server | undefined;
-  let origin = "", base = "", sourceId = "", otherResultId = "";
+  let origin = "", base = "", otherBase = "", sourceId = "", otherResultId = "";
   let lecturer: AuthUser, coordinator: AuthUser, student: AuthUser, unrelated: AuthUser;
   let wrongProgramme: AuthUser;
   const ref = "https://drive.google.com/file/d/synthetic-test-work/view";
@@ -74,6 +77,7 @@ isolated("assessment evidence protected API and immutable history", () => {
     const first = await createResult(), second = await createResult();
     sourceId = first.resultId; otherResultId = second.resultId;
     base = "/api/qa/assessment-evidence/offerings/" + first.offeringId + "/specs/" + spec.id + "/assessments/" + item.id;
+    otherBase = "/api/qa/assessment-evidence/offerings/" + second.offeringId + "/specs/" + spec.id + "/assessments/" + item.id;
     server = createApp().listen(0, "127.0.0.1");
     await once(server, "listening");
     origin = "http://127.0.0.1:" + (server.address() as AddressInfo).port;
@@ -281,4 +285,53 @@ isolated("assessment evidence protected API and immutable history", () => {
       score: 85, maxScore: 100, selectionReason: "Invalid mixed source", actorId: lecturer.id,
     } }); }).toThrow();
   }, 60000);
+
+  const realStorageTest = process.env.ASSESSMENT_EVIDENCE_REAL_STORAGE_TEST === "1" ? test : test.skip;
+  realStorageTest("real isolated private Storage, scanner, signed download and independent review", async () => {
+    const endpoint = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY, anonKey = process.env.SUPABASE_ANON_KEY;
+    if (!endpoint || !key || !anonKey || !["127.0.0.1","localhost"].includes(new URL(endpoint).hostname)) throw new Error("Local-only Supabase Storage required");
+    const storage = createClient(endpoint, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const anon = createClient(endpoint, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    // Restrictive bucket policy also denies clients even if another permissive policy exists.
+    await prisma.$executeRawUnsafe(`CREATE POLICY "evidence_ci_deny_clients" ON storage.objects AS RESTRICTIVE FOR ALL TO anon, authenticated USING (bucket_id <> 'assessment-evidence-private') WITH CHECK (bucket_id <> 'assessment-evidence-private')`);
+    const existing = await storage.storage.getBucket(EVIDENCE_BUCKET);
+    expect(existing.data).toBeNull();
+    const bucketResult = await storage.storage.createBucket(EVIDENCE_BUCKET, { public: false, fileSizeLimit: 5*1024*1024, allowedMimeTypes: ["application/pdf","image/jpeg","image/png"] });
+    expect(bucketResult.error).toBeNull();
+    process.env.ASSESSMENT_EVIDENCE_UPLOADS_ENABLED = "true";
+    process.env.ASSESSMENT_EVIDENCE_CLAMSCAN_READY = "true";
+    const path = otherBase + "/results/" + otherResultId;
+    const bytes = Buffer.from("%PDF-1.4\nSynthetic marked work only\n%%EOF\n");
+    const upload = async (actor: AuthUser, data: Buffer, expectedRevision = 0) => fetch(origin + path + "/attachment", { method: "POST", headers: {
+      Authorization: "Bearer " + signToken(actor), "Content-Type": "application/octet-stream",
+      "x-evidence-filename": "synthetic.pdf", "x-evidence-mime": "application/pdf", "x-evidence-revision": String(expectedRevision), "x-evidence-reason": "Synthetic marked sample",
+    }, body: data });
+    expect((await upload(student, bytes)).status).toBe(404);
+    const response = await upload(lecturer, bytes);
+    expect(response.status).toBe(201);
+    const row = await prisma.assessmentEvidenceRevision.findFirstOrThrow({ where: { resultId: otherResultId, revision: 1 } });
+    const file = parseEvidenceAttachment(row.attachment);
+    expect(file?.sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
+    if (!file) throw new Error("Attachment metadata absent");
+    const publicUrl = storage.storage.from(EVIDENCE_BUCKET).getPublicUrl(file.objectKey).data.publicUrl;
+    expect((await fetch(publicUrl)).ok).toBe(false);
+    expect((await anon.storage.from(EVIDENCE_BUCKET).download(file.objectKey)).error).not.toBeNull();
+    expect((await anon.storage.from(EVIDENCE_BUCKET).upload("v1/unauthorised.pdf", bytes, { contentType: "application/pdf" })).error).not.toBeNull();
+    const downloadPath = path + "/revisions/1/download";
+    expect((await request(downloadPath, unrelated)).status).toBe(404);
+    expect((await request(downloadPath, student)).status).toBe(404);
+    const signed = await fetch(origin + downloadPath, { headers: { Authorization: "Bearer " + signToken(coordinator) } });
+    expect(signed.status).toBe(200);
+    const link = await signed.json() as { url: string; expiresInSeconds: number };
+    expect(link.expiresInSeconds).toBe(60);
+    const downloaded = await fetch(link.url);
+    expect(downloaded.ok).toBe(true);
+    expect(Buffer.from(await downloaded.arrayBuffer())).toEqual(bytes);
+    expect((await upload(lecturer, bytes)).status).toBe(409);
+    expect((await request(path + "/revisions", lecturer, { action: "submit", expectedRevision: 1, confirmedMarkedWork: true })).status).toBe(201);
+    expect((await request(path + "/revisions", coordinator, { action: "verify", expectedRevision: 2, reviewReason: "Synthetic file verified", confirmedRestrictedWorkAndMarks: true })).status).toBe(201);
+    expect((await request(otherBase, coordinator)).body.evidence[0].effectiveStatus).toBe("verified");
+    // Scanner rejection is exercised separately with the standard harmless EICAR test signature.
+    // The disposable stack, including all stored revisions, is discarded by CI.
+  }, 120000);
 });
