@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { StudentCareerProfileSchema } from "./student-career-profile.ts";
+
+export const UniversityEmailSchema = z.string().trim().max(254).email().refine(value => /^[^@\s]+@rupp\.edu\.kh$/i.test(value), "Use your university email ending in @rupp.edu.kh").transform(value => value.toLowerCase());
 
 const namePart = z.string().trim().min(1).max(100).refine(
   (value) => !/[\u0000-\u001F\u007F]/.test(value),
@@ -15,7 +18,8 @@ export const TelegramStudentRegistrationInputSchema = z.object({
   cohortId: z.string().trim().min(1).max(100),
   sectionId: z.string().trim().min(1).max(100),
   officialStudentId: z.string().trim().min(1).max(100).optional(),
-  email: z.string().trim().max(254).email().optional(),
+  email: UniversityEmailSchema,
+  careerProfile: StudentCareerProfileSchema.optional(),
 }).strict();
 
 export type TelegramStudentRegistrationInput = z.infer<
