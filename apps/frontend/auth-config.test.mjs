@@ -6,6 +6,26 @@ function env(values) {
 }
 
 describe("validateProductionAuthConfig", () => {
+
+  test("registration UAT accepts only its exact preview API and issuer", () => {
+    const safe = {
+      NODE_ENV: "production", VERCEL_ENV: "preview",
+      DSE_REGISTRATION_UAT: "true", NEXT_PUBLIC_STAGING_MODE: "true",
+      NEXT_PUBLIC_AUTH_MODE: "neon-staging",
+      NEXT_PUBLIC_API_URL: "https://dse-pms-telegram1364-uat.onrender.com",
+      NEXT_PUBLIC_NEON_AUTH_BASE_URL: "https://ep-solitary-block-a1hm2c16.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth",
+    };
+    expect(() => validateProductionAuthConfig(safe)).not.toThrow();
+    for (const overrides of [
+      { VERCEL_ENV: "production" }, { VERCEL_ENV: undefined },
+      { DSE_REGISTRATION_UAT: undefined }, { NEXT_PUBLIC_STAGING_MODE: "false" },
+      { NEXT_PUBLIC_API_URL: "https://dse-pms-staging-isolated-free.onrender.com" },
+      { NEXT_PUBLIC_NEON_AUTH_BASE_URL: "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth" },
+    ]) {
+      expect(() => validateProductionAuthConfig({ ...safe, ...overrides })).toThrow();
+    }
+  });
+
   test("does nothing outside production", () => {
     expect(() => validateProductionAuthConfig(env({ NODE_ENV: "development" }))).not.toThrow();
   });
