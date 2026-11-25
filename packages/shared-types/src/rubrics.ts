@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ASSESSMENT_TYPES } from "./course-spec.ts";
+import { AssessmentInstrumentKindSchema, type AssessmentInstrumentKind } from "./assessment-instruments.ts";
 
 /**
  * Rubric Library domain schemas. A rubric is a reusable assessment grid: a set
@@ -43,6 +44,7 @@ export const RubricCriterion = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1, "A criterion name is required"),
   descriptors: z.array(z.string()).default([]),
+  maxPoints: z.number().finite().positive().optional(),
 });
 export type RubricCriterion = z.infer<typeof RubricCriterion>;
 
@@ -67,7 +69,8 @@ export const RubricSchema = z.object({
   name: z.string().min(1),
   type: RubricTypeSchema,
   description: z.string(),
-  levels: z.array(RubricLevel).min(1),
+  instrumentKind: AssessmentInstrumentKindSchema.optional(),
+  levels: z.array(RubricLevel),
   criteria: z.array(RubricCriterion),
   status: RubricStatusSchema,
   owner: RubricOwner.nullable(),
@@ -95,18 +98,41 @@ export const PublicRubricSchema = z.object({
 export type PublicRubric = z.infer<typeof PublicRubricSchema>;
 
 /** Body for POST /api/rubrics. Owner is taken from the caller, never the body. */
-export const CreateRubricInput = z.object({
+const RubricInputBase = z.object({
+  instrumentKind: AssessmentInstrumentKindSchema.optional(),
   name: z.string().trim().min(1, "A rubric name is required"),
   type: RubricTypeSchema,
   description: z.string().trim().default(""),
-  levels: z.array(RubricLevel).min(1, "At least one rating level is required"),
+  levels: z.array(RubricLevel),
   criteria: z.array(RubricCriterion).min(1, "At least one criterion is required"),
   status: RubricStatusSchema.default("Draft"),
+});
+export function validateInstrumentContent(input: {
+  instrumentKind?: AssessmentInstrumentKind;
+  levels: readonly RubricLevel[];
+  criteria: readonly RubricCriterion[];
+}): string | null {
+  const ids = new Set(input.criteria.map((criterion) => criterion.id));
+  if (!input.criteria.length || ids.size !== input.criteria.length) return "Distinct criteria or questions are required";
+  if (input.instrumentKind === "marking_scheme") {
+    if (input.levels.length) return "Marking schemes do not use rating levels";
+    if (input.criteria.some((criterion) => !Number.isFinite(criterion.maxPoints) || (criterion.maxPoints ?? 0) <= 0 || criterion.descriptors.length)) return "Each question needs a positive maximum and no rating descriptors";
+    if (!Number.isFinite(input.criteria.reduce((sum, criterion) => sum + (criterion.maxPoints ?? 0), 0))) return "Invalid total maximum";
+    return null;
+  }
+  if (!input.levels.length) return "At least one rating level is required";
+  if (input.criteria.some((criterion) => criterion.maxPoints !== undefined)) return "Traditional rubrics use their existing shared rating scale";
+  return null;
+}
+
+export const CreateRubricInput = RubricInputBase.superRefine((input, ctx) => {
+  const error = validateInstrumentContent(input);
+  if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
 });
 export type CreateRubricInput = z.infer<typeof CreateRubricInput>;
 
 /** Body for PATCH /api/rubrics/:id — all fields optional. */
-export const UpdateRubricInput = CreateRubricInput.partial();
+export const UpdateRubricInput = RubricInputBase.partial();
 export type UpdateRubricInput = z.infer<typeof UpdateRubricInput>;
 
 /** Query params for GET /api/rubrics. */
@@ -125,7 +151,9 @@ export function rubricMaxLevelPoints(levels: readonly RubricLevel[]): number {
 export function rubricTotalPoints(rubric: {
   levels: readonly RubricLevel[];
   criteria: readonly RubricCriterion[];
+  instrumentKind?: AssessmentInstrumentKind;
 }): number {
+  if (rubric.instrumentKind === "marking_scheme") return rubric.criteria.reduce((sum, criterion) => sum + (criterion.maxPoints ?? 0), 0);
   return rubric.criteria.length * rubricMaxLevelPoints(rubric.levels);
 }
 

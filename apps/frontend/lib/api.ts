@@ -8,6 +8,7 @@ import { createInflightGetDeduper } from "./inflight-get";
 import { createInflightLoader } from "./inflight-value";
 import { runConfirmedMutation } from "./mutation-invalidation";
 import { AUTH_MODE, getSupabase } from "./supabase";
+import { getStagingAuth, stagingBearerToken } from "./staging-auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "";
@@ -16,6 +17,10 @@ const runInflightGet = createInflightGetDeduper();
 const runInflightAuthHeader = createInflightLoader<Record<string, string>>();
 
 async function authHeader(): Promise<Record<string, string>> {
+  if (AUTH_MODE === "neon-staging") {
+    const token = await stagingBearerToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
   if (AUTH_MODE === "supabase") {
     return runInflightAuthHeader(async (): Promise<Record<string, string>> => {
       const { data } = await getSupabase().auth.getSession();
@@ -61,6 +66,29 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
     cache: "no-store",
   });
 
+  if (res.status === 401 && AUTH_MODE === "neon-staging" && !isRetry) {
+    // A valid Neon session does not grant a PMS role. Redirecting every 401 to
+    // /login would loop forever: login sees that session and returns to /.
+    // Show AuthGuard's recoverable access-denied screen instead, where the user
+    // can sign out and switch to a correctly provisioned staging account.
+    let hasProviderSession = false;
+    if (typeof window !== "undefined") {
+      try {
+        const { data } = await getStagingAuth().getSession();
+        hasProviderSession = Boolean(data?.session);
+      } catch {
+        // Fail closed if the provider session cannot be confirmed.
+      }
+    }
+    if (hasProviderSession) {
+      throw new ApiError(
+        401,
+        "Your staging identity is not authorized for DSE PMS. Sign out and use a provisioned test account.",
+      );
+    }
+    if (typeof window !== "undefined") window.location.replace("/login");
+    throw new ApiError(401, "Staging session expired. Please sign in again.");
+  }
   if (res.status === 401 && AUTH_MODE === "supabase" && !isRetry) {
     const supabase = getSupabase();
     const { data, error } = await supabase.auth.refreshSession();
@@ -97,6 +125,12 @@ export const api = {
   put: <T>(path: string, body: unknown, signal?: AbortSignal) =>
     runConfirmedMutation("PUT", path, () =>
       request<T>(path, { method: "PUT", body: JSON.stringify(body), signal }),
+    ),
+  uploadFile: <T>(path: string, file: File) =>
+    runConfirmedMutation("POST", path, () =>
+      request<T>(path, {
+        method: "POST", headers: { "Content-Type": file.type }, body: file,
+      }),
     ),
   delete: <T>(path: string, body?: unknown) =>
     runConfirmedMutation("DELETE", path, () =>

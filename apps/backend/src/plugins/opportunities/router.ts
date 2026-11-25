@@ -1,0 +1,119 @@
+import { Router, raw, type Request, type Response } from "express";
+import { CreateOpportunityInput, ReviewOpportunityExperienceInput, SubmitOpportunityExperienceInput, UpdateOpportunityInput } from "@dse-pms/shared-types";
+import { requireAuth } from "../../core/auth/middleware.ts";
+import { OpportunityError, opportunitiesService } from "./service.ts";
+import { opportunityInterestService } from "./service-interest.ts";
+
+type RouteTask = (req: Request, res: Response) => Promise<void>;
+function route(task: RouteTask) {
+  return (req: Request, res: Response) => {
+    void task(req, res).catch((error: unknown) => {
+      if (error instanceof OpportunityError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      console.error("Student Opportunities request failed", error);
+      res.status(500).json({ error: "Could not complete opportunity request" });
+    });
+  };
+}
+function programmeId(req: Request): string {
+  const value = req.query.programmeId;
+  if (value === undefined) return "dse";
+  if (typeof value !== "string" || value.length > 80 || value.length === 0) {
+    throw new OpportunityError(400, "Invalid programme");
+  }
+  return value;
+}
+function parsedId(value: string | undefined): string {
+  if (!value || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(value)) {
+    throw new OpportunityError(400, "Invalid identifier");
+  }
+  return value;
+}
+
+export function createOpportunitiesRouter(): Router {
+  const router = Router();
+  router.use(requireAuth);
+  // No caching a previously public opportunity after archive or expiry.
+  router.use((_req, res, next) => {
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    next();
+  });
+
+  router.get("/", route(async (req, res) => {
+    res.json(await opportunitiesService.list(req.user!, programmeId(req)));
+  }));
+  // Role-scoped lecturer/coordinator dashboard; route must precede /:id.
+  router.get("/participation", route(async (req, res) => {
+    res.json(await opportunityInterestService.overview(req.user!, programmeId(req)));
+  }));
+  router.get("/manage", route(async (req, res) => {
+    res.json(await opportunitiesService.manage(req.user!, programmeId(req)));
+  }));
+  router.post("/manage", route(async (req, res) => {
+    const input = CreateOpportunityInput.safeParse(req.body);
+    if (!input.success) throw new OpportunityError(400, "Invalid opportunity: " + input.error.issues[0]?.message);
+    res.status(201).json(await opportunitiesService.create(req.user!, input.data));
+  }));
+  router.patch("/manage/:id", route(async (req, res) => {
+    const input = UpdateOpportunityInput.safeParse(req.body);
+    if (!input.success) throw new OpportunityError(400, "Invalid opportunity: " + input.error.issues[0]?.message);
+    res.json(await opportunitiesService.updateDraft(req.user!, parsedId(req.params.id), input.data));
+  }));
+  router.post("/manage/:id/restore", route(async (req, res) => {
+    res.json(await opportunitiesService.restoreToDraft(req.user!, parsedId(req.params.id)));
+  }));
+  router.post("/manage/:id/poster", raw({
+    type: ["image/jpeg", "image/png", "image/webp"], limit: "5mb",
+  }), route(async (req, res) => {
+    if (!(req.body instanceof Uint8Array)) throw new OpportunityError(400, "Choose a JPG, PNG or WebP image");
+    res.json(await opportunitiesService.uploadPoster(req.user!, parsedId(req.params.id), req.body, req.headers["content-type"] ?? ""));
+  }));
+  router.post("/manage/:id/publish", route(async (req, res) => {
+    res.json(await opportunitiesService.publish(req.user!, parsedId(req.params.id)));
+  }));
+  router.post("/manage/:id/archive", route(async (req, res) => {
+    res.json(await opportunitiesService.archive(req.user!, parsedId(req.params.id)));
+  }));
+  router.get("/manage/experiences", route(async (req, res) => {
+    res.json(await opportunitiesService.reviewList(req.user!, programmeId(req)));
+  }));
+  router.post("/manage/experiences/:id/approve", route(async (req, res) => {
+    const body = ReviewOpportunityExperienceInput.safeParse(req.body);
+    if (!body.success) throw new OpportunityError(400, "Invalid review note");
+    res.json(await opportunitiesService.reviewExperience(req.user!, parsedId(req.params.id), "approve", body.data.reason));
+  }));
+  router.post("/manage/experiences/:id/hide", route(async (req, res) => {
+    const body = ReviewOpportunityExperienceInput.safeParse(req.body);
+    if (!body.success) throw new OpportunityError(400, "Invalid review note");
+    res.json(await opportunitiesService.reviewExperience(req.user!, parsedId(req.params.id), "hide", body.data.reason));
+  }));
+  router.get("/:id/interest", route(async (req, res) => {
+    res.json(await opportunityInterestService.summary(req.user!, parsedId(req.params.id)));
+  }));
+  router.post("/:id/interest", route(async (req, res) => {
+    res.json(await opportunityInterestService.join(req.user!, parsedId(req.params.id)));
+  }));
+  router.post("/:id/interest/withdraw", route(async (req, res) => {
+    res.json(await opportunityInterestService.withdraw(req.user!, parsedId(req.params.id)));
+  }));
+  router.get("/:id/interest/students", route(async (req, res) => {
+    res.json(await opportunityInterestService.students(req.user!, parsedId(req.params.id)));
+  }));
+  router.get("/:id", route(async (req, res) => {
+    res.json(await opportunitiesService.detail(req.user!, parsedId(req.params.id)));
+  }));
+  router.get("/:id/my-experiences", route(async (req, res) => {
+    res.json(await opportunitiesService.myExperiences(req.user!, parsedId(req.params.id)));
+  }));
+  router.post("/:id/experiences/:experienceId/withdraw", route(async (req, res) => {
+    res.json(await opportunitiesService.withdrawExperience(req.user!, parsedId(req.params.id), parsedId(req.params.experienceId)));
+  }));
+  router.post("/:id/experiences", route(async (req, res) => {
+    const input = SubmitOpportunityExperienceInput.safeParse(req.body);
+    if (!input.success) throw new OpportunityError(400, "Consent, outcome and evidence ID are required");
+    res.status(201).json(await opportunitiesService.submitExperience(req.user!, parsedId(req.params.id), input.data));
+  }));
+  return router;
+}

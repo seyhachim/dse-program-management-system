@@ -298,6 +298,12 @@ jobs:
         env:
           GROUP_ASSESSMENT_DB_TESTS: "1"
 
+      - name: Verify opportunity publication and consent database boundary
+        run: OPPORTUNITIES_DB_TESTS=1 bun test apps/backend/src/plugins/opportunities/service-db.test.ts
+
+      - name: Verify opportunity interest privacy and staff roster boundary
+        run: OPPORTUNITIES_DB_TESTS=1 bun test apps/backend/src/plugins/opportunities/service-interest-db.test.ts
+
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
 
@@ -438,6 +444,7 @@ jobs:
           echo "BROWSER_SMOKE_COORDINATOR_TOKEN=$(bun run gen-token --role program_coordinator | tail -n 1)" >> "$GITHUB_ENV"
           echo "BROWSER_SMOKE_LECTURER_TOKEN=$(bun run gen-token --role lecturer | tail -n 1)" >> "$GITHUB_ENV"
           echo "BROWSER_SMOKE_READONLY_TOKEN=$(bun run gen-token --role program_secretary | tail -n 1)" >> "$GITHUB_ENV"
+          echo "BROWSER_SMOKE_STUDENT_TOKEN=$(bun run gen-token --role student | tail -n 1)" >> "$GITHUB_ENV"
 
       - name: Install Chromium
         run: cd tests/browser && bunx playwright install --with-deps chromium
@@ -502,6 +509,15 @@ jobs:
 
       - name: Seed isolated integration database
         run: bun run seed
+
+      - name: Run Sindora participant/news isolation tests
+        run: bun test apps/backend/src/integration/sindora-news-participants.integration.test.ts
+
+      - name: Run Sindora Course Activities isolated API/database pilot
+        run: bun test apps/backend/src/integration/course-activities.integration.test.ts
+
+      - name: Verify authenticated CourseSpec submission readiness and resubmission
+        run: bun test apps/backend/src/integration/course-spec-submission.integration.test.ts
 
       - name: Run backend route/database authorization integration suite
         run: bun run test:backend:integration

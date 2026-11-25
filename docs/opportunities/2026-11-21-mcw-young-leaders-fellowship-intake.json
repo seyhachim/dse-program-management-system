@@ -1,0 +1,26 @@
+{
+  "importStatus": "NOT_IMPORTED_OR_PUBLISHED",
+  "asOf": "2026-11-21",
+  "scope": "DSE Student Opportunities; staff-only verified intake pending feature release and approval",
+  "origin": "User-provided screenshot of MCW Global's 2027 Young Leaders Fellowship page; details checked on the organizer's official page on 2026-11-21",
+  "officialSource": "https://mcwglobal.org/young-leaders-fellowship-2027/",
+  "cautions": [
+    "The Student Opportunities MVP PR #1285 is draft; this GitHub intake file is NOT a live PMS record.",
+    "Do not insert into production until separate real-auth staging UAT, migration/release gates, and staff review pass.",
+    "The official deadline is Dec 3 2026 at 11:59 PM New York EST, which is Dec 4 2026 at 11:59 AM Phnom Penh; the date-only PMS field uses Dec 3 conservatively.",
+    "The $100 accepted-participant deposit is refundable only after successful completion; passport and visa expenses are not covered."
+  ],
+  "opportunities": [
+    {
+      "programmeId": "dse",
+      "type": "fellowship",
+      "title": "MCW Global 2027 Young Leaders Fellowship",
+      "organizer": "MCW Global",
+      "summary": "A year-long international leadership and community-impact fellowship: community needs assessment starting June 2027, in-person leadership training in New York City and Burlington, Vermont, USA on July 20–29, 2027, and virtual project implementation with alumni mentorship through July 2028. Focus areas: education, health, and economic security. MCW covers economy flights for accepted participants, program housing and meals, and local program travel. An accepted participant must pay a refundable $100 deposit; visa, passport and in-country expenses are not covered. Applications close December 3, 2026 at 11:59 PM NYC EST (December 4 at 11:59 AM Cambodia time).",
+      "eligibility": "Open worldwide, including Cambodia. Applicant must be aged 18–26 on June 1, 2027 (no exceptions), fluent in written and spoken English, committed to positive change in their community, and able to identify an education, health or economic-security issue. Must be available for the June community needs assessment, July in-person training, and subsequent project work; have email/internet access and appropriate travel/visa eligibility. Application in English requires essays, a resume of at most one page, and two recommendation letters. MCW emphasizes authentic, original responses and discourages AI-generated essays.",
+      "sourceUrl": "https://mcwglobal.org/young-leaders-fellowship-2027/",
+      "applicationUrl": "https://applicant.mcwglobal.org/apply/2027-mentee-call-young-leaders-fellowship",
+      "deadline": "2026-12-03"
+    }
+  ]
+}

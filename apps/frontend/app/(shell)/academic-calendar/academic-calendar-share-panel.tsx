@@ -5,6 +5,7 @@ import { Check, CheckCircle2, Clock3, Copy, FilePenLine, Link2 } from "lucide-re
 import type { AcademicCalendarView, AcademicYearView } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { academicCalendarApi, formatAcademicDate } from "@/lib/academic-calendar";
+import { publicCalendarShareUrl } from "./academic-calendar-share-urls";
 
 const STUDY_YEARS = [1, 2, 3, 4] as const;
 
@@ -12,14 +13,6 @@ type YearState = {
   calendar: AcademicCalendarView | null;
   status: "Published" | "Draft" | "NotIssued";
 };
-
-function publicYearSlug(label: string): string {
-  return label.replace(/–/g, "-").replace(/\s+/g, "");
-}
-
-function publicPath(programmeId: string, academicYear: string, studyYear: number): string {
-  return `/calendar/${encodeURIComponent(programmeId)}/${encodeURIComponent(publicYearSlug(academicYear))}/year-${studyYear}`;
-}
 
 function resolveYearState(calendars: AcademicCalendarView[], studyYear: number): YearState {
   const matches = calendars.filter((calendar) => calendar.studyYears.includes(studyYear));
@@ -36,7 +29,8 @@ export function AcademicCalendarSharePanel() {
   const [selectedYearId, setSelectedYearId] = useState("");
   const [calendars, setCalendars] = useState<AcademicCalendarView[]>([]);
   const [loading, setLoading] = useState(true);
-  const [copiedYear, setCopiedYear] = useState<number | null>(null);
+  const [copiedLink, setCopiedLink] = useState<number | "all" | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const selectedYear = useMemo(
     () => years.find((year) => year.id === selectedYearId) ?? null,
@@ -66,7 +60,8 @@ export function AcademicCalendarSharePanel() {
 
   const changeYear = async (academicYearId: string) => {
     setSelectedYearId(academicYearId);
-    setCopiedYear(null);
+    setCopiedLink(null);
+    setCopyError(null);
     if (!programmeId || !academicYearId) {
       setCalendars([]);
       return;
@@ -74,13 +69,19 @@ export function AcademicCalendarSharePanel() {
     setCalendars(await academicCalendarApi.calendars(programmeId, academicYearId));
   };
 
-  const copyLink = async (studyYear: number) => {
+  const copyLink = async (studyYear?: number) => {
     if (!selectedYear || !programmeId) return;
-    const path = publicPath(programmeId, selectedYear.label, studyYear);
-    const url = typeof window === "undefined" ? path : new URL(path, window.location.origin).toString();
-    await navigator.clipboard.writeText(url);
-    setCopiedYear(studyYear);
-    window.setTimeout(() => setCopiedYear((current) => current === studyYear ? null : current), 1800);
+    const target = studyYear ?? "all";
+    setCopyError(null);
+    try {
+      const url = publicCalendarShareUrl(window.location.origin, programmeId, selectedYear.label, studyYear);
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(target);
+      window.setTimeout(() => setCopiedLink((current) => current === target ? null : current), 1800);
+    } catch {
+      setCopiedLink(null);
+      setCopyError("Could not copy the link. Check clipboard permission and try again.");
+    }
   };
 
   if (loading || !selectedYear) return null;
@@ -109,6 +110,21 @@ export function AcademicCalendarSharePanel() {
           </select>
         </div>
       </div>
+
+      <div className="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">All years · {selectedYear.label}</p>
+            <p className="mt-1 text-xs text-muted-foreground">One link for Year 1–4.</p>
+          </div>
+          <Button type="button" className="w-full sm:w-auto" onClick={() => void copyLink()}>
+            {copiedLink === "all" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copiedLink === "all" ? "Link copied" : "Copy link for all years"}
+          </Button>
+        </div>
+      </div>
+
+      {copyError ? <p role="alert" className="mt-3 text-sm text-destructive">{copyError}</p> : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {STUDY_YEARS.map((year) => {
@@ -141,8 +157,8 @@ export function AcademicCalendarSharePanel() {
               </div>
 
               <Button type="button" variant="outline" className="mt-4 w-full" onClick={() => void copyLink(year)}>
-                {copiedYear === year ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copiedYear === year ? "Link copied" : "Copy public link"}
+                {copiedLink === year ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copiedLink === year ? "Link copied" : "Copy public link"}
               </Button>
             </article>
           );

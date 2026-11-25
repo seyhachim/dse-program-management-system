@@ -461,10 +461,10 @@ export const methodsManifest: PluginManifest = {
 
 export const rubricsManifest: PluginManifest = {
   id: "rubrics",
-  name: "Rubric Library",
+  name: "Assessment Instrument Library",
   version: "0.1.0",
   description:
-    "Reusable assessment rubrics — criteria × rating-scale grids shared across courses.",
+    "Reusable rubrics and point-based marking schemes shared across courses.",
   // No routes: reached from within a course's Course Specification → Assessment
   // section (Assessment → Rubric Library), not as a top-level sidebar entry.
   permissions: ["rubrics:read", "rubrics:write"],
@@ -478,6 +478,29 @@ export const authManifest: PluginManifest = {
     "Identity (GET /me) and admin-only account provisioning via Supabase.",
   // No routes: not a sidebar entry — account creation is embedded in the Lecturers page.
   permissions: ["accounts:create"],
+};
+
+export const opportunitiesManifest: PluginManifest = {
+  id: "opportunities",
+  name: "Student Opportunities",
+  version: "0.1.0",
+  description: "Manually reviewed opportunities and consent-based DSE student experiences.",
+  routes: [
+    {
+      label: "Opportunities",
+      path: "/opportunities",
+      icon: "graduation-cap",
+      roles: ["student", "lecturer", "program_coordinator", "program_secretary", "admin"],
+      group: "Community",
+    },
+    {
+      label: "Manage Opportunities",
+      path: "/opportunities/manage",
+      icon: "clipboard-check",
+      roles: ["admin", "program_coordinator"],
+      group: "Community",
+    },
+  ],
 };
 
 export const pluginManifests: PluginManifest[] = [
@@ -494,6 +517,7 @@ export const pluginManifests: PluginManifest[] = [
   methodsManifest,
   rubricsManifest,
   authManifest,
+  opportunitiesManifest,
 ];
 
 /**

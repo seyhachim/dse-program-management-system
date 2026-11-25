@@ -130,6 +130,19 @@ export const authService = {
       assertStudentPortalInviteEligible(studentProfile);
     }
 
+    // Account provisioning replaces primary roles and is NOT the way to
+    // promote/reinvite an appointed Head. Prevent accidental coordinator
+    // revocation before any Supabase side effect.
+    const activeHead = await prisma.programmeHeadAppointment.findFirst({
+      where: { lecturer: { email: input.email }, endedAt: null },
+      select: { id: true },
+    });
+    if (activeHead) {
+      throw new ProgrammeRoleAssignmentError(
+        "This lecturer is an appointed Head of Program. Use the existing account and the Programme Leadership workflow.",
+      );
+    }
+
     const admin = getAdminClient();
     const redirectTo = process.env.SUPABASE_INVITE_REDIRECT_URL;
     const { data, error } = await admin.auth.admin.inviteUserByEmail(input.email, {

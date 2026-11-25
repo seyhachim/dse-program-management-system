@@ -383,10 +383,23 @@ model User {
 
   coursesLed                         Course[]                                  @relation("CourseLecturer")
   offeringsLed                       Offering[]                                @relation("OfferingLecturer")
+  offeringActivitiesCreated OfferingActivity[] @relation("OfferingActivityCreatedBy")
+  offeringActivitiesUpdated OfferingActivity[] @relation("OfferingActivityUpdatedBy")
+  offeringActivityAudits OfferingActivityAuditEvent[] @relation("OfferingActivityAuditActor")
+  activityParticipantsCreated OfferingActivityParticipant[] @relation("VisitParticipantCreatedBy")
+  activityParticipantsUpdated OfferingActivityParticipant[] @relation("VisitParticipantUpdatedBy")
+  activityParticipantAudits OfferingActivityParticipantAudit[] @relation("VisitParticipantAuditActor")
+  dseNewsAuthored DseNewsArticle[] @relation("DseNewsAuthor")
+  dseNewsUpdated DseNewsArticle[] @relation("DseNewsEditor")
+  dseNewsAudits DseNewsAuditEvent[] @relation("DseNewsAuditActor")
+  dseNewsMediaUploaded DseNewsMedia[] @relation("DseNewsMediaUploader")
   rubricsOwned                       Rubric[]                                  @relation("RubricOwner")
   coLecturerOf                       OfferingCoLecturer[]                      @relation("OfferingCoLecturer")
   offeringMeetingAssignments             OfferingMeetingLecturer[]                 @relation("OfferingMeetingLecturerUser")
   roleAssignments                    UserRoleAssignment[]
+  headAppointments                   ProgrammeHeadAppointment[] @relation("ProgrammeHeadLecturer")
+  headAppointmentsMade               ProgrammeHeadAppointment[] @relation("ProgrammeHeadAppointer")
+  headAppointmentsEnded              ProgrammeHeadAppointment[] @relation("ProgrammeHeadEnder")
   courseSpecSubmissions              CourseSpec[]                              @relation("CourseSpecSubmittedBy")
   courseSpecReviewActions            CourseSpecReviewAction[]                  @relation("CourseSpecReviewActor")
   courseSpecRevisionRequests         CourseSpecRevisionRequest[]               @relation("CourseSpecRevisionRequestedBy")
@@ -404,6 +417,12 @@ model User {
   portfolioSupervisorAssignments     StudentPortfolioSupervisorRelationship[]  @relation("PortfolioSupervisorUser")
   portfolioSupervisorApprovals       StudentPortfolioSupervisorRelationship[]  @relation("PortfolioSupervisorApprovedBy")
   portfolioSupervisorRevocations     StudentPortfolioSupervisorRelationship[]  @relation("PortfolioSupervisorRevokedBy")
+  opportunitiesCreated               Opportunity[] @relation("OpportunityCreator")
+  opportunitiesPublished             Opportunity[] @relation("OpportunityPublisher")
+  opportunityAuditEvents             OpportunityAuditEvent[] @relation("OpportunityAuditActor")
+  opportunityExperiencesConsented    OpportunityExperience[] @relation("OpportunityExperienceConsenter")
+  opportunityExperiencesReviewed     OpportunityExperience[] @relation("OpportunityExperienceReviewer")
+  opportunityInterests               OpportunityInterest[]   @relation("OpportunityInterestedStudent")
   announcementsAuthored              CourseAnnouncement[]                      @relation("AnnouncementAuthor")
   assessmentResultsPublished         AssessmentResult[]                        @relation("AssessmentResultPublishedBy")
   assessmentResultsFinalized         AssessmentResult[]                        @relation("AssessmentResultFinalizedBy")
@@ -481,13 +500,16 @@ model Role {
 /// ProgrammeProfile/ProgramPolicy/PLOs in this phase — see issue #143.
 model Programme {
   id        String   @id
+  dseNewsArticles DseNewsArticle[]
   code      String   @unique
   name      String
   status    String   @default("active")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  opportunities            Opportunity[]
   roleAssignments          UserRoleAssignment[]
+  headAppointments         ProgrammeHeadAppointment[]
   courses                  Course[]
   curricula                ProgrammeCurriculum[]
   competencyFrameworks     ProgrammeCompetencyFramework[]
@@ -1549,11 +1571,37 @@ model UserRoleAssignment {
   @@index([programmeId])
 }
 
+/// Historical, programme-scoped appointment of a Head of Program. This is an
+/// academic position, NOT a new login role; coordinator access is granted through
+/// UserRoleAssignment while the lecturer's role and teaching links are preserved.
+/// PostgreSQL enforces exactly one or zero active Heads per programme via a
+/// partial unique index on (programmeId) WHERE endedAt IS NULL.
+model ProgrammeHeadAppointment {
+  id                 String    @id @default(uuid())
+  programmeId        String
+  lecturerId         String
+  appointedById      String
+  endedById          String?
+  appointedAt        DateTime  @default(now())
+  endedAt            DateTime?
+  reference          String?
+  coordinatorGranted Boolean   @default(false)
+
+  programme          Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  lecturer           User      @relation("ProgrammeHeadLecturer", fields: [lecturerId], references: [id], onDelete: Restrict)
+  appointedBy        User      @relation("ProgrammeHeadAppointer", fields: [appointedById], references: [id], onDelete: Restrict)
+  endedBy            User?     @relation("ProgrammeHeadEnder", fields: [endedById], references: [id], onDelete: Restrict)
+
+  @@index([programmeId, appointedAt(sort: Desc)])
+  @@index([lecturerId])
+}
+
 /// Students plugin domain model. `studentId` is the stable institutional identity.
 /// Email is optional because historical/current roster records may legitimately predate
 /// portal-account provisioning; User/auth linkage remains separate through `userId`.
 model Student {
   id                               String                                   @id @default(uuid())
+  activityParticipants OfferingActivityParticipant[]
   name                             String
   email                            String?                                  @unique
   studentId                        String?                                   @unique
@@ -1642,6 +1690,7 @@ model StudentPortfolioEvidence {
   updatedAt              DateTime                            @updatedAt
   archivedAt             DateTime?
   links                  StudentPortfolioEvidenceLink[]
+  opportunityExperiences OpportunityExperience[]
   verificationEvents     StudentPortfolioVerificationEvent[]
   softSkills             StudentPortfolioEvidenceSoftSkill[]
 
@@ -2611,6 +2660,7 @@ model Offering {
   enrollments                    Enrollment[]
   coLecturers                    OfferingCoLecturer[]
   meetings                       OfferingMeeting[]
+  activities OfferingActivity[]
   assessmentDeadlines            OfferingAssessmentDeadline[]
   announcements                  CourseAnnouncement[]
   feedbackResponses              CourseFeedback[]
@@ -2884,6 +2934,7 @@ model AssessmentResultCorrection {
   afterScore         Float
   afterMaxScore      Float
   afterFeedback      String
+  questionChanges    Json @default("[]")
   reason             String
   correctedById      String
   correctedBy        User             @relation("AssessmentResultCorrectionActor", fields: [correctedById], references: [id], onDelete: Restrict)
@@ -3224,6 +3275,7 @@ model Rubric {
   id              String                     @id @default(uuid())
   name            String
   type            String
+  instrumentKind  String                     @default("rubric")
   description     String                     @default("")
   status          RubricStatus               @default(Draft)
   ownerId         String?
@@ -3266,6 +3318,7 @@ model RubricCriterion {
   rubric   Rubric       @relation(fields: [rubricId], references: [id], onDelete: Cascade)
   name     String
   order    Int
+  maxPoints Float?
   cells    RubricCell[]
 
   @@id([rubricId, id])
@@ -3380,4 +3433,244 @@ model UserSecurityAuditEvent {
 
   @@index([actorUserId, createdAt])
   @@index([targetUserId, createdAt])
+}
+
+ 
+/// Manual, staff-reviewed opportunity notice; external organizer remains authoritative.
+/// No crawler, AI, cron, or Vercel-side persistence.
+model Opportunity {
+  id              String   @id @default(uuid())
+  programmeId     String
+  programme       Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  type            String
+  title           String
+  organizer       String
+  summary         String
+  eligibility     String
+  sourceUrl       String
+  applicationUrl  String?
+  posterPath      String?  // Upload-managed Supabase Storage object path; never user-supplied URL
+  deadline        DateTime? @db.Date
+  deadlineTime    String?  // HH:mm Cambodia time; null = end of the local deadline day
+  status          String   @default("Draft")
+  createdById     String
+  createdBy       User     @relation("OpportunityCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedById   String?
+  publishedBy     User?    @relation("OpportunityPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  publishedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  experiences     OpportunityExperience[]
+  interests       OpportunityInterest[]
+  auditEvents     OpportunityAuditEvent[]
+
+  @@index([programmeId, status, deadline])
+  @@index([createdAt])
+}
+
+/// Student intention to join. Separate from organizer registration and verified outcomes.
+/// One current choice per student/opportunity; withdrawals remain recorded with timestamps.
+model OpportunityInterest {
+  id            String      @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  userId        String
+  user          User        @relation("OpportunityInterestedStudent", fields: [userId], references: [id], onDelete: Restrict)
+  status        String      @default("Joined")
+  joinedAt      DateTime    @default(now())
+  withdrawnAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([opportunityId, userId])
+  @@index([opportunityId, status])
+}
+
+model OpportunityExperience {
+  id             String   @id @default(uuid())
+  opportunityId  String
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  evidenceId     String
+  evidence       StudentPortfolioEvidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  outcome        String
+  status         String   @default("Pending")
+  consentedById  String
+  consentedBy    User     @relation("OpportunityExperienceConsenter", fields: [consentedById], references: [id], onDelete: Restrict)
+  consentedAt    DateTime @default(now())
+  reviewedById   String?
+  reviewedBy     User?    @relation("OpportunityExperienceReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  @@unique([opportunityId, evidenceId])
+  @@index([opportunityId, status])
+  @@index([status, createdAt])
+}
+
+model OpportunityAuditEvent {
+  id             String @id @default(uuid())
+  opportunityId  String
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  actorId        String
+  actor          User @relation("OpportunityAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action         String
+  details        String @default("")
+  createdAt      DateTime @default(now())
+
+  @@index([opportunityId, createdAt])
+}
+
+//// Offering-owned delivery evidence, separate from the canonical calendar and CourseSpec plans.
+model OfferingActivity {
+  id               String   @id @default(uuid())
+  offeringId       String
+  offering         Offering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  type             String   @db.VarChar(32)
+  title            String   @db.VarChar(160)
+  date             DateTime @db.Date
+  startTime        String?  @db.VarChar(5)
+  endTime          String?  @db.VarChar(5)
+  host             String   @db.VarChar(160)
+  location         String   @default("") @db.VarChar(240)
+  description      String   @default("") @db.VarChar(2000)
+  objectives       String   @default("") @db.VarChar(2000)
+  reflectionPrompt String   @default("") @db.VarChar(1200)
+  evidenceLinks    Json     @default("[]")
+  status           String   @default("Draft")
+  version          Int      @default(1)
+  createdById      String
+  updatedById      String
+  createdBy        User     @relation("OfferingActivityCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy        User     @relation("OfferingActivityUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  auditEvents      OfferingActivityAuditEvent[]
+  participants OfferingActivityParticipant[]
+  dseNewsArticles DseNewsArticle[]
+
+  @@index([offeringId, date])
+  @@index([status])
+}
+
+model OfferingActivityAuditEvent {
+  id         String           @id @default(uuid())
+  activityId String
+  activity   OfferingActivity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  actorId    String
+  actor      User             @relation("OfferingActivityAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action     String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([activityId, createdAt])
+}
+
+
+//// Staff-only field-trip participation evidence. Not a course attendance event.
+model OfferingActivityParticipant {
+  id           String           @id @default(uuid())
+  activityId   String
+  activity     OfferingActivity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  studentId    String?
+  student      Student?         @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  externalName String?          @db.VarChar(160)
+  externalRole String?          @db.VarChar(32)
+  goStatus     String           @default("Unknown")
+  returnStatus String           @default("Unknown")
+  farmStatus   String           @default("Unverified")
+  source       String           @default("Manual")
+  note         String           @default("") @db.VarChar(500)
+  version      Int              @default(1)
+  createdById  String
+  updatedById  String
+  createdBy    User             @relation("VisitParticipantCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User             @relation("VisitParticipantUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  audits       OfferingActivityParticipantAudit[]
+
+  @@unique([activityId, studentId])
+  @@index([activityId])
+}
+
+model OfferingActivityParticipantAudit {
+  id            String                      @id @default(uuid())
+  participantId String
+  participant   OfferingActivityParticipant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  actorId       String
+  actor         User                        @relation("VisitParticipantAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action        String
+  before        Json?
+  after         Json
+  createdAt     DateTime @default(now())
+
+  @@index([participantId, createdAt])
+}
+
+//// Programme-wide articles are separate from private activity participation.
+model DseNewsArticle {
+  id             String            @id @default(uuid())
+  programmeId    String
+  programme      Programme         @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  activityId     String?
+  activity       OfferingActivity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  authorId       String
+  author         User              @relation("DseNewsAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  updatedById    String
+  updatedBy      User              @relation("DseNewsEditor", fields: [updatedById], references: [id], onDelete: Restrict)
+  title          String            @db.VarChar(180)
+  summary        String            @default("") @db.VarChar(350)
+  body           String            @default("") @db.Text
+  coverImageUrl  String?
+  coverAlt       String            @default("") @db.VarChar(250)
+  gallery        Json              @default("[]")
+  tags           Json              @default("[]")
+  mediaApproved  Boolean           @default(false)
+  status         String            @default("Draft")
+  version        Int               @default(1)
+  publishedAt    DateTime?
+  publicPublishedAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  audits         DseNewsAuditEvent[]
+  media          DseNewsMedia[]
+
+  @@index([programmeId, status, publishedAt])
+  @@index([programmeId, publicPublishedAt])
+  @@index([activityId])
+}
+
+model DseNewsAuditEvent {
+  id        String         @id @default(uuid())
+  articleId String
+  article   DseNewsArticle @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  actorId   String
+  actor     User           @relation("DseNewsAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action    String
+  before    Json?
+  after     Json
+  createdAt DateTime       @default(now())
+
+  @@index([articleId, createdAt])
+}
+
+//// Private uploaded photos attached to an existing news draft.
+//// Source bytes and private object paths are never served to API clients.
+model DseNewsMedia {
+  id            String         @id @default(uuid())
+  articleId     String
+  article       DseNewsArticle @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  kind          String
+  storagePath   String         @unique @db.VarChar(240)
+  thumbnailPath String         @unique @db.VarChar(240)
+  alt           String         @db.VarChar(250)
+  width         Int
+  height        Int
+  bytes         Int
+  uploadedById  String
+  uploadedBy    User           @relation("DseNewsMediaUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt     DateTime       @default(now())
+
+  @@index([articleId, kind])
 }

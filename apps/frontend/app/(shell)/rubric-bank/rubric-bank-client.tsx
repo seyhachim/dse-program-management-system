@@ -7,6 +7,8 @@ import {
   RUBRIC_STATUSES,
   RUBRIC_TYPES,
   rubricScaleSummary,
+  rubricTotalPoints,
+  type AssessmentInstrumentKind,
   type CreateRubricInput,
   type Rubric,
   type RubricCriterion,
@@ -43,9 +45,11 @@ function blankCriterion(levelCount: number): RubricCriterion {
   return { id: crypto.randomUUID(), name: "", descriptors: Array.from({ length: levelCount }, () => "") };
 }
 
-function blankDraft(): CreateRubricInput {
+function blankDraft(kind: AssessmentInstrumentKind = "rubric"): CreateRubricInput {
+  if (kind === "marking_scheme") return { instrumentKind: kind, name: "", type: "Exam", description: "", levels: [], criteria: [{ ...blankCriterion(0), maxPoints: 1 }], status: "Draft" };
   const levels = DEFAULT_RUBRIC_LEVELS.map((level) => ({ ...level }));
   return {
+    instrumentKind: "rubric",
     name: "",
     type: RUBRIC_TYPES[0],
     description: "",
@@ -64,6 +68,7 @@ export function RubricBankClient() {
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"" | RubricStatus>("");
+  const [kind, setKind] = useState<"" | AssessmentInstrumentKind>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -95,13 +100,13 @@ export function RubricBankClient() {
   }, [load]);
 
   const visible = useMemo(
-    () => status ? rubrics : rubrics.filter((rubric) => rubric.status !== "Archived"),
-    [rubrics, status],
+    () => rubrics.filter((instrument) => (status || instrument.status !== "Archived") && (!kind || (instrument.instrumentKind ?? "rubric") === kind)),
+    [rubrics, status, kind],
   );
 
-  const openCreate = () => {
+  const openCreate = (kind: AssessmentInstrumentKind) => {
     setEditing(null);
-    setDraft(blankDraft());
+    setDraft(blankDraft(kind));
     setMutationError(null);
     setDialogOpen(true);
   };
@@ -109,6 +114,7 @@ export function RubricBankClient() {
   const openEdit = (rubric: Rubric) => {
     setEditing(rubric);
     setDraft({
+      instrumentKind: rubric.instrumentKind ?? "rubric",
       name: rubric.name,
       type: rubric.type,
       description: rubric.description,
@@ -157,7 +163,7 @@ export function RubricBankClient() {
 
   const addCriterion = () => setDraft((current) => ({
     ...current,
-    criteria: [...current.criteria, blankCriterion(current.levels.length)],
+    criteria: [...current.criteria, { ...blankCriterion(current.levels.length), ...(current.instrumentKind === "marking_scheme" ? { maxPoints: 1 } : {}) }],
   }));
 
   const removeCriterion = (index: number) => setDraft((current) => current.criteria.length <= 1 ? current : ({
@@ -209,18 +215,19 @@ export function RubricBankClient() {
       <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <h2 className="font-semibold text-foreground">Reusable assessment rubrics</h2>
+            <h2 className="font-semibold text-foreground">Reusable assessment instruments</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Active rubrics are selectable in Course Specifications. Published scoring content stays immutable; revise by creating a new rubric instead of rewriting academic history.
+              Active instruments are selectable in Course Specifications. Published scoring content stays immutable. Marking schemes are private to their owner and programme leadership.
             </p>
           </div>
-          {canWrite ? <Button onClick={openCreate}><Plus className="h-4 w-4" />New rubric</Button> : null}
+          {canWrite ? <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => openCreate("marking_scheme")}><Plus className="h-4 w-4" />New marking scheme</Button><Button onClick={() => openCreate("rubric")}><Plus className="h-4 w-4" />New rubric</Button></div> : null}
         </div>
       </section>
 
       <section className="rounded-xl border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row">
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, description, or type" className="sm:max-w-md" aria-label="Search rubrics" />
+          <select value={kind} onChange={(e) => setKind(e.target.value as "" | AssessmentInstrumentKind)} className="h-9 rounded-md border border-input bg-background px-3 text-sm" aria-label="Filter instrument kind"><option value="">All instruments</option><option value="rubric">Rubrics</option><option value="marking_scheme">Marking schemes</option></select>
           <select value={status} onChange={(e) => setStatus(e.target.value as "" | RubricStatus)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground" aria-label="Filter rubric status">
             <option value="">Current (Draft + Active)</option>
             {RUBRIC_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -235,7 +242,7 @@ export function RubricBankClient() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="px-4 py-3 font-medium">Rubric</th><th className="px-4 py-3 font-medium">Type</th><th className="px-4 py-3 font-medium">Scale</th><th className="px-4 py-3 font-medium">Usage</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Owner</th><th className="px-4 py-3 text-right font-medium">Actions</th></tr>
+                <tr><th className="px-4 py-3 font-medium">Instrument</th><th className="px-4 py-3 font-medium">Type</th><th className="px-4 py-3 font-medium">Scale</th><th className="px-4 py-3 font-medium">Usage</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Owner</th><th className="px-4 py-3 text-right font-medium">Actions</th></tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {visible.map((rubric) => {
@@ -243,14 +250,14 @@ export function RubricBankClient() {
                   const lock = rubricLockLabel(rubric);
                   return (
                     <tr key={rubric.id} className="align-top">
-                      <td className="px-4 py-4"><div className="font-medium text-foreground">{rubric.name}</div><div className="mt-1 max-w-md text-xs text-muted-foreground">{rubric.description || "No description"}</div><div className="mt-1 text-xs text-muted-foreground">{rubric.criteria.length} criteria{lock ? ` · ${lock}` : ""}</div></td>
+                      <td className="px-4 py-4"><div className="font-medium text-foreground">{rubric.name}</div><div className="mt-1 max-w-md text-xs text-muted-foreground">{rubric.description || "No description"}</div><div className="mt-1 text-xs text-muted-foreground">{rubric.instrumentKind === "marking_scheme" ? "Marking scheme" : "Rubric"} · {rubric.criteria.length} {rubric.instrumentKind === "marking_scheme" ? "questions" : "criteria"}{lock ? ` · ${lock}` : ""}</div></td>
                       <td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-xs font-medium ${typeChipClass(rubric.type)}`}>{rubric.type}</span></td>
-                      <td className="px-4 py-4 text-xs text-muted-foreground">{rubricScaleSummary(rubric.levels)}</td>
+                      <td className="px-4 py-4 text-xs text-muted-foreground">{rubric.instrumentKind === "marking_scheme" ? `${rubricTotalPoints(rubric)} points` : rubricScaleSummary(rubric.levels)}</td>
                       <td className="px-4 py-4">{rubric.assessmentUsageCount ?? 0}</td>
                       <td className="px-4 py-4"><StatusBadge tone={rubricStatusTone(rubric.status)} label={rubric.status} /></td>
                       <td className="px-4 py-4 text-muted-foreground">{rubric.owner?.name ?? "—"}</td>
                       <td className="px-4 py-4"><div className="flex justify-end gap-1">
-                        {rubric.status === "Active" ? <a href={`/rubrics/${rubric.id}`} target="_blank" rel="noreferrer" aria-label={`View ${rubric.name}`} className={buttonVariants({ variant: "ghost", size: "sm" })}><Eye className="h-4 w-4" /></a> : null}
+                        {rubric.status === "Active" && rubric.instrumentKind !== "marking_scheme" ? <a href={`/rubrics/${rubric.id}`} target="_blank" rel="noreferrer" aria-label={`View ${rubric.name}`} className={buttonVariants({ variant: "ghost", size: "sm" })}><Eye className="h-4 w-4" /></a> : null}
                         {canEditRubric(me, rubric) ? <Button variant="ghost" size="sm" onClick={() => openEdit(rubric)} aria-label={`Edit ${rubric.name}`}><Pencil className="h-4 w-4" /></Button> : null}
                         {manageable && rubric.status === "Draft" ? <Button variant="outline" size="sm" onClick={() => void mutateStatus(rubric, "Active")}>Publish</Button> : null}
                         {canArchiveRubric(me, rubric) ? <Button variant="ghost" size="sm" onClick={() => void mutateStatus(rubric, "Archived")} aria-label={`Archive ${rubric.name}`}><Archive className="h-4 w-4" /></Button> : null}
@@ -267,7 +274,7 @@ export function RubricBankClient() {
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!saving) setDialogOpen(open); }}>
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-          <DialogHeader><DialogTitle>{editing ? "Edit rubric" : "Create rubric"}</DialogTitle><DialogDescription>Save scoring content as Draft first. Publish only when it is ready for Course Specification use.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Edit instrument" : draft.instrumentKind === "marking_scheme" ? "Create marking scheme" : "Create rubric"}</DialogTitle><DialogDescription>Save scoring content as Draft first. Publish only when it is ready for Course Specification use.</DialogDescription></DialogHeader>
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2"><Label htmlFor="rubric-name">Name</Label><Input id="rubric-name" value={draft.name} onChange={(e) => setDraft((current) => ({ ...current, name: e.target.value }))} /></div>
@@ -275,6 +282,13 @@ export function RubricBankClient() {
             </div>
             <div className="space-y-2"><Label htmlFor="rubric-description">Description</Label><textarea id="rubric-description" value={draft.description} onChange={(e) => setDraft((current) => ({ ...current, description: e.target.value }))} className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" /></div>
 
+            {draft.instrumentKind === "marking_scheme" ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-medium">Questions and maximum marks</h3><p className="text-xs text-muted-foreground">Use neutral labels only (e.g. Q1 – Web architecture). Keep exam questions and solutions in secure lecturer-only documents. Map questions to CLOs in CourseSpec.</p></div><Button variant="outline" size="sm" onClick={addCriterion}><Plus className="h-4 w-4" />Question</Button></div>
+                {draft.criteria.map((question, index) => <div key={question.id} className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3"><div className="min-w-40 flex-1 space-y-1"><Label>Question / section</Label><Input value={question.name} onChange={(e) => setCriterionName(index, e.target.value)} placeholder={`Q${index + 1}`} aria-label={`Question ${index + 1} label`} /></div><div className="w-28 space-y-1"><Label>Max points</Label><Input type="number" min="0.01" step="any" value={question.maxPoints ?? ""} onChange={(e) => setDraft((current) => ({ ...current, criteria: current.criteria.map((c, i) => i === index ? { ...c, maxPoints: Number(e.target.value) } : c) }))} aria-label={`Question ${index + 1} maximum`} /></div><Button variant="ghost" size="sm" onClick={() => removeCriterion(index)} disabled={draft.criteria.length <= 1} aria-label={`Remove question ${index + 1}`}><Trash2 className="h-4 w-4" /></Button></div>)}
+                <p className="text-sm font-medium">Total maximum: {rubricTotalPoints(draft)} points</p>
+              </div>
+            ) : <>
             <div className="space-y-3">
               <div className="flex items-center justify-between"><div><h3 className="font-medium text-foreground">Rating levels</h3><p className="text-xs text-muted-foreground">Ordered left-to-right in the scoring grid.</p></div><Button variant="outline" size="sm" onClick={addLevel}><Plus className="h-4 w-4" />Level</Button></div>
               <div className="grid gap-3 md:grid-cols-2">
@@ -287,8 +301,9 @@ export function RubricBankClient() {
               {draft.criteria.map((criterion, criterionIndex) => <div key={criterion.id} className="space-y-3 rounded-lg border border-border p-4"><div className="flex gap-2"><Input value={criterion.name} onChange={(e) => setCriterionName(criterionIndex, e.target.value)} placeholder={`Criterion ${criterionIndex + 1}`} aria-label={`Criterion ${criterionIndex + 1} name`} /><Button variant="ghost" size="sm" onClick={() => removeCriterion(criterionIndex)} disabled={draft.criteria.length <= 1} aria-label={`Remove criterion ${criterionIndex + 1}`}><Trash2 className="h-4 w-4" /></Button></div><div className="grid gap-3 md:grid-cols-2">{draft.levels.map((level, levelIndex) => <div key={levelIndex} className="space-y-1"><Label className="text-xs">{level.points} · {level.label}</Label><textarea value={criterion.descriptors[levelIndex] ?? ""} onChange={(e) => setDescriptor(criterionIndex, levelIndex, e.target.value)} className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" aria-label={`${criterion.name || `Criterion ${criterionIndex + 1}`} descriptor for ${level.label}`} /></div>)}</div></div>)}
             </div>
 
+            </>}
             {mutationError ? <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{mutationError}</div> : null}
-            <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button><Button onClick={() => void save()} disabled={saving || !draft.name.trim() || draft.criteria.some((criterion) => !criterion.name.trim())}>{saving ? "Saving…" : editing ? "Save draft" : "Create draft"}</Button></div>
+            <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button><Button onClick={() => void save()} disabled={saving || !draft.name.trim() || draft.criteria.some((criterion) => !criterion.name.trim() || (draft.instrumentKind === "marking_scheme" && (!Number.isFinite(criterion.maxPoints) || (criterion.maxPoints ?? 0) <= 0)))}>{saving ? "Saving…" : editing ? "Save draft" : "Create draft"}</Button></div>
           </div>
         </DialogContent>
       </Dialog>

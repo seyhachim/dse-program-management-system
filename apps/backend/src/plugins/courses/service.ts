@@ -1120,8 +1120,9 @@ async function syncAssessmentPlan(
 
   const clos = await tx.courseSpecClo.findMany({
     where: { courseSpecId },
-    select: { order: true },
+    select: { order: true, status: true },
   });
+  const activeCloCodes = new Set(clos.filter((clo) => clo.status === "Active").map((clo) => `CLO${clo.order + 1}`));
   const validCloCodes = new Set(clos.map((clo) => `CLO${clo.order + 1}`));
   validateAssessmentCloEvidence(items, validCloCodes);
 
@@ -1131,8 +1132,10 @@ async function syncAssessmentPlan(
         where: { id: { in: rubricIds } },
         select: {
           id: true,
+          instrumentKind: true,
+          status: true,
           levelRows: { select: { id: true, label: true, points: true, order: true } },
-          criterionRows: { select: { id: true, name: true, order: true } },
+          criterionRows: { select: { id: true, name: true, order: true, maxPoints: true } },
         },
       })
     : [];
@@ -1140,6 +1143,18 @@ async function syncAssessmentPlan(
   const validRubricIds = new Set(rubrics.map((rubric) => rubric.id));
   for (const item of items) {
     const rubric = item.rubricId ? rubricById.get(item.rubricId) : undefined;
+    if (rubric?.instrumentKind === "marking_scheme") {
+      if (item.mode !== "individual") throw new ReferenceError("Marking schemes currently support individual assessments only");
+      if (rubric.status === "Draft") throw new ReferenceError("Activate the marking scheme before linking it");
+      if (!rubric.criterionRows.length || rubric.criterionRows.some((question) => !Number.isFinite(question.maxPoints) || (question.maxPoints ?? 0) <= 0)) throw new ReferenceError("Marking scheme has invalid question maxima");
+      const mappedClos = new Set<string>();
+      for (const question of rubric.criterionRows) {
+        const mappings = item.criterionCloMappings.filter((mapping) => mapping.criterionId === question.id);
+        if (mappings.length !== 1 || mappings[0]!.cloCodes.length !== 1 || !activeCloCodes.has(mappings[0]!.cloCodes[0]!)) throw new ReferenceError("Each marking scheme question must map to exactly one active CLO");
+        mappedClos.add(mappings[0]!.cloCodes[0]!);
+      }
+      if (item.cloCodes.some((code) => !mappedClos.has(code))) throw new ReferenceError("Every mapped assessment CLO needs a marking scheme question");
+    }
     validateCriterionCloMappings(
       item,
       validCloCodes,

@@ -1,0 +1,130 @@
+import { z } from "zod";
+
+export const OpportunityKind = z.enum([
+  "scholarship", "competition", "internship", "fellowship", "exchange",
+  "hackathon", "research", "training", "conference", "grant", "career", "other",
+]);
+export type OpportunityKind = z.infer<typeof OpportunityKind>;
+export const OpportunityStatus = z.enum(["Draft", "Published", "Archived"]);
+export type OpportunityStatus = z.infer<typeof OpportunityStatus>;
+export const OpportunityOutcome = z.enum(["Winner", "Finalist", "Participant"]);
+export type OpportunityOutcome = z.infer<typeof OpportunityOutcome>;
+
+const httpsUrl = z.string().url().max(2048).refine((value) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password
+      && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+      && !url.hostname.endsWith(".local");
+  } catch {
+    return false;
+  }
+}, "Use an official HTTPS URL without credentials or localhost");
+
+export const OpportunityDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+  const date = new Date(value + "T00:00:00.000Z");
+  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+}, "Use a valid YYYY-MM-DD date");
+
+export const CreateOpportunityInput = z.object({
+  programmeId: z.string().min(1).max(80).default("dse"),
+  type: OpportunityKind,
+  title: z.string().trim().min(5).max(180),
+  organizer: z.string().trim().min(2).max(180),
+  summary: z.string().trim().min(10).max(3000),
+  eligibility: z.string().trim().min(5).max(2000),
+  sourceUrl: httpsUrl,
+  applicationUrl: httpsUrl.nullable().default(null),
+  deadline: OpportunityDate.nullable().default(null),
+  deadlineTime: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "Use a valid Cambodia local HH:mm time").nullable().optional(),
+}).strict();
+export type CreateOpportunityInput = z.infer<typeof CreateOpportunityInput>;
+
+// Editing an existing draft cannot transfer it to another programme.
+export const UpdateOpportunityInput = CreateOpportunityInput.omit({ programmeId: true });
+export type UpdateOpportunityInput = z.infer<typeof UpdateOpportunityInput>;
+
+/** Reviewer must document what official result/evidence was checked. */
+export const ReviewOpportunityExperienceInput = z.object({
+  reason: z.string().trim().max(1000).default(""),
+}).strict();
+
+export const SubmitOpportunityExperienceInput = z.object({
+  evidenceId: z.string().uuid(),
+  outcome: OpportunityOutcome,
+  consent: z.literal(true),
+}).strict();
+export type SubmitOpportunityExperienceInput = z.infer<typeof SubmitOpportunityExperienceInput>;
+
+export interface OpportunityView {
+  id: string;
+  programmeId: string;
+  type: OpportunityKind;
+  title: string;
+  organizer: string;
+  summary: string;
+  eligibility: string;
+  sourceUrl: string;
+  applicationUrl: string | null;
+  posterUrl: string | null;
+  deadline: string | null;
+  deadlineTime: string | null;
+  status: OpportunityStatus;
+  publishedAt: string | null;
+}
+
+export interface OpportunityExperienceView {
+  id: string;
+  outcome: OpportunityOutcome;
+  studentName: string;
+  evidenceTitle: string;
+  publicPortfolioSlug: string;
+}
+
+export interface OpportunityDetailView extends OpportunityView {
+  experiences: OpportunityExperienceView[];
+}
+
+/** Student-only consent record; no peer evidence or private verification details. */
+export interface OwnOpportunityExperienceView {
+  id: string;
+  evidenceId: string;
+  outcome: OpportunityOutcome;
+  status: "Pending" | "Approved" | "Hidden";
+  consentedAt: string;
+}
+
+export interface OpportunityExperienceReviewView {
+  id: string;
+  opportunityId: string;
+  opportunityTitle: string;
+  evidenceId: string;
+  outcome: OpportunityOutcome;
+  status: "Pending" | "Approved" | "Hidden";
+  consentedAt: string;
+  publicStudent: OpportunityExperienceView | null;
+}
+
+/** Anonymous count + only the signed-in student's own choice. Never includes names. */
+export interface OpportunityInterestSummary {
+  count: number;
+  joined: boolean;
+  canJoin: boolean;
+}
+
+/** Only authorized programme lecturers and staff may fetch these identities. */
+export interface OpportunityInterestedStudent {
+  studentId: string | null;
+  name: string;
+  yearGroup: string;
+  joinedAt: string;
+}
+
+export interface OpportunityInterestOverviewItem {
+  id: string;
+  title: string;
+  status: OpportunityStatus;
+  deadline: string | null;
+  deadlineTime: string | null;
+  count: number;
+}

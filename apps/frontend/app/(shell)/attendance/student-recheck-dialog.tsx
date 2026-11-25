@@ -38,6 +38,7 @@ interface StudentRecheckDialogProps {
   initialMode?: "standard" | "late-arrival";
   offeringId: string;
   date: string;
+  expectedUpdatedAt: string | null;
   record: AttendanceRecordView | null;
   hasPrevious: boolean;
   hasNext: boolean;
@@ -93,6 +94,7 @@ export function StudentRecheckDialog({
   initialMode = "standard",
   offeringId,
   date,
+  expectedUpdatedAt,
   record,
   hasPrevious,
   hasNext,
@@ -175,11 +177,16 @@ export function StudentRecheckDialog({
       !finalValue ||
       check2
     ) return;
+    if (!expectedUpdatedAt) {
+      setError("Attendance changed or is still loading. Reload the register before recording Check 2.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const saved = await offeringsApi.recheckAttendance(offeringId, date, {
         studentId: record.studentId,
+        expectedUpdatedAt,
         observation: markInput(observedValue, observationNote),
         final: markInput(finalValue, finalNote),
       });

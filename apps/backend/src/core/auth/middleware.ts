@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { prisma } from "../db/prisma.ts";
 import { AccountLinkingError, assertEmailOnlySupabaseIdentity, assertLegacyEmailClaim, type ConfirmedAuthUser } from "./account-linking.ts";
 import { resolveRequestAuthOnce } from "./request-auth-cache.ts";
+import { resolveNeonStagingUser } from "./neon-staging.ts";
 import {
   getAuthMode,
   verifySupabaseToken,
@@ -70,7 +71,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   try {
     await resolveRequestAuthOnce(req, async () => {
-      const user = getAuthMode() === "supabase" ? await resolveSupabaseUser(token) : verifyToken(token);
+      const mode = getAuthMode();
+      const user = mode === "supabase" ? await resolveSupabaseUser(token)
+        : mode === "neon-staging" ? await resolveNeonStagingUser(token)
+        : verifyToken(token);
 
       // Cache this request only after the complete authentication boundary has
       // succeeded. A password-gated or failed identity request is never marked

@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 const EXPECTED_PUBLIC_TABLES = [
   "User",
   "UserSecurityAuditEvent",
+  "ProgrammeHeadAppointment",
   "LecturerProfile",
   "Role",
   "Programme",
@@ -80,6 +81,13 @@ const EXPECTED_PUBLIC_TABLES = [
   "CourseSpecDocumentTheme",
   "CourseSpecDocumentThemeAuditEvent",
   "Offering",
+  "OfferingActivity",
+  "OfferingActivityAuditEvent",
+  "OfferingActivityParticipant",
+  "OfferingActivityParticipantAudit",
+  "DseNewsArticle",
+  "DseNewsAuditEvent",
+  "DseNewsMedia",
   "OfferingStudentSemesterNote",
   "OfferingStudentSemesterNoteRevision",
   "OfferingResultAccessPolicy",
@@ -161,6 +169,10 @@ const EXPECTED_PUBLIC_TABLES = [
   "CopDiscussion",
   "CopComment",
   "CopAction",
+  "Opportunity",
+  "OpportunityInterest",
+  "OpportunityExperience",
+  "OpportunityAuditEvent",
 ] as const;
 
 const EXPECTED_ATTENDANCE_TABLES = [

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button, FormFieldLabel, Input } from "@dse-pms/ui";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
+import { getStagingAuth, notifyStagingAuthChange } from "@/lib/staging-auth";
 
 function safeReturnPath(value: string | null): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
@@ -51,8 +52,14 @@ function LoginForm() {
   const canSubmit = email.trim().length > 0 && password.length > 0 && !submitting;
 
   useEffect(() => {
-    if (AUTH_MODE !== "supabase") {
+    if (AUTH_MODE === "dev") {
       router.replace(returnPath);
+      return;
+    }
+    if (AUTH_MODE === "neon-staging") {
+      void getStagingAuth().getSession().then(({ data }) => {
+        if (data?.session) router.replace(returnPath);
+      });
       return;
     }
     getSupabase()
@@ -70,16 +77,16 @@ function LoginForm() {
     setError(null);
 
     try {
-      const { error: providerError } = await getSupabase().auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const { error: providerError } = AUTH_MODE === "neon-staging"
+        ? await getStagingAuth().signIn.email({ email: email.trim(), password })
+        : await getSupabase().auth.signInWithPassword({ email: email.trim(), password });
 
       if (providerError) {
-        setError(friendlyLoginError(providerError.message));
+        setError(friendlyLoginError(providerError.message ?? "Sign-in failed"));
         return;
       }
 
+      if (AUTH_MODE === "neon-staging") notifyStagingAuthChange();
       router.replace(returnPath);
     } catch {
       setError("We could not sign you in right now. Please check your connection and try again.");
@@ -268,8 +275,8 @@ function LoginForm() {
 }
 
 /**
- * Email + password login. Only meaningful in AUTH_MODE=supabase; in dev mode the
- * app runs on the static dev token, so we just bounce to the requested safe route.
+ * Email + password login for Supabase production or isolated Neon staging; in dev the
+ * app uses local dev tokens and redirects to the requested safe route.
  */
 export default function LoginPage() {
   return (

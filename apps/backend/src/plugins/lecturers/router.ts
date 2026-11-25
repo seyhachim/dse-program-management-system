@@ -18,7 +18,7 @@ import {
   PortfolioNotFoundError,
   PortfolioValidationError,
 } from "./portfolio-service.ts";
-import { lecturerService, NotFoundError } from "./service.ts";
+import { lecturerService, LecturerHeadAppointmentError, NotFoundError } from "./service.ts";
 
 /** Lecturers router — profile CRUD plus self-owned professional portfolio. */
 export function createLecturerRouter(): Router {
@@ -199,7 +199,7 @@ function requirePortfolioReviewer(req: Request, res: Response, next: NextFunctio
 function errStatus(err: unknown): number {
   if (err instanceof NotFoundError || err instanceof PortfolioNotFoundError) return 404;
   if (err instanceof PortfolioValidationError) return 400;
-  if (err instanceof PortfolioConflictError) return 409;
+  if (err instanceof PortfolioConflictError || err instanceof LecturerHeadAppointmentError) return 409;
   const code = (err as { code?: string }).code;
   if (code === "P2002") return 409;
   if (code === "P2025") return 404;
@@ -212,6 +212,7 @@ function errMessage(err: unknown): string | null {
     || err instanceof PortfolioNotFoundError
     || err instanceof PortfolioValidationError
     || err instanceof PortfolioConflictError
+    || err instanceof LecturerHeadAppointmentError
   ) return err.message;
   const code = (err as { code?: string }).code;
   if (code === "P2002") return "A user with that email already exists";

@@ -3,6 +3,7 @@ import type {
   Student,
   StudentCohortSummaryView,
   StudentPage,
+  StudentRosterCohortOverview,
   StudentStatus,
   UpdateStudentInput,
 } from "@dse-pms/shared-types";
@@ -23,16 +24,23 @@ export const studentsApi = {
     const query = new URLSearchParams({ programmeId });
     return api.get<StudentCohortSummaryView[]>(`/api/students/cohorts?${query.toString()}`);
   },
+  rosterCohorts(): Promise<StudentRosterCohortOverview> {
+    return api.get<StudentRosterCohortOverview>("/api/students/roster-cohorts");
+  },
   /** Bounded cursor page for the interactive roster. */
   listPage(params: {
     search?: string;
     activeOnly?: boolean;
+    cohortId?: string;
+    sectionId?: string;
     cursor?: string;
     limit?: number;
   }): Promise<StudentPage> {
     const qs = new URLSearchParams();
     if (params.search) qs.set("search", params.search);
     if (params.activeOnly) qs.set("activeOnly", "true");
+    if (params.cohortId) qs.set("cohortId", params.cohortId);
+    if (params.sectionId) qs.set("sectionId", params.sectionId);
     if (params.cursor) qs.set("cursor", params.cursor);
     if (params.limit) qs.set("limit", String(params.limit));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";

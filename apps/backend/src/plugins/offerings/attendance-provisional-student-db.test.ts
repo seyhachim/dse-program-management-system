@@ -131,6 +131,7 @@ describeDb("attendance for students with pending official IDs", () => {
       "2026-09-14",
       {
         studentId: student.id,
+        expectedUpdatedAt: first.updatedAt!,
         observation: {
           status: "Present",
           permissionPending: false,

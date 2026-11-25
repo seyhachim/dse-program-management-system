@@ -68,8 +68,7 @@ export function createRubricRouter(): Router {
       const created = await rubricService.create(parsed.data, req.user!);
       res.status(201).json(created);
     } catch (error) {
-      console.error("Could not create rubric", error);
-      res.status(500).json({ error: "Could not create rubric" });
+      sendRubricMutationError(res, error, "Could not create instrument");
     }
   });
 
