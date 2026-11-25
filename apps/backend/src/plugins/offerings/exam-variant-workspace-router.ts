@@ -5,7 +5,7 @@ import { prisma } from "../../core/db/prisma.ts";
 import { createExamVariantManagementService, ExamVariantAccessError, ExamVariantConflictError } from "../../core/academic/exam-variant-management.ts";
 import type { AuthUser } from "../../core/auth/token.ts";
 
-type Env = Pick<NodeJS.ProcessEnv, "NODE_ENV"|"DATABASE_URL"|"EXAM_VARIANT_WORKSPACE_ENABLED"|"EXAM_VARIANT_PROPOSAL_KEY">;
+type Env = Partial<Record<"NODE_ENV"|"DATABASE_URL"|"EXAM_VARIANT_WORKSPACE_ENABLED"|"EXAM_VARIANT_PROPOSAL_KEY", string>>;
 /** Explicitly non-production, loopback disposable database only. This is not
  * a production feature flag; Phase 3 must implement the release interlock. */
 export function examWorkspacePilotKey(env: Env): Buffer | null {
@@ -49,6 +49,7 @@ export function createExamVariantWorkspaceRouter(env: Env = process.env): Router
   }
   if (service) {
     router.post("/exam-variants/workspace", endpoint(service.workspace));
+    router.post("/exam-variants/preview", endpoint(async (actor, data) => (await service.prepare(actor, data)).snapshot));
     router.post("/exam-variants/submit", endpoint(service.submit));
     router.post("/exam-variants/decide", endpoint(service.decide));
     router.post("/exam-variants/permit", endpoint(service.permitOffering));
