@@ -75,14 +75,14 @@ export async function submitTelegramStudentRegistration(
         ${requestId}, ${verification.telegramUserId}, ${programmeId},
         ${input.cohortId}, ${input.sectionId}, ${input.khmerFamilyName},
         ${input.khmerGivenName}, ${input.latinFamilyName}, ${input.latinGivenName},
-        ${input.officialStudentId ?? null}, ${input.email},
+        ${input.officialStudentId ?? null}, ${input.email ?? null},
         ${consent.phone}, ${consent.consentAt}, ${input.careerProfile ? JSON.stringify(input.careerProfile) : null}::jsonb
       )
       ON CONFLICT ("telegramUserId") DO UPDATE SET
         "khmerFamilyName"=EXCLUDED."khmerFamilyName", "khmerGivenName"=EXCLUDED."khmerGivenName",
         "latinFamilyName"=EXCLUDED."latinFamilyName", "latinGivenName"=EXCLUDED."latinGivenName",
         "cohortId"=EXCLUDED."cohortId", "sectionId"=EXCLUDED."sectionId",
-        "officialStudentId"=EXCLUDED."officialStudentId", "email"=EXCLUDED."email",
+        "officialStudentId"=EXCLUDED."officialStudentId", "email"=EXCLUDED."email", "emailVerifiedAt"=NULL,
         "telegramPhone"=EXCLUDED."telegramPhone", "phoneConsentAt"=EXCLUDED."phoneConsentAt",
         "careerProfile"=EXCLUDED."careerProfile",
         "status"='PENDING', "updatedAt"=CURRENT_TIMESTAMP
@@ -91,6 +91,8 @@ export async function submitTelegramStudentRegistration(
       RETURNING "id"
     `;
     if (!inserted.length) throw new TelegramStudentRegistrationError("ALREADY_SUBMITTED");
+
+    await tx.$executeRaw`UPDATE "telegram_security"."StudentRegistrationEmailChallenge" SET "consumedAt"=CURRENT_TIMESTAMP WHERE "requestId"=${inserted[0]!.id} AND "consumedAt" IS NULL`;
 
     const consumed = await tx.$executeRaw`
       UPDATE "telegram_security"."TelegramInitVerification"
