@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
+import type { Socket } from "node:net";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
@@ -16,6 +17,7 @@ import { resultsLifecycleService } from "../plugins/student-portal/results-lifec
 const isolated = process.env.BACKEND_INTEGRATION_TESTS === "1" ? describe : describe.skip;
 isolated("assessment evidence protected API and immutable history", () => {
   let server: Server | undefined;
+  const sockets = new Set<Socket>();
   let origin = "", base = "", otherBase = "", sourceId = "", otherResultId = "";
   let lecturer: AuthUser, coordinator: AuthUser, student: AuthUser, unrelated: AuthUser;
   let wrongProgramme: AuthUser;
@@ -27,14 +29,19 @@ isolated("assessment evidence protected API and immutable history", () => {
   type TestBody = {
     id: string; status: string;
     suggestions: { eligibleCount: number };
-    evidence: { effectiveStatus: string; attachment: { filename: string; objectKey?: string } }[];
+    evidence: { effectiveStatus: string; attachment: { filename: string; objectKey?: string } | null }[];
     revisions: { revision: number }[];
     eligibleResults: { resultId: string; memberEnrollmentIds: string[] }[];
     totalOfferings: number;
     rows: { assessments: { state: string; population: string; verified: number; stale: number; gap: number }[] }[];
   };
+  function first<T>(rows: T[]): T {
+    const row = rows[0];
+    if (row === undefined) throw new Error("Expected a non-empty response array");
+    return row;
+  }
   async function request(url: string, actor: AuthUser | null, body?: object) {
-    const headers = new Headers();
+    const headers = new Headers({ Connection: "close" });
     if (actor) headers.set("Authorization", "Bearer " + signToken(actor));
     if (body) headers.set("Content-Type", "application/json");
     const res = await fetch(origin + url, { method: body ? "POST" : "GET", headers, body: body ? JSON.stringify(body) : undefined });
@@ -79,11 +86,17 @@ isolated("assessment evidence protected API and immutable history", () => {
     base = "/api/qa/assessment-evidence/offerings/" + first.offeringId + "/specs/" + spec.id + "/assessments/" + item.id;
     otherBase = "/api/qa/assessment-evidence/offerings/" + second.offeringId + "/specs/" + spec.id + "/assessments/" + item.id;
     server = createApp().listen(0, "127.0.0.1");
+    server.on("connection", socket => { sockets.add(socket); socket.once("close", () => sockets.delete(socket)); });
     await once(server, "listening");
     origin = "http://127.0.0.1:" + (server.address() as AddressInfo).port;
   });
   afterAll(async () => {
-    if (server?.listening) await new Promise<void>((resolve, reject) => { server!.close(err => err ? reject(err) : resolve()); server!.closeAllConnections(); });
+    if (server?.listening) {
+      // Bun can delay the HTTP close callback while fetch keeps sockets alive.
+      // Stop accepting traffic and destroy the tracked synthetic test sockets.
+      server.close();
+      for (const socket of sockets) socket.destroy();
+    }
     // Immutable records intentionally remain in the disposable CI database.
     await prisma.$disconnect();
   });
@@ -100,7 +113,7 @@ isolated("assessment evidence protected API and immutable history", () => {
     expect(overview.body.evidence).toEqual([]);
     expect((await request(url, coordinator, draft)).status).toBe(403);
     const upload = async (actor: AuthUser | null, resultId: string, file: string, filename = "sample.pdf") => {
-      const headers = new Headers({ "Content-Type": "application/octet-stream", "x-evidence-filename": encodeURIComponent(filename), "x-evidence-mime": "application/pdf", "x-evidence-revision": "0", "x-evidence-reason": "Synthetic sample" });
+      const headers = new Headers({ Connection: "close", "Content-Type": "application/octet-stream", "x-evidence-filename": encodeURIComponent(filename), "x-evidence-mime": "application/pdf", "x-evidence-revision": "0", "x-evidence-reason": "Synthetic sample" });
       if (actor) headers.set("Authorization", "Bearer " + signToken(actor));
       const res = await fetch(origin + base + "/results/" + resultId + "/attachment", { method: "POST", headers, body: file });
       return res.status;
@@ -143,7 +156,7 @@ isolated("assessment evidence protected API and immutable history", () => {
     expect(verified.body.status).toBe("verified");
     const history = await request(base + "/results/" + sourceId + "/history", lecturer);
     expect(history.body.revisions.map((row: { revision: number }) => row.revision)).toEqual([6, 5, 4, 3, 2, 1]);
-    expect((await request(base, coordinator)).body.evidence[0].effectiveStatus).toBe("verified");
+    expect(first((await request(base, coordinator)).body.evidence).effectiveStatus).toBe("verified");
     await expect(async () => { await prisma.assessmentEvidenceRevision.update({ where: { id: created.body.id }, data: { selectionReason: "tamper" } }); }).toThrow(/append-only/i);
     await expect(async () => { await prisma.assessmentEvidenceRevision.delete({ where: { id: created.body.id } }); }).toThrow(/append-only/i);
     const official = await prisma.assessmentResult.findUniqueOrThrow({ where: { id: sourceId } });
@@ -152,9 +165,9 @@ isolated("assessment evidence protected API and immutable history", () => {
       assessmentResultId: sourceId, score: 8, maxScore: 10, feedback: "Corrected synthetic feedback",
       reason: "Synthetic moderation correction", expectedUpdatedAt: official.updatedAt.toISOString(),
     });
-    expect((await request(base, coordinator)).body.evidence[0].effectiveStatus).toBe("stale");
+    expect(first((await request(base, coordinator)).body.evidence).effectiveStatus).toBe("stale");
     expect((await request(url, lecturer, { action: "revise", expectedRevision: 6, selectionReason: "New work", workReference: ref })).status).toBe(201);
-    expect((await request(base, coordinator)).body.evidence[0].effectiveStatus).toBe("draft");
+    expect(first((await request(base, coordinator)).body.evidence).effectiveStatus).toBe("draft");
     // Metadata-only fixture: no cloud file exists, no live storage or scanner is used.
     const previous = await prisma.assessmentEvidenceRevision.findFirstOrThrow({ where: { resultId: sourceId }, orderBy: { revision: "desc" } });
     const fakeAttachment = { objectKey: "v1/" + randomUUID() + ".pdf", filename: "synthetic.pdf", mimeType: "application/pdf", sizeBytes: 20, sha256: "a".repeat(64) };
@@ -165,9 +178,9 @@ isolated("assessment evidence protected API and immutable history", () => {
       sourceSnapshot: previous.sourceSnapshot as Prisma.InputJsonObject,
       workReference: null, attachment: fakeAttachment, selectionReason: "Synthetic metadata fixture", actorId: lecturer.id,
     } });
-    const fileView = (await request(base, lecturer)).body.evidence[0];
-    expect(fileView.attachment.filename).toBe("synthetic.pdf");
-    expect(fileView.attachment.objectKey).toBeUndefined();
+    const fileView = first((await request(base, lecturer)).body.evidence);
+    expect(fileView.attachment?.filename).toBe("synthetic.pdf");
+    expect(fileView.attachment?.objectKey).toBeUndefined();
     const downloadPath = base + "/results/" + sourceId + "/revisions/8/download";
     expect((await request(downloadPath, student)).status).toBe(404);
     expect((await request(downloadPath, unrelated)).status).toBe(404);
@@ -176,10 +189,10 @@ isolated("assessment evidence protected API and immutable history", () => {
     const storedAttachment = await prisma.assessmentEvidenceRevision.findFirstOrThrow({ where: { resultId: sourceId, revision: 10 } });
     expect(storedAttachment.attachment).toEqual(fakeAttachment);
     expect((await request(url, lecturer, { action: "revise", expectedRevision: 10, selectionReason: "Retain file in new draft", workReference: null, keepAttachment: true })).status).toBe(201);
-    const retained = (await request(base, coordinator)).body.evidence[0];
+    const retained = first((await request(base, coordinator)).body.evidence);
     expect(retained.effectiveStatus).toBe("draft");
-    expect(retained.attachment.filename).toBe("synthetic.pdf");
-    expect(retained.attachment.objectKey).toBeUndefined();
+    expect(retained.attachment?.filename).toBe("synthetic.pdf");
+    expect(retained.attachment?.objectKey).toBeUndefined();
   }, 30000);
 
   test("collects one shared group sample, separates individual contributions and reports coordinator coverage", async () => {
@@ -215,7 +228,7 @@ isolated("assessment evidence protected API and immutable history", () => {
     expect((await request(dashboard, { ...coordinator, programmeRoles: [{ role: "program_coordinator", programmeId: "other-programme" }] })).status).toBe(404);
     const initial = await request(dashboard, coordinator);
     expect(initial.status).toBe(200);
-    expect(initial.body.rows[0].assessments.map((x: { state: string }) => x.state)).toEqual(["not_ready", "not_ready"]);
+    expect(first(initial.body.rows).assessments.map((x: { state: string }) => x.state)).toEqual(["not_ready", "not_ready"]);
     const workspace = await groupAssessmentService.replaceGroups(lecturer.id, false, offering.id, itemId, { groups: [{ name: "Synthetic Group A", enrollmentIds }] });
     const groupId = workspace.groups[0]!.id;
     await groupAssessmentService.saveGroupScore(lecturer.id, false, offering.id, itemId, groupId, { score: 80, maxScore: 100, feedback: "Synthetic group feedback" });
@@ -233,10 +246,10 @@ isolated("assessment evidence protected API and immutable history", () => {
     const individual = await request(componentPath, lecturer);
     expect(shared.status).toBe(200); expect(individual.status).toBe(200);
     expect(shared.body.suggestions.eligibleCount).toBe(1);
-    expect(shared.body.eligibleResults[0].memberEnrollmentIds).toHaveLength(2);
+    expect(first(shared.body.eligibleResults).memberEnrollmentIds).toHaveLength(2);
     expect(individual.body.suggestions.eligibleCount).toBe(2);
-    const groupSource = shared.body.eligibleResults[0].resultId as string;
-    const componentSource = individual.body.eligibleResults[0].resultId as string;
+    const groupSource = first(shared.body.eligibleResults).resultId as string;
+    const componentSource = first(individual.body.eligibleResults).resultId as string;
     const draft = { action: "create", expectedRevision: 0, selectionReason: "Synthetic marked sample", workReference: ref };
     const groupUrl = groupPath + "/results/" + groupSource + "/revisions";
     const componentUrl = componentPath + "/results/" + componentSource + "/revisions";
@@ -252,7 +265,7 @@ isolated("assessment evidence protected API and immutable history", () => {
     const coverage = await request(dashboard, coordinator);
     expect(coverage.status).toBe(200);
     expect(coverage.body.totalOfferings).toBe(1);
-    expect(coverage.body.rows[0].assessments).toEqual([
+    expect(first(coverage.body.rows).assessments).toEqual([
       expect.objectContaining({ population: "group", eligibleCount: 1, verified: 1, target: 1, gap: 0, state: "target_met" }),
       expect.objectContaining({ population: "component", eligibleCount: 2, verified: 1, target: 2, gap: 1, state: "evidence_needed" }),
     ]);
@@ -267,7 +280,7 @@ isolated("assessment evidence protected API and immutable history", () => {
       expectedUpdatedAt: officialGroup.updatedAt.toISOString(),
     });
     const after = await request(dashboard, coordinator);
-    expect(after.body.rows[0].assessments).toEqual([
+    expect(first(after.body.rows).assessments).toEqual([
       expect.objectContaining({ population: "group", stale: 1, verified: 0, gap: 1 }),
       expect.objectContaining({ population: "component", stale: 0, verified: 1, gap: 1 }),
     ]);
@@ -275,7 +288,7 @@ isolated("assessment evidence protected API and immutable history", () => {
       score: officialComponent.score + 1, maxScore: officialComponent.maxScore, feedback: "Synthetic corrected defence",
       adjustmentPoints: 0, adjustmentReason: "", reason: "Synthetic moderation of defence", expectedUpdatedAt: officialComponent.updatedAt.toISOString(),
     });
-    expect((await request(componentPath, coordinator)).body.evidence[0].effectiveStatus).toBe("stale");
+    expect(first((await request(componentPath, coordinator)).body.evidence).effectiveStatus).toBe("stale");
     const stored = await prisma.assessmentEvidenceRevision.findFirstOrThrow({ where: { groupScoreId: groupSource, revision: 3 } });
     expect(stored.resultId).toBeNull();
     expect(stored.componentId).toBeNull();
@@ -303,7 +316,7 @@ isolated("assessment evidence protected API and immutable history", () => {
     const path = otherBase + "/results/" + otherResultId;
     const bytes = Buffer.from("%PDF-1.4\nSynthetic marked work only\n%%EOF\n");
     const upload = async (actor: AuthUser, data: Buffer, expectedRevision = 0) => fetch(origin + path + "/attachment", { method: "POST", headers: {
-      Authorization: "Bearer " + signToken(actor), "Content-Type": "application/octet-stream",
+      Authorization: "Bearer " + signToken(actor), Connection: "close", "Content-Type": "application/octet-stream",
       "x-evidence-filename": "synthetic.pdf", "x-evidence-mime": "application/pdf", "x-evidence-revision": String(expectedRevision), "x-evidence-reason": "Synthetic marked sample",
     }, body: data });
     expect((await upload(student, bytes)).status).toBe(404);
@@ -330,7 +343,7 @@ isolated("assessment evidence protected API and immutable history", () => {
     expect((await upload(lecturer, bytes)).status).toBe(409);
     expect((await request(path + "/revisions", lecturer, { action: "submit", expectedRevision: 1, confirmedMarkedWork: true })).status).toBe(201);
     expect((await request(path + "/revisions", coordinator, { action: "verify", expectedRevision: 2, reviewReason: "Synthetic file verified", confirmedRestrictedWorkAndMarks: true })).status).toBe(201);
-    expect((await request(otherBase, coordinator)).body.evidence[0].effectiveStatus).toBe("verified");
+    expect(first((await request(otherBase, coordinator)).body.evidence).effectiveStatus).toBe("verified");
     // Scanner rejection is exercised separately with the standard harmless EICAR test signature.
     // The disposable stack, including all stored revisions, is discarded by CI.
   }, 120000);
