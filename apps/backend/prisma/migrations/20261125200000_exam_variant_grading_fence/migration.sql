@@ -16,7 +16,7 @@ $preflight$;
 
 -- A durable row, not merely an advisory lock, is essential under Repeatable
 -- Read/Serializable: concurrent incompatible inserts must conflict even when
--- one transaction has an earlier MVCC snapshot. No historical data backfill.
+-- one transaction has an earlier MVCC snapshot. Seed only scope ownership metadata; never modify historical marks.
 -- Deliberately no FK: legacy result scopes predate canonical item binding and
 -- must not acquire a new FK requirement. Retain the fence even after deletion.
 CREATE TABLE exam_variant."ExamGradingFence" (
@@ -26,6 +26,15 @@ CREATE TABLE exam_variant."ExamGradingFence" (
   PRIMARY KEY ("courseSpecId","assessmentItemId")
 );
 ALTER TABLE exam_variant."ExamGradingFence" ENABLE ROW LEVEL SECURITY;
+
+-- Preserve the ownership of pre-migration scopes, including after later
+-- deletion of an ordinary draft. Preflight above guarantees no overlap.
+INSERT INTO exam_variant."ExamGradingFence" ("courseSpecId","assessmentItemId",mode)
+SELECT "courseSpecId","assessmentItemId",'variant' FROM exam_variant."ExamConfiguration"
+UNION
+SELECT "courseSpecId","assessmentItemId",'legacy' FROM public."AssessmentResult"
+UNION
+SELECT "courseSpecId","assessmentItemId",'legacy' FROM public."AssessmentGroup";
 
 CREATE FUNCTION exam_variant.guard_grading_fence() RETURNS trigger
 LANGUAGE plpgsql SET search_path=pg_catalog AS $$
@@ -45,6 +54,12 @@ CREATE FUNCTION exam_variant.claim_grading_mode(spec_id text, item_id text, requ
 LANGUAGE plpgsql SET search_path=pg_catalog AS $$
 DECLARE acquired text;
 BEGIN
+  -- Once a committed mode is visible it is immutable. Avoid a write/lock on
+  -- every mark in an established assessment. The unique upsert still handles
+  -- first-writer races and stale MVCC snapshots.
+  SELECT mode INTO acquired FROM exam_variant."ExamGradingFence"
+    WHERE "courseSpecId"=spec_id AND "assessmentItemId"=item_id;
+  IF acquired=requested_mode THEN RETURN; END IF;
   INSERT INTO exam_variant."ExamGradingFence" AS f ("courseSpecId","assessmentItemId",mode)
   VALUES (spec_id,item_id,requested_mode)
   ON CONFLICT ("courseSpecId","assessmentItemId") DO UPDATE SET mode=EXCLUDED.mode
