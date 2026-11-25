@@ -3690,7 +3690,7 @@ model AssessmentEvidenceRevision {
   offering         Offering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
   courseSpecId     String
   assessmentItemId String
-  assessmentItem   CourseSpecAssessmentItem @relation(fields: [courseSpecId, assessmentItemId], references: [courseSpecId, id], onDelete: Restrict)
+  assessmentItem   CourseSpecAssessmentItem @relation(fields: [courseSpecId, assessmentItemId], references: [courseSpecId, id], onDelete: Restrict, map: "AssessmentEvidenceRevision_item_fkey")
   revision         Int
   status           String
   action           String
