@@ -51,6 +51,13 @@ Draft implementation; no release or production import is authorized.
 - Added authenticated local Playwright test for exact contextual PDF and Word downloads (signature, filename, mobile), Draft and wrong-placement denial, and student API denial; runs in disposable CI only. Latest execution still required.
 - Do not run a manual SQL migration on persistent staging; use reviewed Prisma migration runner on a separately verified synthetic-only target. No Vercel or Render deployment was requested.
 
+## Phase 5 browser fixture correction
+
+- Commit 33e0073: 16/17 workflows passed; Main CI passed typecheck/lint/tests/build, fresh migration/seed/security and backend authorization. Chromium: 36 passed, one failed twice at the document-page visibility assertion, before either download.
+- The selector is the real PDF-renderer attribute. The generic seed creates an already Approved CS101 CourseSpec after migrations, without a version theme snapshot or exact grading policy binding. The official preview correctly blocks missing style rather than inventing historical formatting. The historical grading API also requires an exact saved binding.
+- New smoke fixture script is restricted to the local disposable dse_browser database and creates a distinct synthetic Draft CourseSpec, binds an approved policy, saves its theme and course-info snapshot, then locks only that fixture. It never changes existing Approved specs. The test verifies the theme and grading APIs before navigation, requires the official code inside a real document page, retains download signature/filename checks and asserts Draft/invalid placement hides downloads. Fresh CI required.
+- No production code, schema, seed, real academic records, or deployment changes in this correction.
+
 ## Remaining merge blockers
 
 1. Validate the new version-wide constraint and duplicate preflight on isolated staging, including detached legacy snapshots. No production migration or data correction authorized.
