@@ -25,6 +25,16 @@ import {
   PortalNotFoundError,
 } from "./service.ts";
 
+// A friendly preflight for authorized callers. PostgreSQL is the authoritative
+// interlock for races, direct SQL, imports, and alternative write paths.
+async function assertLegacyGradingAvailable(db: Pick<typeof prisma, "$queryRaw">, courseSpecId: string, assessmentItemId: string) {
+  const rows = await db.$queryRaw<Array<{ configured: boolean }>>`
+    SELECT EXISTS(SELECT 1 FROM exam_variant."ExamConfiguration"
+      WHERE "courseSpecId"=${courseSpecId} AND "assessmentItemId"=${assessmentItemId}) AS configured
+  `;
+  if (rows[0]?.configured) throw new PortalConflictError("Multi-variant exam requires variant-aware grading; legacy grading is disabled");
+}
+
 type ResultContext = Awaited<ReturnType<typeof resultContext>>;
 type ReviewAssessment = {
   id: string;
@@ -382,6 +392,7 @@ export const resultsLifecycleService = {
   ) {
     const context = await resultContext(input.enrollmentId, authorId, programmeWide);
     const assessment = assessmentFrom(context, input.assessmentItemId);
+    await assertLegacyGradingAvailable(prisma, context.spec.id, assessment.id);
     if (assessment.mode !== "Individual") throw new PortalConflictError("Use the group assessment workspace for Group and Group + Individual scoring");
     if (assessment.rubric?.instrumentKind === "marking_scheme") throw new PortalConflictError("Enter actual question marks; the exam total is calculated automatically");
 
@@ -427,6 +438,7 @@ export const resultsLifecycleService = {
   ) {
     const context = await resultContext(input.enrollmentId, authorId, programmeWide);
     const assessment = assessmentFrom(context, input.assessmentItemId);
+    await assertLegacyGradingAvailable(prisma, context.spec.id, assessment.id);
     if (assessment.mode !== "Individual") throw new PortalConflictError("Use the group assessment workspace for Group and Group + Individual criterion scoring");
     if (!assessment.rubricId || !assessment.rubric) {
       throw new PortalConflictError("This assessment has no linked rubric");
@@ -551,6 +563,7 @@ export const resultsLifecycleService = {
 
     return prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Offering" WHERE "id" = ${offering.id} FOR UPDATE`;
+      await assertLegacyGradingAvailable(tx, spec.id, assessment.id);
       const currentEnrollments = await tx.enrollment.findMany({
         where: { offeringId: offering.id },
         select: { id: true },
@@ -647,6 +660,7 @@ export const resultsLifecycleService = {
 
     return prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Offering" WHERE "id" = ${offering.id} FOR UPDATE`;
+      await assertLegacyGradingAvailable(tx, spec.id, assessment.id);
       const currentEnrollments = await tx.enrollment.findMany({
         where: { offeringId: offering.id },
         select: { id: true },
@@ -772,6 +786,7 @@ export const resultsLifecycleService = {
           "Finalized result does not match the Offering's bound CourseSpec assessment.",
         );
       }
+      await assertLegacyGradingAvailable(tx, spec.id, assessment.id);
       assertGenericFinalizedCorrectionMode(assessment.mode);
       const isScheme = assessment.rubric?.instrumentKind === "marking_scheme";
       if (isScheme !== Boolean(input.questionScores)) throw new PortalConflictError(isScheme ? "Correct the actual question marks, not the exam total" : "Question corrections are only for marking schemes");
