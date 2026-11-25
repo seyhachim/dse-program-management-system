@@ -186,6 +186,97 @@ export function createAssessmentEvidenceRouter(): Router {
     next();
   });
 
+  // Programme-level reporting exposes counts and context only, never marks,
+  // student identities, attachment metadata or external work references.
+  router.get("/assessment-evidence/programmes", async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!await roleHasPermission(user.roles, "qa:manage")) throw new EvidenceError(403, "Coordinator permission required");
+      const programmes = await prisma.programme.findMany({ orderBy: { code: "asc" }, select: { id: true, code: true, name: true } });
+      res.json(programmes.filter(p => hasAnyRoleInProgramme(user, ["admin", "program_coordinator"], p.id)));
+    } catch (error) { sendError(res, error); }
+  });
+
+  router.get("/assessment-evidence/programmes/:programmeId/terms", async (req, res) => {
+    try {
+      const programmeId = req.params.programmeId!;
+      if (!hasAnyRoleInProgramme(req.user!, ["admin", "program_coordinator"], programmeId) ||
+          !await roleHasPermission(req.user!.roles, "qa:manage")) throw new EvidenceError(404, "Programme not found");
+      const terms = await prisma.offering.findMany({ where: { course: { programmeId } },
+        distinct: ["term"], orderBy: { term: "desc" }, select: { term: true } });
+      res.json(terms.map(t => t.term));
+    } catch (error) { sendError(res, error); }
+  });
+
+  router.get("/assessment-evidence/programmes/:programmeId/dashboard", async (req, res) => {
+    try {
+      const programmeId = req.params.programmeId!;
+      if (!hasAnyRoleInProgramme(req.user!, ["admin", "program_coordinator"], programmeId) ||
+          !await roleHasPermission(req.user!.roles, "qa:manage")) throw new EvidenceError(404, "Programme not found");
+      const parsed = z.object({ term: z.string().trim().min(1).max(150),
+        page: z.coerce.number().int().min(1).max(10000).default(1),
+        search: z.string().trim().max(100).optional() }).safeParse(req.query);
+      if (!parsed.success) throw new EvidenceError(400, "Invalid evidence dashboard filters");
+      const { term, page, search } = parsed.data;
+      const pageSize = 5;
+      const response = await prisma.$transaction(async db => {
+        const where: Prisma.OfferingWhereInput = { term, course: { programmeId,
+          ...(search ? { OR: [{ code: { contains: search, mode: "insensitive" } }, { title: { contains: search, mode: "insensitive" } }] } : {}) } };
+        const totalOfferings = await db.offering.count({ where });
+        const offerings = await db.offering.findMany({ where, skip: (page - 1) * pageSize, take: pageSize,
+          orderBy: [{ course: { code: "asc" } }, { sectionCode: "asc" }, { id: "asc" }],
+          select: { id: true, courseId: true, sectionCode: true, status: true,
+            course: { select: { code: true, title: true } }, lecturer: { select: { name: true } },
+            courseSpec: { select: { id: true, courseId: true, reviewStatus: true, assessmentItems: {
+              where: { status: "Active" }, orderBy: { order: "asc" }, select: { id: true, name: true, mode: true, rubricId: true },
+            } } } } });
+        const rows = [];
+        for (const o of offerings) {
+          const spec = o.courseSpec;
+          const ready = spec?.reviewStatus === "Approved" && spec.courseId === o.courseId;
+          const assessments = [];
+          if (ready && spec) {
+            if (spec.assessmentItems.length > 60) throw new EvidenceError(409, "Offering exceeds dashboard assessment limit");
+            for (const item of spec.assessmentItems) {
+              const populations: Population[] = item.mode === "Individual" ? ["individual"] : item.mode === "Group" ? ["group"] : ["group", "component"];
+              for (const population of populations) {
+                const context = { offeringId: o.id, courseSpecId: spec.id, assessmentItemId: item.id };
+                const sources = await sourcesFor(db, context, population);
+                if (sources.length > 500) throw new EvidenceError(409, "Assessment exceeds the pilot cohort limit");
+                const eligibleSources = sources.filter(eligible);
+                const byId = new Map(eligibleSources.map(s => [s.id, s]));
+                const latest = await db.assessmentEvidenceRevision.findMany({
+                  where: { ...context, ...populationFilter(population) },
+                  distinct: ["resultId", "groupScoreId", "componentId"], orderBy: { revision: "desc" },
+                  select: { resultId: true, groupScoreId: true, componentId: true, sourceHash: true, status: true, workReference: true, attachment: true },
+                });
+                const counts = { draft: 0, submitted: 0, verified: 0, changesRequested: 0, stale: 0, collected: 0 };
+                for (const rev of latest) {
+                  if (rev.workReference || parseEvidenceAttachment(rev.attachment)) counts.collected++;
+                  const source = byId.get(revisionSourceId(rev));
+                  if (!source || provenance(source, item.rubricId).hash !== rev.sourceHash) counts.stale++;
+                  else if (rev.status === "verified") counts.verified++;
+                  else if (rev.status === "submitted") counts.submitted++;
+                  else if (rev.status === "changes_requested") counts.changesRequested++;
+                  else counts.draft++;
+                }
+                const target = Math.min(3, eligibleSources.length);
+                assessments.push({ assessmentItemId: item.id, name: item.name, population, eligibleCount: eligibleSources.length,
+                  target, gap: Math.max(0, target - counts.verified), ...counts,
+                  state: eligibleSources.length === 0 ? "not_ready" : counts.verified >= target ? "target_met" : "evidence_needed" });
+              }
+            }
+          }
+          rows.push({ offeringId: o.id, code: o.course.code, title: o.course.title, sectionCode: o.sectionCode,
+            status: o.status, lecturerName: o.lecturer?.name ?? null, courseSpecId: ready ? spec!.id : null,
+            specificationStatus: spec?.reviewStatus ?? null, assessments });
+        }
+        return { programmeId, term, page, pageSize, totalOfferings, rows };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
+      res.json(response);
+    } catch (error) { sendError(res, error); }
+  });
+
   router.get("/assessment-evidence/offerings/:offeringId/context", async (req, res) => {
     try {
       const id = z.string().uuid().safeParse(req.params.offeringId);
