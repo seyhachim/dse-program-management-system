@@ -16,10 +16,12 @@ const prepareSchema = scopeSchema.extend({
   mappings: z.array(z.object({ questionId: id, cloCode: id, evidence: z.enum(["direct", "supporting"]) }).strict()).min(1).max(1000),
 });
 const approvalSchema = z.object({ token: z.string().min(1).max(500000), moderationRef: ref, expectedHash: hash }).strict();
-const assignSchema = versionSchema.extend({
+const assignmentEntrySchema = z.object({
+  variantId: id, variantHash: hash,
   enrollmentId: id, expectedRevision: z.number().int().min(0).max(2147483646),
   reason: z.string().trim().min(5).max(500), evidenceRef: ref,
-});
+}).strict();
+const assignSchema = scopeSchema.merge(assignmentEntrySchema);
 const resolveSchema = scopeSchema.extend({ enrollmentId: id });
 const proposalSchema = z.object({
   purpose: z.literal("exam-variant-proposal-v1"), offeringId: id,
@@ -312,7 +314,7 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
       });
     },
     async assignBulk(actor: AuthUser, input: unknown) {
-      const request = scopeSchema.extend({ entries: z.array(assignSchema.omit({ offeringId: true, assessmentItemId: true })).min(1).max(50) }).parse(input);
+      const request = scopeSchema.extend({ entries: z.array(assignmentEntrySchema).min(1).max(50) }).parse(input);
       if (new Set(request.entries.map((e) => e.enrollmentId)).size !== request.entries.length) conflict("Duplicate enrollment in batch");
       return transact(async (tx) => {
         const results = [];
