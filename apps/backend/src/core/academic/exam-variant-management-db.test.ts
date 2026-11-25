@@ -102,6 +102,41 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
         SELECT revision,"actorId","previousVariantId","variantId" FROM exam_variant."ExamAssignmentEvent" WHERE "assignmentId"=${second.id} ORDER BY revision`;
       expect(events).toEqual([{ revision: 1, actorId: teacher.id, previousVariantId: null, variantId: "A" },
         { revision: 2, actorId: teacher.id, previousVariantId: "A", variantId: "B" }]);
+      // Phase 2C: durable queue, one terminal decision, exact offering scope.
+      const submitted = await service.submit(teacher, { ...prepare, variantId: "C" });
+      await expect(service.submit(teacher, { ...prepare, variantId: "C" })).rejects.toBeInstanceOf(ExamVariantConflictError);
+      const decision = { ...scope, submissionId: submitted.id, expectedHash: submitted.snapshot.variantHash,
+        decision: "Approved", decisionRef: "synthetic-moderation-C" };
+      await expect(service.decide(teacher, decision)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.decide(outsider, decision)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.decide(reviewer, { ...decision, offeringId: f.other.id })).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.decide(reviewer, { ...decision, expectedHash: a.snapshot.variantHash })).rejects.toBeInstanceOf(ExamVariantConflictError);
+      const beforeReview = await service.workspace(teacher, scope);
+      expect(beforeReview.submissions.find(s => s.id === submitted.id)?.status).toBe("Pending");
+      expect(beforeReview.papers.some(p => p.variantId === "C")).toBe(false);
+      await expect(service.workspace(outsider, scope)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      expect((await service.workspace(otherTeacher, { ...scope, offeringId: f.other.id })).submissions).toHaveLength(0);
+      expect(await service.decide(reviewer, decision)).toEqual({ id: submitted.id, status: "Approved" });
+      await expect(service.decide(reviewer, decision)).rejects.toBeInstanceOf(ExamVariantConflictError);
+      const returned = await service.submit(teacher, { ...prepare, variantId: "D" });
+      await service.decide(reviewer, { ...decision, submissionId: returned.id, expectedHash: returned.snapshot.variantHash,
+        decision: "Returned", decisionRef: "Review CLO mapping" });
+      const resubmitted = await service.submit(teacher, { ...prepare, variantId: "D" });
+      expect(resubmitted.id).not.toBe(returned.id);
+      const afterReview = await service.workspace(reviewer, scope);
+      expect(afterReview.submissions.find(s => s.id === returned.id)?.status).toBe("Returned");
+      expect(afterReview.papers.find(p => p.variantId === "C")?.permitted).toBe(true);
+      await expect(db.$executeRaw`UPDATE exam_variant."ExamModerationSubmission" SET "decisionRef"='forged' WHERE id=${submitted.id}`).rejects.toThrow();
+      await expect(db.$executeRaw`DELETE FROM exam_variant."ExamModerationSubmission" WHERE id=${submitted.id}`).rejects.toThrow();
+      const probeStudent = await db.student.create({ data: { name: "Synthetic batch probe", studentId: "BATCH-" + suffix } });
+      const probe = await db.enrollment.create({ data: { offeringId: f.offering.id, studentId: probeStudent.id } });
+      const entry = { enrollmentId: probe.id, variantId: "C", variantHash: submitted.snapshot.variantHash, expectedRevision: 0, reason: "Verified actual paper", evidenceRef: "synthetic-batch" };
+      await expect(service.assignBulk(teacher, { ...scope, entries: [entry, entry] })).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect(service.assignBulk(teacher, { ...scope, entries: [entry, { ...entry, enrollmentId: f.foreign.id }] })).rejects.toBeInstanceOf(ExamVariantAccessError);
+      expect((await service.workspace(teacher, scope)).roster.find(r => r.enrollmentId === probe.id)?.assignment).toBeNull();
+      expect(await service.assignBulk(teacher, { ...scope, entries: [entry] })).toHaveLength(1);
+      expect((await service.history(teacher, { ...scope, enrollmentId: probe.id }))[0]?.variantId).toBe("C");
+      await expect(service.history(otherTeacher, { ...scope, enrollmentId: probe.id })).rejects.toBeInstanceOf(ExamVariantAccessError);
       const mark = await db.assessmentResult.create({ data: { enrollmentId: f.enrolled.id, courseSpecId: f.spec.id, assessmentItemId: "exam", score: 80, maxScore: 100 } });
       await expect(service.assign(teacher, { ...initial, expectedRevision: 2 })).rejects.toBeInstanceOf(ExamVariantConflictError);
       expect(await db.assessmentResult.findUniqueOrThrow({ where: { id: mark.id } })).toEqual(mark);
