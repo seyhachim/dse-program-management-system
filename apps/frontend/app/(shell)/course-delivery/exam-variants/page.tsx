@@ -5,6 +5,7 @@ import type { CourseDeliveryOffering, ExamWorkspace, ExamWorkspaceHistory, ExamW
 import { api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { courseDeliveryApi } from "@/lib/course-delivery";
+import { ExamGradeMarkbook } from "./exam-grade-markbook";
 
 const base="/api/offerings/exam-variants/";
 const field="w-full min-h-10 rounded border border-border bg-background p-2 text-sm";
@@ -27,7 +28,7 @@ function Picker(){
   const exams=rows.find(o=>o.offeringId===oid)?.assessments.filter(a=>a.type.toLowerCase()==="exam"&&a.mode==="individual"&&!a.rubricId&&a.countsTowardGrade)??[];
   return <main className="mx-auto max-w-6xl space-y-4 p-4 md:p-6">
     <Link href="/course-delivery" className="underline">Course Delivery</Link>
-    <h1 className="text-2xl font-semibold">Examination paper management</h1><p>Isolated pilot · No marks or grade release.</p>
+    <h1 className="text-2xl font-semibold">Examination paper management</h1><p>Isolated pilot · Private draft marks only; no grade release.</p>
     {error&&<p role="alert">{error}</p>}
     <div className="grid gap-3 md:grid-cols-2">
       <label>Offering<select className={field} value={oid} onChange={e=>{setOid(e.target.value);setAid("");}}><option value="">Choose offering</option>{rows.map(o=><option value={o.offeringId} key={o.offeringId}>{o.code} · {o.sectionCode} · {o.term}</option>)}</select></label>
@@ -66,7 +67,7 @@ function Workspace({offeringId,assessmentItemId}:{offeringId:string;assessmentIt
   const max=data.examMaximum??Number(maximum);
   const ready=variant.trim()&&Number.isInteger(Number(rev))&&Number(rev)>0&&max>0&&questions.length>0&&questions.every(q=>(q.maxPoints??0)>0&&maps[q.id]?.cloCode)&&Math.abs(total-max)<=Math.max(total,max)*1e-12;
   const paper=data.papers.find(p=>p.variantHash===paperHash&&p.permitted);
-  const eligible=data.roster.filter(r=>r.eligible&&!r.hasResult&&r.assignment?.variantHash!==paperHash);
+  const eligible=data.roster.filter(r=>r.eligible&&!r.hasResult&&!r.grade&&r.assignment?.variantHash!==paperHash);
   const selected=eligible.filter(r=>chosen.includes(r.enrollmentId));
   const body:ExamWorkspacePrepare={...scope,instrumentId:instrument,variantId:variant.trim(),revision:Number(rev),examMaximum:max,mappings:questions.map(q=>({questionId:q.id,...maps[q.id]!}))};
   const inputKey=JSON.stringify(body);
@@ -94,9 +95,10 @@ function Workspace({offeringId,assessmentItemId}:{offeringId:string;assessmentIt
     <section className={panel}><h2 className="font-semibold">Approved versions and permissions</h2>{data.papers.map(p=><div key={p.variantHash} className="flex flex-wrap justify-between gap-2"><span>{p.variantId} · r{p.revision} · {p.permitted?"Permitted":"Not permitted"}</span>{data.canReview&&!p.permitted&&<button className={btn} disabled={busy} onClick={()=>void run("permit",{...scope,variantId:p.variantId,variantHash:p.variantHash},"Permission granted.")}>Permit for class</button>}</div>)}</section>
     <section className={panel}><h2 className="font-semibold">Actual student paper assignment</h2>
       {data.canAssign&&<div className="grid gap-2 md:grid-cols-2"><label>Exact paper<select className={field} value={paperHash} onChange={e=>{setPaperHash(e.target.value);setChosen([]);}}><option value="">Choose paper</option>{data.papers.filter(p=>p.permitted).map(p=><option key={p.variantHash} value={p.variantHash}>{p.variantId} · r{p.revision}</option>)}</select></label><label>Reason<input className={field} value={reason} onChange={e=>setReason(e.target.value)}/></label><label>Opaque evidence reference<input className={field} value={evidenceRef} onChange={e=>setEvidenceRef(e.target.value)}/></label></div>}
-      {data.roster.map(r=><div key={r.enrollmentId} className="flex flex-wrap items-center gap-3 rounded border p-2 text-sm">{data.canAssign&&<input type="checkbox" aria-label={"Select "+r.name} checked={chosen.includes(r.enrollmentId)} disabled={busy||!paper||!eligible.some(x=>x.enrollmentId===r.enrollmentId)} onChange={e=>setChosen(ids=>e.target.checked?[...ids,r.enrollmentId]:ids.filter(x=>x!==r.enrollmentId))}/>}<div className="flex-1">{r.name} · {r.studentId??"Missing ID"}<p>{r.assignment?r.assignment.variantId+" · revision "+r.assignment.revision:"Unassigned"}{r.hasResult?" · Result locked":""}</p></div>{r.assignment&&<button className={btn} disabled={busy} onClick={async()=>{setBusy(true);setHistory(null);try{setHistory(await api.post<ExamWorkspaceHistory[]>(base+"history",{...scope,enrollmentId:r.enrollmentId}));}catch{setError("History unavailable");}finally{setBusy(false);}}}>History</button>}</div>)}
+      {data.roster.map(r=><div key={r.enrollmentId} className="flex flex-wrap items-center gap-3 rounded border p-2 text-sm">{data.canAssign&&<input type="checkbox" aria-label={"Select "+r.name} checked={chosen.includes(r.enrollmentId)} disabled={busy||!paper||!eligible.some(x=>x.enrollmentId===r.enrollmentId)} onChange={e=>setChosen(ids=>e.target.checked?[...ids,r.enrollmentId]:ids.filter(x=>x!==r.enrollmentId))}/>}<div className="flex-1">{r.name} · {r.studentId??"Missing ID"}<p>{r.assignment?r.assignment.variantId+" · revision "+r.assignment.revision:"Unassigned"}{r.hasResult?" · Result locked":r.grade?" · Paper locked by saved draft":""}</p></div>{r.assignment&&<button className={btn} disabled={busy} onClick={async()=>{setBusy(true);setHistory(null);try{setHistory(await api.post<ExamWorkspaceHistory[]>(base+"history",{...scope,enrollmentId:r.enrollmentId}));}catch{setError("History unavailable");}finally{setBusy(false);}}}>History</button>}</div>)}
       {data.canAssign&&<button className={btn} disabled={busy||!paper||!selected.length||selected.length>50||reason.trim().length<5||!evidenceRef.trim()} onClick={assign}>Confirm {selected.length} actual paper(s)</button>}
       {history&&<div className="space-y-2"><h3>Assignment history</h3>{history.map(e=><p key={e.revision}>r{e.revision}: {e.previousVariantId??"Unassigned"} → {e.variantId} · {e.reason} · {e.evidenceRef}</p>)}</div>}
     </section>
+    <ExamGradeMarkbook workspace={data} onSaved={(enrollmentId,grade)=>setData(current=>current?{...current,roster:current.roster.map(r=>r.enrollmentId===enrollmentId?{...r,grade:{revision:grade.gradeRevision,complete:grade.complete}}:r)}:current)}/>
   </div>;
 }

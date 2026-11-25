@@ -142,6 +142,54 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       expect(await service.assignBulk(teacher, { ...scope, entries: [entry] })).toHaveLength(1);
       expect((await service.history(teacher, { ...scope, enrollmentId: probe.id }))[0]?.variantId).toBe("C");
       await expect(service.history(otherTeacher, { ...scope, enrollmentId: probe.id })).rejects.toBeInstanceOf(ExamVariantAccessError);
+      // Phase 3B: exact paper, explicit null versus zero, immutable grading revisions.
+      const grade = await service.gradeWorkspace(teacher, resolve);
+      expect(grade.gradeRevision).toBe(0);
+      expect(grade.snapshot.variantHash).toBe(b.snapshot.variantHash);
+      expect(grade.marks.map(m=>m.score)).toEqual([null,null]);
+      expect(grade.earnedPoints).toBeNull();
+      expect(grade.canEdit).toBe(true);
+      expect((await service.gradeWorkspace(reviewer,resolve)).canEdit).toBe(false);
+      await expect(service.gradeWorkspace(outsider,resolve)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.gradeWorkspace(otherTeacher,resolve)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      const gradeInput = {...resolve,assignmentId:grade.assignment.id,assignmentRevision:grade.assignment.revision,
+        variantHash:grade.assignment.variantHash,expectedGradeRevision:0,marks:[{questionId:"Q1",score:0},{questionId:"Q2",score:null}]};
+      await expect(service.saveGradeDraft(reviewer,gradeInput)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.saveGradeDraft(outsider,gradeInput)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.saveGradeDraft(teacher,{...gradeInput,variantHash:a.snapshot.variantHash})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect(service.saveGradeDraft(teacher,{...gradeInput,assignmentRevision:1})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect(service.saveGradeDraft(teacher,{...gradeInput,assignmentId:probe.id})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect(service.saveGradeDraft(teacher,{...gradeInput,marks:[gradeInput.marks[0]]})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect(service.saveGradeDraft(teacher,{...gradeInput,marks:[gradeInput.marks[0],gradeInput.marks[0]]})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect(service.saveGradeDraft(teacher,{...gradeInput,marks:[gradeInput.marks[0],{questionId:"UNKNOWN",score:0}]})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect(service.saveGradeDraft(teacher,{...gradeInput,marks:[{questionId:"Q1",score:71},gradeInput.marks[1]]})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      const partial = await service.saveGradeDraft(teacher,gradeInput);
+      expect(partial.gradeRevision).toBe(1);
+      expect(partial.complete).toBe(false);
+      expect(partial.earnedPoints).toBeNull();
+      expect(partial.marks.map(m=>m.score)).toEqual([0,null]);
+      expect((await service.gradeWorkspace(teacher,resolve)).marks).toEqual(partial.marks);
+      await expect(service.assign(teacher,{...initial,expectedRevision:2})).rejects.toThrow("Saved question marks lock");
+      // Raw SQL cannot bypass the service-level assignment protection.
+      await expect((async()=>await db.$executeRaw`UPDATE exam_variant."ExamPaperAssignment" SET revision=3,"variantId"='A',"variantHash"=${a.snapshot.variantHash} WHERE id=${grade.assignment.id}`)()).rejects.toThrow();
+      const completedInput = {...gradeInput,expectedGradeRevision:1,marks:[{questionId:"Q2",score:30},{questionId:"Q1",score:0}]};
+      const gradeRace = await Promise.allSettled([service.saveGradeDraft(teacher,completedInput),service.saveGradeDraft(teacher,completedInput)]);
+      expect(gradeRace.filter(x=>x.status==="fulfilled")).toHaveLength(1);
+      expect(gradeRace.filter(x=>x.status==="rejected")).toHaveLength(1);
+      const completed = await service.gradeWorkspace(teacher,resolve);
+      expect(completed.gradeRevision).toBe(2);
+      expect(completed.complete).toBe(true);
+      expect(completed.earnedPoints).toBe(30);
+      expect(completed.maximumPoints).toBe(100);
+      expect((await service.saveGradeDraft(teacher,{...completedInput,expectedGradeRevision:2})).gradeRevision).toBe(2);
+      const revisions = await db.$queryRaw<Array<{revision:number;complete:boolean;earnedPoints:number|null}>>`SELECT revision,complete,"earnedPoints" FROM exam_variant."ExamGradeRevision" WHERE "assignmentId"=${grade.assignment.id} ORDER BY revision`;
+      expect(revisions).toEqual([{revision:1,complete:false,earnedPoints:null},{revision:2,complete:true,earnedPoints:30}]);
+      await expect((async()=>await db.$executeRaw`UPDATE exam_variant."ExamGradeRevision" SET "earnedPoints"=99 WHERE "assignmentId"=${grade.assignment.id}`)()).rejects.toThrow("immutable");
+      await expect((async()=>await db.$executeRaw`DELETE FROM exam_variant."ExamGradeRevision" WHERE "assignmentId"=${grade.assignment.id}`)()).rejects.toThrow("immutable");
+      await expect((async()=>await db.$executeRaw`INSERT INTO exam_variant."ExamGradeRevision" ("assignmentId","assignmentRevision","variantId","variantHash",revision,marks,complete,"earnedPoints","maximumPoints","actorId")
+        VALUES (${grade.assignment.id},${grade.assignment.revision},${grade.assignment.variantId},${grade.assignment.variantHash},3,${JSON.stringify(completed.marks)}::jsonb,true,99,100,${f.teacher.id})`)()).rejects.toThrow("Grade total or completeness mismatch");
+      expect((await service.workspace(teacher,scope)).roster.find(r=>r.enrollmentId===f.enrolled.id)?.grade).toEqual({revision:2,complete:true});
+      expect(await db.assessmentResult.count({where:{courseSpecId:f.spec.id,assessmentItemId:"exam"}})).toBe(0);
       // Phase 3A: legacy marks cannot coexist with a configured assessment.
       const rawMark = (tx: Pick<typeof db,"$executeRaw">, itemId: string, enrollmentId: string = f.enrolled.id) => tx.$executeRaw`
         INSERT INTO public."AssessmentResult" (id,"enrollmentId","courseSpecId","assessmentItemId",score,"maxScore","updatedAt")

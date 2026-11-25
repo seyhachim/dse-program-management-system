@@ -25,7 +25,7 @@ describe("exam variant workspace activation", () => {
       const address=server.address();
       if(!address||typeof address==="string")throw new Error("Missing test server address");
       const url="http://127.0.0.1:"+address.port;
-      for(const endpoint of ["workspace","preview","submit","decide","permit","assign","history","resolve"]){
+      for(const endpoint of ["workspace","preview","submit","decide","permit","assign","history","resolve","grade","grade/save"]){
         const disabled=await fetch(url+"/disabled/exam-variants/"+endpoint,{method:"POST"});
         expect(disabled.status).toBe(404);
         expect(disabled.headers.get("cache-control")).toBe("private, no-store");
