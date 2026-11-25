@@ -21,6 +21,12 @@ describe("Telegram student pending registration contract", () => {
     expect(parsed.careerProfile).toBeUndefined();
   });
 
+  test("explicit not-issued application is valid but cannot claim an email simultaneously", () => {
+    expect(TelegramStudentRegistrationInputSchema.safeParse({...valid,email:undefined,emailNotIssued:true}).success).toBe(true);
+    expect(TelegramStudentRegistrationInputSchema.safeParse({...valid,emailNotIssued:true}).success).toBe(false);
+    expect(TelegramStudentRegistrationInputSchema.safeParse({...valid,email:undefined,emailNotIssued:false}).success).toBe(false);
+  });
+
   for (const extra of [
     { telegramUserId: "999" },
     { role: "admin" },
