@@ -19,6 +19,7 @@ import {
 } from "./class-delivery-service.ts";
 import { resolveTelegramDeepLink } from "./deep-link.ts";
 import { getPmsTelegramConfig } from "./config.ts";
+import { studentRegistrationBotUrl } from "./student-registration-bot-contract.ts";
 import { submitTelegramStudentRegistration, TelegramStudentRegistrationError } from "./student-registration-service.ts";
 import { TelegramInitDataError } from "./init-data.ts";
 import { TelegramLinkError, telegramIdentityStore } from "./identity-store.ts";
@@ -153,6 +154,15 @@ export function createTelegramRouter(service: TelegramService = telegramService)
 
   // Registration does not issue a protected Mini App session. Keep disabled until
   // staff review, retention policy, abuse controls and staging gates are complete.
+  router.get("/registration/config", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const config = getPmsTelegramConfig();
+    const registrationUrl = process.env.TELEGRAM_STUDENT_REGISTRATION_ENABLED === "true"
+      && config.enabled && config.webhookSecret && config.botToken
+      ? studentRegistrationBotUrl(config.botUsername) : null;
+    res.json({ enabled: Boolean(registrationUrl), registrationUrl });
+  });
+
   router.post("/registration/requests", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     if (process.env.TELEGRAM_STUDENT_REGISTRATION_ENABLED !== "true") {
