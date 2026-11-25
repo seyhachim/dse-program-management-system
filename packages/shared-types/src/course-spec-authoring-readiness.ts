@@ -1,6 +1,7 @@
 import {
   COMPLETABLE_SPEC_SECTIONS,
   teachingLearningIsReady,
+  type CourseSpecSessionType,
   type SpecSectionId,
   type SpecSectionStatus,
   type TeachingLearningProfile,
@@ -46,6 +47,7 @@ export type CourseSpecReadinessAssessment = {
 
 export type CourseSpecReadinessWeek = {
   topic: string;
+  sessionType?: CourseSpecSessionType | null;
   cloCodes: readonly string[];
   lloItems?: readonly string[];
   lessonLearningOutcomes?: unknown;
@@ -100,22 +102,43 @@ function hasStructuredText(value: unknown, key: string): boolean {
   });
 }
 
-export function isCourseSpecAssessmentOnlyWeek(
-  week: Pick<CourseSpecReadinessWeek, "topic">,
-): boolean {
-  return ASSESSMENT_ONLY_TOPIC.test(week.topic.trim());
+type SessionTypeEvidence = Pick<CourseSpecReadinessWeek, "topic" | "sessionType" | "assessment" | "assessmentMethodIds">;
+
+export const COURSE_SPEC_SESSION_TYPE_LABELS: Record<CourseSpecSessionType, string> = {
+  teaching: "Teaching",
+  assessment: "Assessment",
+  teaching_and_assessment: "Teaching + Assessment",
+};
+
+export function courseSpecHasWeekAssessment(week: Pick<CourseSpecReadinessWeek, "assessment" | "assessmentMethodIds">): boolean {
+  return (week.assessmentMethodIds ?? []).some((id) => id.trim().length > 0) ||
+    Boolean((week.assessment ?? "").trim());
 }
 
-/**
- * Canonical 1–14 instructional subset. Legacy Midterm/Final assessment-only rows
- * remain persisted for audit/history but do not count as teaching weeks.
- */
-export function courseSpecInstructionalWeeks<
-  T extends Pick<CourseSpecReadinessWeek, "topic">,
->(weeks: readonly T[]): T[] {
-  return weeks
-    .filter((week) => !isCourseSpecAssessmentOnlyWeek(week))
+/** Explicit choices take precedence. Legacy exam titles and assessment evidence are read-only inference. */
+export function courseSpecSessionType(week: SessionTypeEvidence): CourseSpecSessionType {
+  if (week.sessionType != null) return week.sessionType;
+  if (ASSESSMENT_ONLY_TOPIC.test(week.topic.trim())) return "assessment";
+  return courseSpecHasWeekAssessment(week) ? "teaching_and_assessment" : "teaching";
+}
+
+export function isCourseSpecAssessmentOnlyWeek(week: SessionTypeEvidence): boolean {
+  return courseSpecSessionType(week) === "assessment";
+}
+
+/** Preserve the existing instructional-week cap and exclude assessment-only hours from teaching totals. */
+export function courseSpecInstructionalWeeks<T extends SessionTypeEvidence>(weeks: readonly T[]): T[] {
+  return weeks.filter((week) => !isCourseSpecAssessmentOnlyWeek(week))
     .slice(0, MAX_COURSE_SPEC_INSTRUCTIONAL_WEEKS);
+}
+
+/** Preserve old blank exam placeholders for audit; actual assessment sessions participate in readiness. */
+export function courseSpecPlannedWeeks<T extends CourseSpecReadinessWeek>(weeks: readonly T[]): T[] {
+  return weeks.filter((week) => week.sessionType != null ||
+    !isCourseSpecAssessmentOnlyWeek(week) ||
+    week.cloCodes.length > 0 || courseSpecHasWeekAssessment(week) ||
+    [week.lectureHours, week.tutorialHours, week.practiceHours, week.otherHours, week.selfStudyHours]
+      .some((hour) => numericHour(hour) > 0));
 }
 
 /** Canonical per-week readiness issues used by CourseSpec authoring/progress. */
@@ -144,26 +167,24 @@ export function courseSpecWeeklyPlanWeekAttention(
   const issues: CourseSpecWeeklyPlanAttentionIssue[] = [];
   if (!week.topic.trim()) issues.push("Topic");
   if (week.cloCodes.length === 0) issues.push("CLO");
-  if (!hasLlo) issues.push("LLO");
-  if ((week.teachingMethodIds ?? []).length === 0) issues.push("Teaching method");
-  if (!hasActivity) issues.push("Learning activity");
-  if (slt <= 0) issues.push("Learning time");
-  if (
-    (week.assessmentMethodIds ?? []).length === 0 &&
-    !(week.assessment ?? "").trim()
-  ) {
-    issues.push("Assessment");
+  const type = courseSpecSessionType(week);
+  if (type !== "assessment") {
+    if (!hasLlo) issues.push("LLO");
+    if (!(week.teachingMethodIds ?? []).some((id) => id.trim().length > 0)) issues.push("Teaching method");
+    if (!hasActivity) issues.push("Learning activity");
   }
+  if (slt <= 0) issues.push("Learning time");
+  if (type !== "teaching" && !courseSpecHasWeekAssessment(week)) issues.push("Assessment");
   return issues;
 }
 
 export function isCourseSpecWeeklyPlanReady(
   weeks: readonly CourseSpecReadinessWeek[],
 ): boolean {
-  const instructional = courseSpecInstructionalWeeks(weeks);
+  const planned = courseSpecPlannedWeeks(weeks);
   return (
-    instructional.length > 0 &&
-    instructional.every(
+    courseSpecInstructionalWeeks(planned).length > 0 &&
+    planned.every(
       (week) => courseSpecWeeklyPlanWeekAttention(week).length === 0,
     )
   );
@@ -213,7 +234,7 @@ export function deriveCourseSpecAuthoringReadinessStatus(
       : false);
   effective.teachingLearning = teachingLearningReady ? "complete" : "draft";
 
-  effective.slt = isCourseSpecWeeklyPlanReady(instructional)
+  effective.slt = isCourseSpecWeeklyPlanReady(weeks)
     ? "complete"
     : "draft";
 

@@ -159,6 +159,44 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
       where: { courseSpecId: specId }, data: { status: "Active" },
     });
 
+    // Exercise the combined session-aware rules on the real API. The first
+    // week is teaching only, the second is explicitly mixed, and week 8 is
+    // assessment only; the legacy blank final placeholder remains untouched.
+    const teachingWeek = await prisma.courseSpecWeek.findFirstOrThrow({
+      where: { courseSpecId: specId, order: 0 },
+    });
+    await prisma.courseSpecWeek.update({
+      where: { courseSpecId_id: { courseSpecId: specId, id: teachingWeek.id } },
+      data: { sessionType: "teaching", assessment: "", assessmentMethodIds: [] },
+    });
+    const mixedWeek = await prisma.courseSpecWeek.findFirstOrThrow({
+      where: { courseSpecId: specId, order: 1 },
+    });
+    await prisma.courseSpecWeek.update({
+      where: { courseSpecId_id: { courseSpecId: specId, id: mixedWeek.id } },
+      data: { sessionType: "teaching_and_assessment", assessment: "", assessmentMethodIds: [] },
+    });
+    const mixedGap = await request("/submit", lecturer);
+    expect(mixedGap.status).toBe(400);
+    expect(mixedGap.body.error ?? "").toContain("Weekly Plan");
+    await prisma.courseSpecWeek.update({
+      where: { courseSpecId_id: { courseSpecId: specId, id: mixedWeek.id } },
+      data: { assessment: "Formative check" },
+    });
+    const exam = await prisma.courseSpecWeek.create({ data: {
+      courseSpecId: specId, order: 15, week: 8,
+      topic: "Midterm Exam", sessionType: "assessment",
+      cloCodes: ["CLO1"], otherHours: 2,
+    }});
+    const examGap = await request("/submit", lecturer);
+    expect(examGap.status).toBe(400);
+    expect(examGap.body.error ?? "").toContain("Weekly Plan");
+    expect((await snapshot()).reviewActions).toHaveLength(0);
+    await prisma.courseSpecWeek.update({
+      where: { courseSpecId_id: { courseSpecId: specId, id: exam.id } },
+      data: { assessment: "Individual written examination" },
+    });
+
     const dateBefore = localDate(new Date());
     const submitted = await request("/submit", lecturer);
     expect(submitted.status).toBe(200);

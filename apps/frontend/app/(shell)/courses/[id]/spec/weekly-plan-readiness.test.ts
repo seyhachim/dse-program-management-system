@@ -51,3 +51,8 @@ describe("weekly plan readiness", () => {
     expect(weeklyPlanIsReady([])).toBe(false);
   });
 });
+
+test("a teaching week without a scheduled assessment is complete", () => {
+  expect(weeklyPlanWeekAttention({ ...readyWeek, sessionType: "teaching", assessmentMethodIds: [] })).toEqual([]);
+  expect(weeklyPlanIsReady([{ ...readyWeek, sessionType: "teaching", assessmentMethodIds: [] }])).toBe(true);
+});

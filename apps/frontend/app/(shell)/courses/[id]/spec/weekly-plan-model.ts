@@ -1,3 +1,4 @@
+import { courseSpecInstructionalWeeks, isCourseSpecAssessmentOnlyWeek, CourseSpecSessionType } from "@dse-pms/shared-types";
 import type {
   LessonLearningOutcome,
   StudentLearningActivity,
@@ -12,6 +13,7 @@ export type WeekForm = {
   id: string;
   week: string;
   topic: string;
+  sessionType?: CourseSpecSessionType | null;
   cloCodes: string[];
   lloItems: string[];
   lessonLearningOutcomes: LessonLearningOutcome[];
@@ -33,20 +35,13 @@ export type WeeklyPlanForm = WeekForm[];
 export const EMPTY_WEEKLY_PLAN: WeeklyPlanForm = [];
 export const MAX_INSTRUCTIONAL_WEEKS = 14;
 
-const ASSESSMENT_ONLY_TOPIC =
-  /^(?:mid[- ]?term(?:\s+(?:exam|quiz|assessment))?|final(?:\s+(?:exam|assessment))?|final\s+exam\s*:\s*.*|exam\s*:\s*.*)$/i;
-
-/**
- * Legacy imports sometimes stored Midterm / Final Exam rows inside §18.
- * Keep those records intact in persistence, but exclude them from the teaching
- * week view and official instructional-week document calculations.
- */
+/** Use the same classification in authoring, readiness, and official teaching SLT. */
 export function isAssessmentOnlyWeek(week: WeekForm): boolean {
-  return ASSESSMENT_ONLY_TOPIC.test(week.topic.trim());
+  return isCourseSpecAssessmentOnlyWeek(week);
 }
 
 export function instructionalWeeklyPlan(form: WeeklyPlanForm): WeeklyPlanForm {
-  return form.filter((week) => !isAssessmentOnlyWeek(week)).slice(0, MAX_INSTRUCTIONAL_WEEKS);
+  return courseSpecInstructionalWeeks(form);
 }
 
 export function legacyAssessmentOnlyWeeks(form: WeeklyPlanForm): WeeklyPlanForm {
@@ -125,18 +120,18 @@ const studentLearningActivityArray = (
 /** A fresh instructional week, using the first available week number 1–14. */
 export function emptyWeek(existing: WeeklyPlanForm): WeekForm {
   const used = new Set(
-    instructionalWeeklyPlan(existing)
-      .map((week) => Number(week.week))
-      .filter((week) => Number.isInteger(week) && week >= 1 && week <= MAX_INSTRUCTIONAL_WEEKS),
+    existing.map((week) => Number(week.week))
+      .filter((week) => Number.isInteger(week) && week >= 1 && week <= 52),
   );
   const nextNo =
-    Array.from({ length: MAX_INSTRUCTIONAL_WEEKS }, (_, index) => index + 1).find(
+    Array.from({ length: 52 }, (_, index) => index + 1).find(
       (week) => !used.has(week),
-    ) ?? MAX_INSTRUCTIONAL_WEEKS;
+    ) ?? 52;
   return {
     id: uuid(),
     week: String(nextNo),
     topic: "",
+    sessionType: "teaching",
     cloCodes: [],
     lloItems: [],
     lessonLearningOutcomes: [],
@@ -227,6 +222,7 @@ export function toWeeklyPlanForm(data: unknown): WeeklyPlanForm {
         id: str(d.id) || uuid(),
         week: str(d.week),
         topic: str(d.topic),
+        sessionType: CourseSpecSessionType.safeParse(d.sessionType).data,
         cloCodes: strArray(d.cloCodes),
         lloItems: legacyLloItems,
         lessonLearningOutcomes,
@@ -265,6 +261,7 @@ export function toWeeklyPlanPayload(form: WeeklyPlanForm): WeeklyPlanSection {
         id: w.id,
         week: Number(w.week) || 1,
         topic: w.topic.trim(),
+        ...(w.sessionType != null ? { sessionType: w.sessionType } : {}),
         cloCodes: w.cloCodes,
 
         // New source of truth with stable IDs.

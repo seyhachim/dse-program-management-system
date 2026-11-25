@@ -192,24 +192,36 @@ describe("overview readiness", () => {
     expect(status.mapping).toBeUndefined();
   });
 
-  test("legacy Midterm and Final rows do not keep a completed instructional plan in draft", () => {
-    const midterm = {
-      ...week("w8", ["CLO1"]),
-      topic: "Midterm Exam",
-    };
-    const final = {
-      ...week("w16", ["CLO1"]),
-      topic: "Final Exam",
-    };
+  test("empty legacy Midterm and Final placeholders do not block a completed instructional plan", () => {
+    const placeholder = (id: string, topic: string): WeekForm => ({
+      ...week(id, []),
+      topic,
+      lectureHours: "",
+      selfStudyHours: "",
+    });
     const status = deriveOverviewReadinessStatus(
       { ...baseStatus, slt: "draft" },
       [clo("CLO1")],
-      [readyWeek("w1", ["CLO1"]), midterm, readyWeek("w9", ["CLO1"]), final],
+      [readyWeek("w1", ["CLO1"]), placeholder("w8", "Midterm Exam"), readyWeek("w9", ["CLO1"]), placeholder("w16", "Final Exam")],
       [assessment("a1", ["CLO1"])],
       { cloReady: true, teachingLearningReady: true },
     );
 
     expect(status.slt).toBe("complete");
     expect(status.mapping).toBe("complete");
+  });
+
+  test("legacy assessment sessions with allocated hours need assessment evidence, not teaching fields", () => {
+    const midterm = { ...week("w8", ["CLO1"]), topic: "Midterm Exam" };
+    const derive = (exam: WeekForm) => deriveOverviewReadinessStatus(
+      { ...baseStatus, slt: "complete" },
+      [clo("CLO1")],
+      [readyWeek("w1", ["CLO1"]), exam],
+      [assessment("a1", ["CLO1"])],
+      { cloReady: true, teachingLearningReady: true },
+    );
+    expect(derive(midterm).slt).toBe("draft");
+    expect(derive({ ...midterm, assessment: "Midterm Exam" }).slt).toBe("complete");
+    expect(derive({ ...midterm, assessment: "Midterm Exam" }).mapping).toBe("complete");
   });
 });

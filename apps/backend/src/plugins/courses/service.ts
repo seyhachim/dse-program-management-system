@@ -883,6 +883,7 @@ function reassembleSpec(spec: SpecRow | null): {
         id: w.id,
         week: w.week,
         topic: w.topic,
+        ...(w.sessionType != null ? { sessionType: w.sessionType } : {}),
         cloCodes: w.cloCodes,
         lloItems: w.lloItems,
         lessonLearningOutcomes: w.lessonLearningOutcomes ?? [],
@@ -1093,6 +1094,10 @@ async function syncWeeklyPlan(
   courseSpecId: string,
   weeks: WeeklyPlanSection["weeks"],
 ) {
+  // Older clients may omit this new field. Keep explicit classifications on existing rows.
+  const existingTypes = new Map((await tx.courseSpecWeek.findMany({
+    where: { courseSpecId }, select: { id: true, sessionType: true },
+  })).map((row) => [row.id, row.sessionType]));
   await tx.courseSpecWeek.deleteMany({ where: { courseSpecId } });
   if (weeks.length === 0) return;
   await tx.courseSpecWeek.createMany({
@@ -1102,6 +1107,7 @@ async function syncWeeklyPlan(
       order,
       week: w.week,
       topic: w.topic,
+      sessionType: w.sessionType ?? existingTypes.get(w.id) ?? null,
       cloCodes: w.cloCodes,
       lloItems: w.lloItems,
       lessonLearningOutcomes: w.lessonLearningOutcomes,
