@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import Link from "next/link";
 import type { PendingRegistrationReceipt, TelegramRegistrationBootstrap } from "@dse-pms/shared-types";
 import { API_URL } from "../../../lib/api";
 import "../telegram-client";
@@ -30,7 +29,7 @@ export default function TelegramRegistrationPage() {
     if (!boot.current) {
       const app = window.Telegram?.WebApp;
       app?.ready(); app?.expand();
-      boot.current = app?.initData ? post("bootstrap", { initData: app.initData }) : Promise.reject(new Error("Open registration from the official DSE PMS Telegram bot."));
+      boot.current = app?.initData ? post<TelegramRegistrationBootstrap>("bootstrap", { initData: app.initData }) : Promise.reject(new Error("Open registration from the official DSE PMS Telegram bot."));
     }
     void boot.current.then(value => { if (active) setData(value); }).catch((e: unknown) => { if (active) setError(e instanceof Error ? e.message : "Registration unavailable"); });
     return () => { active = false; };
@@ -68,7 +67,7 @@ export default function TelegramRegistrationPage() {
     <header><p className="text-sm font-medium text-blue-700">DSE PMS · RUPP</p><h1 className="mt-1 text-2xl font-semibold">Student registration</h1><p className="mt-1 text-sm text-slate-600">ចុះឈ្មោះនិស្សិត · Enter your official names and class.</p></header>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {!data && !error && <p role="status">Verifying your Telegram account…</p>}
-    {state && state !== "FORM" && <div className="space-y-3"><p role="status" className="rounded-lg bg-slate-50 p-4 text-sm">{messages[state]}</p>{state === "APPROVED" && <p className="text-sm"><Link className="text-blue-700 underline" href="/telegram">Open PMS</Link> — if verification fails, reopen the Mini App from the bot.</p>}</div>}
+    {state && state !== "FORM" && <div className="space-y-3"><p role="status" className="rounded-lg bg-slate-50 p-4 text-sm">{messages[state]}</p>{state === "APPROVED" && <p className="text-sm">Close this screen and launch the usual PMS Mini App from the bot for a fresh verified sign-in.</p>}</div>}
     {state === "FORM" && <form onSubmit={submit} className="space-y-4">
       <p className="text-xs leading-5 text-slate-600">Your information is visible only to authorized staff for student verification. Submitting does not activate an account.</p>
       {([["khmerFamilyName", "នាមត្រកូល · Khmer family name"], ["khmerGivenName", "នាមខ្លួន · Khmer given name"], ["latinFamilyName", "English family name"], ["latinGivenName", "English given name"]] as const).map(([key,label]) => <label className="block space-y-1 text-sm font-medium" key={key}>{label}<input className={fieldClass} required maxLength={100} value={fields[key]} onChange={e => setField(key,e.target.value)} /></label>)}
