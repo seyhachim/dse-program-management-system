@@ -11,8 +11,8 @@ export function policyAccess(user: AuthUser, programmeId: string): "manage" | "r
 }
 
 const metadata = (max: number) => z.string().trim().min(1).max(max)
-  .refine(s => !/(?:https?:|www\\.|[a-z][a-z0-9+.-]*:\\/\\/)/i.test(s), "Use bibliographic metadata only; source links are not accepted");
-const date = z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).refine(s => {
+  .refine(s => !/(?:https?:|www\.|[a-z][a-z0-9+.-]*:\/\/)/i.test(s), "Use bibliographic metadata only; source links are not accepted");
+const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s => {
   const d = new Date(s + "T00:00:00Z");
   return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10) === s;
 }, "Invalid date");
