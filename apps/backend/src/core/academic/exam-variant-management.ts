@@ -188,7 +188,9 @@ async function gradeContext(tx: Tx, actorId: string, request: z.infer<typeof res
     permissions: [{ ...ctx.scope, offeringId: ctx.offering.id, ...v }],
     assignment: { ...scope, ...v, confirmed: true },
   };
-  return { ctx, current, snapshot: resolveExamVariant(resolution), scope, v, resolution,
+  const labels = await tx.rubricCriterion.findMany({ where: { rubricId: snapshot.instrumentId }, select: { id: true, name: true } });
+  const questionLabels = Object.fromEntries(labels.map(q=>[q.id,q.name]));
+  return { ctx, current, snapshot: resolveExamVariant(resolution), scope, v, resolution, questionLabels,
     canEdit: ctx.teacher && ctx.offering.status === "Active" && student.student.status === "Active" && Boolean(student.student.studentId) };
 }
 function gradeResponse(g: Awaited<ReturnType<typeof gradeContext>>, row: GradeRevision | undefined) {
@@ -199,7 +201,7 @@ function gradeResponse(g: Awaited<ReturnType<typeof gradeContext>>, row: GradeRe
     conflict("Stored grade integrity mismatch");
   }
   return { assignment: g.current, snapshot: g.snapshot, canEdit: g.canEdit,
-    gradeRevision: row?.revision ?? 0, complete: summary.complete,
+    gradeRevision: row?.revision ?? 0, complete: summary.complete, questionLabels: g.questionLabels,
     earnedPoints: summary.earnedPoints, maximumPoints: summary.maximumPoints,
     marks: summary.rows.map(q=>({ questionId:q.questionId,maxPoints:q.maxPoints,score:q.score })),
     savedAt: row?.savedAt.toISOString() ?? null };
