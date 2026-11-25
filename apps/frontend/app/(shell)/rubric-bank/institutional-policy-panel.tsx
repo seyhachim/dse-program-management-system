@@ -29,7 +29,7 @@ export function InstitutionalPolicyPanel({onVerifiedObe}: {onVerifiedObe: (recor
     const unsubscribe = subscribeAuthIdentityChange(() => {
       active = false; setRegistry(null); setDraft(initial); onVerifiedObe(null);
     });
-    void api.get<Registry>(endpoint).then(value => {
+    void api.getUnshared<Registry>(endpoint).then(value => {
       if (!active) return;
       setRegistry(value);
       onVerifiedObe(value.records.find(r => r.topic === "obe" && r.status === "verified") ?? null);
@@ -46,7 +46,7 @@ export function InstitutionalPolicyPanel({onVerifiedObe}: {onVerifiedObe: (recor
   async function save() {
     setBusy(true); setError("");
     try {
-      await api.post(endpoint,{...draft,version:draft.version.trim() || null,effectiveDate:draft.effectiveDate || null,locator:draft.locator.trim() || null});
+      await api.postUnshared(endpoint,{...draft,version:draft.version.trim() || null,effectiveDate:draft.effectiveDate || null,locator:draft.locator.trim() || null});
       setDraft(initial); setRefresh(v => v+1);
     } catch { setError("Revision not saved. Reload references and verify the metadata."); }
     finally {setBusy(false);}

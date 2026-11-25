@@ -16,18 +16,19 @@ export const DEV_TOKEN_STORAGE_KEY = "dse-pms-dev-token";
 const runInflightGet = createInflightGetDeduper();
 const runInflightAuthHeader = createInflightLoader<Record<string, string>>();
 
-async function authHeader(): Promise<Record<string, string>> {
+async function authHeader(unshared = false): Promise<Record<string, string>> {
   if (AUTH_MODE === "neon-staging") {
     const token = await stagingBearerToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
   if (AUTH_MODE === "supabase") {
-    return runInflightAuthHeader(async (): Promise<Record<string, string>> => {
+    const loadHeader = async (): Promise<Record<string, string>> => {
       const { data } = await getSupabase().auth.getSession();
       const token = data.session?.access_token;
       if (!token) return {};
       return { Authorization: `Bearer ${token}` };
-    });
+    };
+    return unshared ? loadHeader() : runInflightAuthHeader(loadHeader);
   }
   const browserOverride =
     typeof window !== "undefined"
@@ -55,12 +56,12 @@ function errorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-async function request<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, isRetry = false, unshared = false): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(await authHeader()),
+      ...(await authHeader(unshared)),
       ...init?.headers,
     },
     cache: "no-store",
@@ -92,7 +93,7 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
   if (res.status === 401 && AUTH_MODE === "supabase" && !isRetry) {
     const supabase = getSupabase();
     const { data, error } = await supabase.auth.refreshSession();
-    if (!error && data.session) return request<T>(path, init, true);
+    if (!error && data.session) return request<T>(path, init, true, unshared);
     await supabase.auth.signOut();
     window.location.replace("/login");
     throw new ApiError(401, "Session expired. Please sign in again.");
@@ -113,6 +114,13 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
 }
 
 export const api = {
+  // Restricted metadata must not reuse a pending response or bearer lookup
+  // belonging to a previous signed-in identity during account switching.
+  getUnshared: <T>(path: string) => request<T>(path, undefined, false, true),
+  postUnshared: <T>(path: string, body: unknown) =>
+    runConfirmedMutation("POST", path, () =>
+      request<T>(path, { method: "POST", body: JSON.stringify(body) }, false, true),
+    ),
   get: <T>(path: string) => runInflightGet(path, () => request<T>(path)),
   post: <T>(path: string, body: unknown) =>
     runConfirmedMutation("POST", path, () =>
