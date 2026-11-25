@@ -1,0 +1,74 @@
+.newsPage {
+  min-height:100vh;background:#f7f9fc;color:#0b1f3a;
+  font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.newsPage * {box-sizing:border-box}
+.shell {width:min(1160px,calc(100% - 40px));margin:0 auto}
+.header {background:#fff;border-bottom:1px solid #dce4ef;position:sticky;top:0;z-index:20}
+.nav {min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand {display:inline-flex;align-items:center;gap:14px;font-weight:760;color:#0b1f3a;text-decoration:none}
+.brand img {width:38px;height:38px;object-fit:contain}
+.topLink {border:1px solid #dce4ef;border-radius:10px;padding:10px 14px;text-decoration:none;color:#2267e8;font-size:.89rem;font-weight:680}
+.hero {padding:50px 0 30px}
+.eyebrow {text-transform:uppercase;letter-spacing:.16em;font-size:.7rem;font-weight:850;color:#2267e8}
+.hero h1 {font-size:clamp(2.1rem,5vw,3.8rem);line-height:1.1;letter-spacing:-.04em;margin:12px 0}
+.hero p {max-width:650px;color:#5f6f83;line-height:1.65}
+.searchForm {margin:25px 0;display:flex;gap:8px}
+.searchForm input {min-width:0;flex:1;max-width:560px;padding:12px 15px;border:1px solid #cfdaeb;border-radius:10px;font:inherit}
+.searchForm button {padding:0 20px;background:#2267e8;color:#fff;border:0;border-radius:10px;font:inherit;font-weight:700;cursor:pointer}
+.grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin:22px 0 72px}
+.card {background:#fff;border:1px solid #dce4ef;border-radius:16px;overflow:hidden;box-shadow:0 8px 35px rgba(16,36,68,.05);display:flex;flex-direction:column}
+.imageLink {display:block}
+.cardImage,.cardPlaceholder {width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:#eaf2ff}
+.cardPlaceholder {display:grid;place-items:center;color:#2267e8}
+.cardPlaceholder svg {width:48px;height:48px}
+.cardContent {padding:20px;display:flex;flex-direction:column;flex:1;gap:11px}
+.cardDate {color:#64748b;font-size:.78rem;display:flex;align-items:center;gap:7px}
+.cardDate svg {width:14px;height:14px}
+.card h3 {font-size:1.12rem;line-height:1.4;letter-spacing:-.02em;margin:0}
+.card h3 a {color:#0b1f3a;text-decoration:none}
+.card h3 a:hover {color:#2267e8}
+.cardSummary {color:#5f6f83;font-size:.9rem;line-height:1.6}
+.tagList {display:flex;flex-wrap:wrap;gap:7px}
+.tagList span {font-size:.73rem;font-weight:650;border-radius:20px;background:#eaf2ff;color:#154fbf;padding:5px 9px}
+.readLink {display:inline-flex;align-items:center;gap:5px;color:#154fbf;text-decoration:none;font-weight:750;font-size:.86rem;margin-top:auto}
+.readLink svg {width:16px;height:16px}
+.empty {padding:42px;border:1px dashed #cbd5e1;border-radius:14px;background:#fff;text-align:center;color:#5f6f83}
+.back {display:inline-flex;align-items:center;gap:7px;color:#2267e8;text-decoration:none;font-weight:700;font-size:.9rem}
+.detail {padding:40px 0 75px;max-width:800px}
+.detail h1 {font-size:clamp(2rem,5vw,3.2rem);line-height:1.15;margin:16px 0;letter-spacing:-.04em}
+.deck {font-size:1.11rem;color:#5f6f83;line-height:1.6}
+.fullCover {width:100%;max-height:480px;border-radius:16px;object-fit:cover;margin:24px 0}
+.articleBody {white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.85;font-size:1.02rem;color:#243b59;margin:28px 0}
+.gallery {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:28px 0}
+.gallery figure {margin:0}
+.gallery img {width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px}
+.gallery figcaption {font-size:.78rem;color:#64748b;padding:7px 0}
+.footer {padding:24px 0;border-top:1px solid #dce4ef;color:#64748b;font-size:.8rem}
+.more {display:flex;gap:15px;align-items:center;justify-content:space-between;margin-bottom:20px}
+.more a {color:#2267e8;text-decoration:none;font-weight:700}
+.teaser {padding-top:42px;padding-bottom:32px;color:#0b1f3a}
+.teaserHeading {display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:18px}
+.teaserHeading h2 {font-size:clamp(1.7rem,3vw,2.4rem);margin:6px 0}
+.teaserHeading p {color:#5f6f83}
+.teaser .grid {margin:0}
+@media(max-width:900px) {.grid {grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px) {
+  .grid,.gallery {grid-template-columns:1fr}
+  .nav {gap:10px}
+  .brand {font-size:.85rem;gap:8px}
+  .brand img {width:30px;height:30px}
+  .topLink {padding:8px;font-size:.75rem}
+  .hero {padding:32px 0 18px}
+  .searchForm button {padding:0 14px}
+  .teaserHeading {align-items:start;flex-direction:column}
+}
+@media(prefers-color-scheme:dark) {
+  .newsPage {background:#07182f;color:#f6f9ff}
+  .header,.card,.empty {background:#0c2240;border-color:#243b59}
+  .brand,.card h3 a,.teaser {color:#f6f9ff}
+  .topLink,.searchForm input {background:#102947;border-color:#243b59;color:#f6f9ff}
+  .cardSummary,.hero p,.deck,.articleBody,.teaserHeading p {color:#bacbe0}
+  .cardPlaceholder {background:#102947}
+  .empty {color:#bacbe0}
+}

@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 const EXPECTED_PUBLIC_TABLES = [
   "User",
   "UserSecurityAuditEvent",
+  "ProgrammeHeadAppointment",
   "LecturerProfile",
   "Role",
   "Programme",
@@ -80,6 +81,13 @@ const EXPECTED_PUBLIC_TABLES = [
   "CourseSpecDocumentTheme",
   "CourseSpecDocumentThemeAuditEvent",
   "Offering",
+  "OfferingActivity",
+  "OfferingActivityAuditEvent",
+  "OfferingActivityParticipant",
+  "OfferingActivityParticipantAudit",
+  "DseNewsArticle",
+  "DseNewsAuditEvent",
+  "DseNewsMedia",
   "OfferingStudentSemesterNote",
   "OfferingStudentSemesterNoteRevision",
   "OfferingResultAccessPolicy",
@@ -161,6 +169,10 @@ const EXPECTED_PUBLIC_TABLES = [
   "CopDiscussion",
   "CopComment",
   "CopAction",
+  "Opportunity",
+  "OpportunityInterest",
+  "OpportunityExperience",
+  "OpportunityAuditEvent",
 ] as const;
 
 const EXPECTED_ATTENDANCE_TABLES = [
@@ -521,7 +533,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, ${courseSpecGovernanceTables.length} course-spec governance tables, ${publicAnalyticsTables.length} public-analytics tables, ${studentHandbookTables.length} student-handbook tables, and ${lecturerPortfolioTables.length} lecturer-portfolio tables, and ${lecturerAnnualTables.length} lecturer-annual tables are classified, RLS-protected, and not granted to Data API roles.`,
+    `Database security verified: ${publicTables.length} public PMS tables, ${attendanceTables.length} attendance tables, ${telegramSecurityTables.length} Telegram security tables, ${qaSecurityTables.length} QA security tables, ${curriculumArtifactTables.length} curriculum artifact tables, ${courseSpecGovernanceTables.length} course-spec governance tables, ${publicAnalyticsTables.length} public-analytics tables, ${studentHandbookTables.length} student-handbook tables, ${lecturerPortfolioTables.length} lecturer-portfolio tables, and ${lecturerAnnualTables.length} lecturer-annual tables are classified, RLS-protected, and not granted to Data API roles.`,
   );
 }
 

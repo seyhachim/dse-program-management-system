@@ -256,3 +256,27 @@ for (const width of [390, 1280]) {
     await context.close();
   });
 }
+
+
+test("dirty semester note registers a browser unload guard", async ({ browser }) => {
+  const context = await newRoleContext(browser, "lecturer");
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 390, height: 900 });
+  await stubAttendance(page);
+  await page.goto("/attendance");
+
+  await expect(page.getByText("Synthetic Student").filter({ visible: true })).toBeVisible();
+  await page.getByRole("button", { name: "Add persistent student note" }).click();
+
+  const unloadPrevented = () => page.evaluate(() => {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+
+  expect(await unloadPrevented()).toBe(false);
+  await page.getByRole("textbox", { name: "Lecturer-only note" }).fill("Unsaved private note");
+  expect(await unloadPrevented()).toBe(true);
+
+  await context.close();
+});

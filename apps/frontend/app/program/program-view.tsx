@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { PublicProgrammePageModel } from "@/lib/public-programme-page";
 import { ProgrammeThemeToggle } from "./program-theme-toggle";
+import { ProgrammeNewsTeaser } from "./programme-news-teaser";
 import styles from "./program.module.css";
 
 const snapshotIcons = [CalendarDays, BookOpen, GraduationCap, BriefcaseBusiness] as const;
@@ -75,6 +76,7 @@ export function ProgrammeView({ content }: { content: PublicProgrammePageModel }
             <a href="#programme">Programme</a>
             <a href="#journey">Journey</a>
             <a href="#curriculum">Curriculum</a>
+            <Link href="/program/news">News & Activities</Link>
             {hasFaqs && <a href="#faq">FAQ</a>}
             {hasDates && <a href="#dates">Dates</a>}
             {hasContact && <a href="#contact">Contact</a>}
@@ -93,6 +95,7 @@ export function ProgrammeView({ content }: { content: PublicProgrammePageModel }
                 <a href="#programme">Programme</a>
                 <a href="#journey">Journey</a>
                 <a href="#curriculum">Curriculum</a>
+                <Link href="/program/news">News & Activities</Link>
                 {hasFaqs && <a href="#faq">FAQ</a>}
                 {hasDates && <a href="#dates">Dates</a>}
                 {hasContact && <a href="#contact">Contact</a>}
@@ -272,6 +275,8 @@ export function ProgrammeView({ content }: { content: PublicProgrammePageModel }
           </div>
         </article>
       </section>
+
+      <ProgrammeNewsTeaser />
 
       {hasUtilityContent && (
         <section className={`${styles.utilityStrip} ${styles.shell}`} aria-label="Programme information">

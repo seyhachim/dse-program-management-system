@@ -487,8 +487,8 @@ async function toDetail(row: EnrollmentRow, userId: string): Promise<PortalCours
           format: item.format,
           submissionMethod: item.submissionMethod,
           instructions: item.instructions,
-          rubricName: item.rubric && item.rubric.status !== "Draft" ? item.rubric.name : "",
-          rubricCriteria: item.rubric && item.rubric.status !== "Draft"
+          rubricName: item.rubric && item.rubric.status !== "Draft" && item.rubric.instrumentKind !== "marking_scheme" ? item.rubric.name : "",
+          rubricCriteria: item.rubric && item.rubric.status !== "Draft" && item.rubric.instrumentKind !== "marking_scheme"
             ? item.rubric.criterionRows.map((criterion) => ({
                 id: criterion.id,
                 name: criterion.name,
@@ -664,11 +664,13 @@ export const studentPortalService = {
             dueWeek: assessment.dueWeek,
             dueAt: deadlines.get(assessment.id)?.toISOString() ?? null,
             rubricId: assessment.rubricId,
+            instrumentKind: assessment.rubric?.instrumentKind === "marking_scheme" ? "marking_scheme" as const : "rubric" as const,
             rubricName: assessment.rubric?.name ?? "",
             rubricContentHash: assessment.rubric ? rubricContentHash(assessment.rubric) : null,
             rubricCriteria: (assessment.rubric?.criterionRows ?? []).map((criterion) => ({
               id: criterion.id,
               name: criterion.name,
+              ...(assessment.rubric?.instrumentKind === "marking_scheme" && criterion.maxPoints !== null ? { maxPoints: criterion.maxPoints } : {}),
               scoringScope: assessment.mode === "Group" ? "group" : assessment.mode === "Individual" ? "individual" : assessment.individualCriterionIds.includes(criterion.id) ? "individual" : "group",
               cloCodes: assessment.criterionCloMappings
                 .filter((mapping) => mapping.rubricId === assessment.rubricId && mapping.criterionId === criterion.id)
@@ -824,7 +826,7 @@ export const studentPortalService = {
       include: {
         offering: {
           include: {
-            courseSpec: { include: { assessmentItems: true } },
+            courseSpec: { include: { assessmentItems: { include: { rubric: { select: { instrumentKind: true } } } } } },
           },
         },
       },
@@ -835,6 +837,7 @@ export const studentPortalService = {
     if (!spec || !spec.assessmentItems.some((item) => item.id === input.assessmentItemId)) {
       throw new PortalNotFoundError("Assessment not found");
     }
+    if (spec.assessmentItems.find((item) => item.id === input.assessmentItemId)?.rubric?.instrumentKind === "marking_scheme") throw new PortalConflictError("Use question-level marking and explicit publication for marking schemes");
     return prisma.assessmentResult.upsert({
       where: {
         enrollmentId_courseSpecId_assessmentItemId: {

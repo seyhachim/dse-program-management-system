@@ -192,6 +192,7 @@ describeDb("two-pass attendance recheck", () => {
       "2026-09-13",
       {
         studentId: student.id,
+        expectedUpdatedAt: correctedBeforeRecheck.updatedAt!,
         observation: { status: "Present", permissionPending: false, note: "Seen in second roll" },
         final: { status: "Late", permissionPending: false, note: "Arrived after first roll" },
       },
@@ -215,6 +216,7 @@ describeDb("two-pass attendance recheck", () => {
         "2026-09-13",
         {
           studentId: student.id,
+          expectedUpdatedAt: rechecked.updatedAt!,
           observation: { status: "Present", permissionPending: false, note: "Duplicate" },
           final: { status: "Present", permissionPending: false, note: "Duplicate" },
         },
@@ -223,13 +225,63 @@ describeDb("two-pass attendance recheck", () => {
     ).rejects.toBeInstanceOf(AttendanceRecheckConflictError);
   });
 
+  test("rejects stale Check 2 without overwriting a newer attendance correction", async () => {
+    const offering = await createOffering("stale-recheck");
+    const student = await createStudent("stale-recheck");
+    const actor = await createActor("stale-recheck");
+    await enroll(offering.id, student.id);
+
+    const baseline = await attendanceService.save(
+      offering.id,
+      "2026-09-19",
+      {
+        expectedUpdatedAt: null,
+        records: [{ studentId: student.id, status: "Absent", note: "First roll" }],
+      },
+      actor.id,
+    );
+    const staleVersion = baseline.updatedAt!;
+
+    const newer = await attendanceService.save(
+      offering.id,
+      "2026-09-19",
+      {
+        expectedUpdatedAt: staleVersion,
+        records: [{ studentId: student.id, status: "Present", note: "Corrected by another lecturer" }],
+      },
+      actor.id,
+    );
+
+    await expect(
+      attendanceRecheckService.recheck(
+        offering.id,
+        "2026-09-19",
+        {
+          studentId: student.id,
+          expectedUpdatedAt: staleVersion,
+          observation: { status: "Late", permissionPending: false, note: "Stale observation" },
+          final: { status: "Late", permissionPending: false, note: "Stale final" },
+        },
+        actor.id,
+      ),
+    ).rejects.toBeInstanceOf(AttendanceRecheckConflictError);
+
+    const after = await attendanceService.get(offering.id, "2026-09-19");
+    const record = after.records.find((row) => row.studentId === student.id)!;
+    expect(after.updatedAt).toBe(newer.updatedAt);
+    expect(record.status).toBe("Present");
+    expect(record.note).toBe("Corrected by another lecturer");
+    expect(record.checkpoints).toHaveLength(1);
+    expect(record.checkpoints?.[0]?.status).toBe("Absent");
+  });
+
   test("supports Permission Pending as an auditable Check 1/final state", async () => {
     const offering = await createOffering("pending-recheck");
     const student = await createStudent("pending-recheck");
     const actor = await createActor("pending-recheck");
     await enroll(offering.id, student.id);
 
-    await attendanceService.save(
+    const pendingBaseline = await attendanceService.save(
       offering.id,
       "2026-09-14",
       {
@@ -250,6 +302,7 @@ describeDb("two-pass attendance recheck", () => {
       "2026-09-14",
       {
         studentId: student.id,
+        expectedUpdatedAt: pendingBaseline.updatedAt!,
         observation: { status: "Present", permissionPending: false, note: "Student is here" },
         final: { status: null, permissionPending: true, note: "Permission still awaiting paper" },
       },
@@ -299,6 +352,7 @@ describeDb("two-pass attendance recheck", () => {
         "2026-08-01",
         {
           studentId: student.id,
+          expectedUpdatedAt: corrected.updatedAt!,
           observation: { status: "Present", permissionPending: false, note: "Should fail" },
           final: { status: "Present", permissionPending: false, note: "Should fail" },
         },

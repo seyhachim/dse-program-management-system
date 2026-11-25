@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { rubricService } from "../rubrics/service.ts";
+import { rubricContentHash } from "../../core/academic/rubric-context.ts";
+import { generateCloAttainmentSnapshots, MARKING_SCHEME_ATTAINMENT_VERSION } from "../qa/evidence/clo-attainment.ts";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../../core/db/prisma.ts";
 import { resultCorrectionsService } from "./result-corrections.ts";
@@ -321,5 +324,65 @@ dbDescribe("finalized result correction database integrity", () => {
     expect(serialized).not.toContain("correctionId");
     expect(serialized).not.toContain("correctedById");
     expect(serialized).not.toContain("corrections");
+  });
+});
+
+
+dbDescribe("marking scheme lifecycle integration", () => {
+  test("authors a private scheme, persists exact marks and computes published/finalized CLO evidence", async () => {
+    const suffix = randomUUID();
+    const actor = await prisma.user.findFirstOrThrow({ select: { id: true } });
+    const other = await prisma.user.findFirstOrThrow({ where: { id: { not: actor.id } }, select: { id: true } });
+    const questions = [6, 6, 8, 5].map((maxPoints, i) => ({ id: randomUUID(), name: `Q${i + 1}`, maxPoints, descriptors: [] as string[] }));
+    const rubric = await rubricService.create({ name: `Midterm ${suffix}`, type: "Exam", description: "", status: "Active", instrumentKind: "marking_scheme", levels: [], criteria: questions }, { id: actor.id, roles: ["lecturer"] });
+    expect(await rubricService.getPublicById(rubric.id)).toBeNull();
+    expect(await rubricService.getById(rubric.id, { id: other.id, roles: ["lecturer"] })).toBeNull();
+    const instrument = await prisma.rubric.findUniqueOrThrow({ where: { id: rubric.id }, include: { levelRows: true, criterionRows: true } });
+    const hash = rubricContentHash(instrument);
+    const course = await prisma.course.create({ data: { code: `I1355-${suffix.slice(0, 8)}`, title: "Marking scheme integration", programmeId: "dse" } });
+    const spec = await prisma.courseSpec.create({ data: { courseId: course.id, versionMajor: 1, versionMinor: 0, revisionTriggers: [], reviewStatus: "Approved" } });
+    for (let order = 0; order < 3; order++) await prisma.courseSpecClo.create({ data: { id: randomUUID(), courseSpecId: spec.id, order, description: `Outcome ${order + 1}` } });
+    const assessment = await prisma.courseSpecAssessmentItem.create({ data: { id: randomUUID(), courseSpecId: spec.id, order: 0, name: "Midterm", type: "Exam", mode: "Individual", rubricId: rubric.id, weight: 25, cloCodes: ["CLO1", "CLO2", "CLO3"] } });
+    await prisma.courseSpecCriterionCloMapping.createMany({ data: questions.map((q, i) => ({ courseSpecId: spec.id, assessmentItemId: assessment.id, rubricId: rubric.id, criterionId: q.id, criterionName: q.name, rubricContentHash: hash, cloCode: ["CLO1", "CLO1", "CLO2", "CLO3"][i]! })) });
+    const offering = await prisma.offering.create({ data: { courseId: course.id, courseSpecId: spec.id, lecturerId: actor.id, term: `issue1355-${suffix}`, sectionCode: "A", capacity: 10, status: "Active" } });
+    const student = await prisma.student.create({ data: { name: "Marking Scheme Student", email: `scheme-${suffix}@dse.invalid`, studentId: `I1355-${suffix}`, status: "Active" } });
+    const enrollment = await prisma.enrollment.create({ data: { offeringId: offering.id, studentId: student.id } });
+    const input = { enrollmentId: enrollment.id, assessmentItemId: assessment.id, scores: questions.map((q, i) => ({ criterionId: q.id, score: [5, 4, 7, 2][i]! })) };
+    await expect(resultsLifecycleService.saveCriterionScores(other.id, false, input)).rejects.toBeInstanceOf(PortalAccessError);
+    await expect(resultsLifecycleService.saveCriterionScores(actor.id, false, { ...input, scores: input.scores.slice(0, 3) })).rejects.toBeInstanceOf(PortalConflictError);
+    await expect(resultsLifecycleService.saveCriterionScores(actor.id, false, { ...input, scores: [{ ...input.scores[0]!, score: 7 }, ...input.scores.slice(1)] })).rejects.toBeInstanceOf(PortalConflictError);
+    await resultsLifecycleService.saveCriterionScores(actor.id, false, input);
+    const result = await prisma.assessmentResult.findFirstOrThrow({ where: { enrollmentId: enrollment.id, assessmentItemId: assessment.id }, include: { criterionScores: true } });
+    expect(result).toMatchObject({ score: 18, maxScore: 25, publishedAt: null });
+    expect(result.criterionScores).toHaveLength(4);
+    const review = await resultsLifecycleService.review(actor.id, false, offering.id);
+    expect(review.rows[0]?.achievements.map((clo) => clo.percentage)).toEqual([75, 88, 40]);
+    const selection = { offeringId: offering.id, assessmentItemId: assessment.id };
+    await resultsLifecycleService.publishAssessment(actor.id, false, selection);
+    await expect(resultsLifecycleService.saveCriterionScores(actor.id, false, input)).rejects.toBeInstanceOf(PortalConflictError);
+    await resultsLifecycleService.finalizeAssessment(actor.id, false, selection);
+    const snapshots = await generateCloAttainmentSnapshots({ programmeId: "dse", offeringId: offering.id, thresholdPercentage: 70 });
+    expect(snapshots.map((snapshot) => snapshot.achievedRate)).toEqual([100, 100, 0]);
+    expect(snapshots.every((snapshot) => snapshot.calculationVersion === MARKING_SCHEME_ATTAINMENT_VERSION)).toBe(true);
+    const official = await prisma.assessmentResult.findUniqueOrThrow({ where: { id: result.id }, include: { criterionScores: true } });
+    const correction = { assessmentResultId: result.id, score: 20, maxScore: 25, feedback: "Corrected Q4", reason: "Second marking verified two more points", expectedUpdatedAt: official.updatedAt.toISOString(), questionScores: questions.map((q, i) => ({ criterionId: q.id, score: [5, 4, 7, 4][i]! })) };
+    await expect(resultsLifecycleService.correctFinalized(other.id, false, correction)).rejects.toBeInstanceOf(PortalAccessError);
+    await expect(resultsLifecycleService.correctFinalized(actor.id, false, { ...correction, questionScores: undefined })).rejects.toBeInstanceOf(PortalConflictError);
+    await expect(resultsLifecycleService.correctFinalized(actor.id, false, { ...correction, score: 21 })).rejects.toBeInstanceOf(PortalConflictError);
+    await expectDatabaseRejection(() => prisma.assessmentCriterionScore.update({ where: { id: official.criterionScores[0]!.id }, data: { score: 0 } }));
+    const corrected = await resultsLifecycleService.correctFinalized(actor.id, false, correction);
+    expect(corrected.score).toBe(20);
+    await expect(resultsLifecycleService.correctFinalized(actor.id, false, correction)).rejects.toBeInstanceOf(PortalConflictError);
+    const history = await resultCorrectionsService.history(actor.id, false, result.id);
+    expect(history.corrections[0]?.questionChanges).toEqual([expect.objectContaining({ criterionId: questions[3]!.id, beforeScore: 2, afterScore: 4, maxScore: 5 })]);
+    expect(official.finalizedAt).not.toBeNull();
+    expect(history.finalizedAt).toBe(official.finalizedAt!.toISOString());
+    const correctedReview = await resultsLifecycleService.review(actor.id, false, offering.id);
+    expect(correctedReview.rows[0]?.achievements.map((clo) => clo.percentage)).toEqual([75, 88, 80]);
+    const revisedSnapshots = await generateCloAttainmentSnapshots({ programmeId: "dse", offeringId: offering.id, thresholdPercentage: 70 });
+    expect(revisedSnapshots.map((snapshot) => snapshot.achievedRate)).toEqual([100, 100, 100]);
+    expect(revisedSnapshots[2]?.supersedesSnapshotId).toBe(snapshots[2]?.id);
+    expect((await prisma.qaCloAttainmentSnapshot.findUniqueOrThrow({ where: { id: snapshots[2]!.id } })).achievedRate).toBe(0);
+
   });
 });

@@ -9,9 +9,11 @@ import { createStudentPortfolioEvidenceRouter } from "./portfolio-evidence-route
 import { createStudentPortfolioPublicRouter } from "./portfolio-public-router.ts";
 import { createStudentPortfolioRouter } from "./portfolio-router.ts";
 import { createStudentPortalRouter } from "./router.ts";
+import { createDseNewsRouter } from "./dse-news-router.ts";
 import { createStudentScheduleImpactRouter } from "./schedule-impact-router.ts";
 import { studentScheduleImpactProjectionService } from "./schedule-impact-service.ts";
 import { studentPortalService } from "./service.ts";
+import { getPublicOpportunityEvidence } from "./public-opportunity-evidence.ts";
 import { createStudentAttendanceRouter } from "./student-attendance-router.ts";
 import { studentPortalAttendanceService } from "./student-attendance-service.ts";
 import { createStudentWeeklyNotesRouter } from "./weekly-notes-router.ts";
@@ -27,6 +29,7 @@ router.use(createStudentScheduleImpactRouter());
 router.use(createCourseAchievementRouter());
 router.use(createStudentAttendanceRouter());
 router.use(createStudentWeeklyNotesRouter());
+router.use("/news", createDseNewsRouter());
 router.use(createStudentPortalRouter());
 router.use("/portfolio", createStudentPortfolioRouter());
 router.use("/portfolio/evidence", createStudentPortfolioEvidenceRouter());
@@ -34,6 +37,7 @@ router.use("/portfolio", createStudentPortfolioCompleteRouter());
 
 export const studentPortalPluginService = {
   ...studentPortalService,
+  getPublicOpportunityEvidence,
   courseAchievements: courseAchievementService,
   attendance: studentPortalAttendanceService,
   scheduleImpacts: studentScheduleImpactProjectionService,

@@ -32,6 +32,7 @@ import {
   percentage,
   validateResultCorrection,
   type ResultCorrectionDraft,
+  type ResultCorrectionValidation,
 } from "@/lib/result-correction";
 
 export function FinalizedResultCorrections({
@@ -209,15 +210,29 @@ function CorrectionDialog({
     feedback: target.feedback,
     reason: "",
   });
+  const scheme = target.questionMarks !== undefined;
+  const questions = target.questionMarks ?? [];
+  const [questionMarks, setQuestionMarks] = useState<Record<string, string>>(() => Object.fromEntries(questions.map((q) => [q.criterionId, String(q.score)])));
+  const validQuestions = !scheme || (questions.length > 0 && questions.every((q) => { const v = questionMarks[q.criterionId]; return v !== undefined && v.trim() !== "" && Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= q.maxScore; }));
+  const changedQuestions = scheme && validQuestions && questions.some((q) => Number(questionMarks[q.criterionId]) !== q.score);
+  const computedTotal = questions.reduce((sum, q) => sum + Number(questionMarks[q.criterionId] ?? 0), 0);
   const [checkedRecord, setCheckedRecord] = useState(false);
   const [checkedAudit, setCheckedAudit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
 
-  const validation = useMemo(
-    () => validateResultCorrection(target, draft),
-    [draft, target],
+  const validation = useMemo<ResultCorrectionValidation>(
+    () => {
+      const checked = validateResultCorrection(
+        target,
+        scheme ? { ...draft, score: String(computedTotal), maxScore: String(target.maxScore) } : draft,
+        { questionMarksChanged: changedQuestions },
+      );
+      if (scheme && !validQuestions) return { ...checked, valid: false, errors: { ...checked.errors, score: "Enter every question mark within its maximum." } };
+      return checked;
+    },
+    [draft, target, scheme, computedTotal, validQuestions, changedQuestions],
   );
   const afterScore = validation.score ?? target.score;
   const afterMaxScore = validation.maxScore ?? target.maxScore;
@@ -238,6 +253,7 @@ function CorrectionDialog({
         feedback: validation.feedback,
         reason: validation.reason,
         expectedUpdatedAt: target.updatedAt,
+        ...(scheme ? { questionScores: questions.map((q) => ({ criterionId: q.criterionId, score: Number(questionMarks[q.criterionId]) })) } : {}),
       });
       await onApplied();
       onClose();
@@ -288,7 +304,7 @@ function CorrectionDialog({
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            {scheme ? <div className="space-y-3"><p className="text-sm font-semibold">Correct question marks</p>{questions.map((q) => <div key={q.criterionId} className="grid grid-cols-[1fr_100px] gap-3 items-center"><div><Label htmlFor={`correct-${q.criterionId}`}>{q.criterionName} / {q.maxScore}</Label><p className="text-xs text-muted-foreground">Before: {q.score} · {q.cloCodes.join(", ")}</p></div><Input id={`correct-${q.criterionId}`} type="number" min="0" max={q.maxScore} step="any" value={questionMarks[q.criterionId] ?? ""} onChange={(event) => setQuestionMarks((old) => ({ ...old, [q.criterionId]: event.target.value }))} /></div>)}<p className="text-xs text-muted-foreground">Total is calculated automatically. The maximum is fixed by the approved instrument.</p>{validation.errors.score ? <FieldError message={validation.errors.score} /> : null}</div> : <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="correction-score">Score</Label>
                 <Input
@@ -315,7 +331,7 @@ function CorrectionDialog({
                 />
                 {validation.errors.maxScore ? <FieldError message={validation.errors.maxScore} /> : null}
               </div>
-            </div>
+            </div>}
 
             <div className="space-y-1.5">
               <Label htmlFor="correction-feedback">Feedback</Label>
@@ -370,6 +386,7 @@ function CorrectionDialog({
               <p className="mt-1 text-xs text-muted-foreground">{beforePercentage}% → {afterPercentage}%</p>
             </div>
 
+            {scheme ? <div className="rounded-xl border border-border p-4 space-y-2"><p className="font-semibold text-sm">Question changes</p>{questions.filter((q) => q.score !== Number(questionMarks[q.criterionId])).map((q) => <p key={q.criterionId} className="text-sm">{q.criterionName}: {q.score} → {Number(questionMarks[q.criterionId])} / {q.maxScore} · {q.cloCodes.join(", ")}</p>)}</div> : null}
             {validation.feedback !== target.feedback ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <ComparisonText label="Feedback before" value={target.feedback || "—"} />
@@ -383,7 +400,7 @@ function CorrectionDialog({
             </div>
 
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-              Whole-result correction does not recalculate or mutate finalized rubric-criterion/CLO evidence. That evidence remains frozen under the existing academic-integrity rules.
+              {scheme ? "Question marks and the exam total are corrected together. Current CLO evidence is recalculated from the corrected marks. Existing QA snapshots remain immutable; regenerate a new snapshot for the updated official evidence." : "Whole-result correction does not recalculate or mutate finalized rubric-criterion/CLO evidence. That evidence remains frozen under the existing academic-integrity rules."}
             </div>
 
             {error ? (
@@ -498,6 +515,7 @@ function HistoryDialog({
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reason</p>
                   <p className="mt-1 whitespace-pre-wrap text-sm">{correction.reason}</p>
                 </div>
+                {correction.questionChanges?.length ? <div className="mt-3 space-y-1"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Question changes</p>{correction.questionChanges.map((q) => <p className="text-sm" key={q.scoreId}>{q.criterionName}: {q.beforeScore} → {q.afterScore} / {q.maxScore}</p>)}</div> : null}
                 {correction.beforeFeedback !== correction.afterFeedback ? (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <ComparisonText label="Feedback before" value={correction.beforeFeedback || "—"} />

@@ -12,7 +12,7 @@ type Advisory = {
 type AuditReport = Record<string, Advisory[]>;
 
 const DEV_ONLY_ADVISORIES: Record<string, Set<number>> = {
-  "@hono/node-server": new Set([1139322, 1243661]),
+  "@hono/node-server": new Set([1139322, 1243661, 1246357]), // shadcn (dev only) -> @modelcontextprotocol/sdk -> @hono/node-server; GHSA 2026-11-21
   // @modelcontextprotocol/sdk is reachable only via the devDependency shadcn CLI;
   // neither the Bun API nor Next.js deployed production entrypoint imports it.
   "@modelcontextprotocol/sdk": new Set([1241339, 1242628, 1242649, 1242667, 1243488, 1244498]),
@@ -21,7 +21,8 @@ const DEV_ONLY_ADVISORIES: Record<string, Set<number>> = {
   // `bun pm why hono` on the refreshed #1010 lockfile resolves this copy only
   // through shadcn -> @modelcontextprotocol/sdk / @hono/node-server. shadcn is
   // explicitly dev-only in both frontend and UI workspaces.
-  hono: new Set([1130733, 1138771, 1138772, 1138773, 1193729, 1193730, 1193731, 1240640, 1242595]),
+  // 2026-11-21 advisories #1246368, #1246369, #1246370, #1246373 and #1246374 also affect the same dev-only MCP server CLI dependency; the application runtime is Express and Next.js, not Hono.
+  hono: new Set([1130733, 1138771, 1138772, 1138773, 1193729, 1193730, 1193731, 1240640, 1242595, 1246368, 1246369, 1246370, 1246373, 1246374]),
   // New 2026-09-29 advisories affect the same dev-only copy previously traced through shadcn tooling.
   "ip-address": new Set([1130722, 1130723, 1130724, 1239948, 1239949, 1240097, 1240098, 1242883]),
   minimatch: new Set([1244623]), // apps/frontend devDependency eslint -> minimatch

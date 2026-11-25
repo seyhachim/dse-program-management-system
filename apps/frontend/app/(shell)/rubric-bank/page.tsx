@@ -5,8 +5,8 @@ export default function RubricBankPage() {
   return (
     <>
       <Topbar
-        title="Rubric Bank"
-        subtitle="Create and manage reusable assessment rubrics for Course Specifications"
+        title="Assessment Instrument Library"
+        subtitle="Create and manage reusable rubrics and marking schemes for Course Specifications"
       />
       <main className="flex-1 overflow-y-auto p-6">
         <RubricBankClient />

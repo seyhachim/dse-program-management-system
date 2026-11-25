@@ -239,6 +239,38 @@ export const ManageProgrammeRoleInput = z.object({
 });
 export type ManageProgrammeRoleInput = z.infer<typeof ManageProgrammeRoleInput>;
 
+/** Head of Program is an appointment held by an existing lecturer, not a login role. */
+export const AppointProgrammeHeadInput = z.object({
+  programmeId: z.string().trim().min(1).max(64),
+  lecturerId: z.string().uuid(),
+  reference: z.string().trim().max(200).optional(),
+});
+export type AppointProgrammeHeadInput = z.infer<typeof AppointProgrammeHeadInput>;
+
+export const EndProgrammeHeadInput = z.object({
+  programmeId: z.string().trim().min(1).max(64),
+});
+export type EndProgrammeHeadInput = z.infer<typeof EndProgrammeHeadInput>;
+
+export interface ProgrammeHeadAppointmentView {
+  id: string;
+  lecturerId: string;
+  lecturerName: string;
+  lecturerEmail: string;
+  appointedAt: string;
+  endedAt: string | null;
+  appointedByName: string;
+  endedByName: string | null;
+  reference: string | null;
+  coordinatorGranted: boolean;
+}
+
+export interface ProgrammeHeadOverview {
+  programmeId: string;
+  current: ProgrammeHeadAppointmentView | null;
+  history: ProgrammeHeadAppointmentView[];
+}
+
 export interface ProgrammeRoleAssignmentView {
   userId: string;
   userName: string;

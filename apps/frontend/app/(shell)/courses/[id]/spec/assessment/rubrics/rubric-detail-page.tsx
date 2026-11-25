@@ -97,7 +97,7 @@ export function RubricDetailPage({
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbLink render={<Link href={libraryHref}>Rubric Bank</Link>} />
+                <BreadcrumbLink render={<Link href={libraryHref}>Assessment Instrument Library</Link>} />
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
@@ -107,7 +107,7 @@ export function RubricDetailPage({
           </Breadcrumb>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Button variant="outline" render={<Link href={libraryHref}><ArrowLeft className="h-4 w-4" />Back to Rubric Bank</Link>} />
+            <Button variant="outline" render={<Link href={libraryHref}><ArrowLeft className="h-4 w-4" />Back to Assessment Instrument Library</Link>} />
             {editable && rubric ? (
               <Button render={<Link href={`${libraryHref}/${rubric.id}/edit`}><Pencil className="h-4 w-4" />Edit Rubric</Link>} />
             ) : null}
@@ -147,14 +147,14 @@ export function RubricDetailPage({
                 </div>
 
                 <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <Meta label="Rating scale" value={rubricScaleSummary(rubric.levels)} />
+                  <Meta label="Instrument" value={rubric.instrumentKind === "marking_scheme" ? "Marking scheme" : rubricScaleSummary(rubric.levels)} />
                   <Meta label="Criteria" value={String(rubric.criteria.length)} />
                   <Meta label="Maximum score" value={String(rubricTotalPoints(rubric))} />
                   <Meta label="Last updated" value={formatDate(rubric.updatedAt)} />
                 </dl>
               </section>
 
-              <RubricMatrix rubric={rubric} />
+              {rubric.instrumentKind === "marking_scheme" ? <section className="rounded-xl border border-border p-4 space-y-3"><h2 className="font-semibold">Question marks</h2>{rubric.criteria.map((question) => <div key={question.id} className="flex justify-between gap-3 border-b border-border py-2"><span>{question.name}</span><span>{question.maxPoints} pts</span></div>)}</section> : <RubricMatrix rubric={rubric} />}
             </>
           ) : null}
         </div>

@@ -81,3 +81,34 @@ describe("CLO evidence calculation", () => {
     });
   });
 });
+
+
+describe("marking scheme evidence", () => {
+  const hash = "marking-scheme-v1:test";
+  const mapping = (criterionId: string, cloCode: string) => ({ criterionId, cloCode, rubricId: "scheme", rubricContentHash: hash });
+  const assessment = { id: "midterm", status: "Active", weight: 25, cloCodes: ["CLO1", "CLO2"], criterionCloMappings: [mapping("q1", "CLO1"), mapping("q2", "CLO1"), mapping("q3", "CLO2")] };
+  const row = (criterionId: string, cloCode: string, score: number, maxScore: number) => ({ assessmentItemId: "midterm", criterionId, criterionName: criterionId, rubricId: "scheme", rubricContentHash: hash, score, maxScore, cloCodes: [cloCode] });
+  const evidence = [row("q1", "CLO1", 2, 2), row("q2", "CLO1", 4, 8), row("q3", "CLO2", 7, 8)];
+  const results = [{ assessmentItemId: "midterm", score: 13, maxScore: 18 }];
+  test("aggregates earned/max marks, not a mean of unequal question percentages", () => {
+    const outcome = calculateCloEvidence("CLO1", [assessment], results, evidence);
+    expect(outcome.percentage).toBe(60);
+    expect(outcome.evidence).toHaveLength(2);
+  });
+  test("missing mapped question does not fall back to overall exam result", () => {
+    expect(calculateCloEvidence("CLO1", [assessment], results, [evidence[0]!]).percentage).toBeNull();
+    expect(calculateCloEvidence("CLO1", [assessment], results, []).evidence).toEqual([]);
+  });
+  test("rejects mismatched historical instrument hash", () => {
+    expect(calculateCloEvidence("CLO1", [assessment], results, [{ ...evidence[0]!, rubricContentHash: "different" }, evidence[1]!]).percentage).toBeNull();
+  });
+  test("each scheme contributes one points-based aggregate alongside other evidence", () => {
+    const other = { id: "lab", status: "Active", weight: 75, cloCodes: ["CLO1"] };
+    const outcome = calculateCloEvidence("CLO1", [assessment, other], [...results, { assessmentItemId: "lab", score: 8, maxScore: 10 }], evidence);
+    expect(outcome.percentage).toBe(70);
+  });
+});
+
+ test("linked marking scheme without mappings never falls back to the exam total", () => {
+  expect(calculateCloEvidence("CLO1", [{ id: "exam", status: "Active", weight: 25, cloCodes: ["CLO1"], rubric: { instrumentKind: "marking_scheme" } }], [{ assessmentItemId: "exam", score: 18, maxScore: 25 }]).percentage).toBeNull();
+});

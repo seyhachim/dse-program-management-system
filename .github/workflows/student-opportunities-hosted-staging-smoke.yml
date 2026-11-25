@@ -1,0 +1,42 @@
+name: Student Opportunities Hosted Staging Smoke
+
+on:
+  push:
+    branches:
+      - feat/student-opportunities-manual-mvp-1284
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hosted-staging-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      STAGING_API: https://dse-pms-staging-isolated-free.onrender.com
+      STAGING_PREVIEW: https://dse-pms-git-feat-student-opportuniti-650954-seyhachims-projects.vercel.app
+      FORBIDDEN_ORIGIN: https://attacker.invalid
+    steps:
+      - name: Health, protected API, staging CORS and frontend checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No secrets, production credentials, or database writes.
+          curl --fail --silent --show-error --retry 8 --retry-delay 5 --retry-all-errors --max-time 90 "${STAGING_API}/health" | jq -e '.ok == true'
+          curl --fail --silent --show-error --retry 8 --retry-delay 5 --retry-all-errors --max-time 90 "${STAGING_API}/api/registry" | jq -e '[.[] | select(.id == "opportunities")] | length == 1'
+          code="$(curl --silent --show-error -o /dev/null -w '%{http_code}' "${STAGING_API}/api/opportunities")"
+          test "$code" = "401" || { echo "::error::Unauthenticated opportunities API must return 401 (got $code)"; exit 1; }
+          curl --silent --show-error -D /tmp/allow-headers -o /dev/null -X OPTIONS \
+            -H "Origin: ${STAGING_PREVIEW}" -H "Access-Control-Request-Method: GET" \
+            "${STAGING_API}/api/opportunities"
+          tr -d '\r' < /tmp/allow-headers | grep -iFx "Access-Control-Allow-Origin: ${STAGING_PREVIEW}"
+          curl --silent --show-error -D /tmp/deny-headers -o /dev/null -X OPTIONS \
+            -H "Origin: ${FORBIDDEN_ORIGIN}" -H "Access-Control-Request-Method: GET" \
+            "${STAGING_API}/api/opportunities"
+          if grep -qi '^Access-Control-Allow-Origin:' /tmp/deny-headers; then
+            echo "::error::Untrusted Origin must not be allowed"; exit 1
+          fi
+          front="$(curl --location --silent --show-error -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 5 --max-time 60 "${STAGING_PREVIEW}/login")"
+          test "$front" = "200" || { echo "::error::Staging login preview must be reachable (got $front)"; exit 1; }
+          echo "Staging public endpoints, permissions boundary, and exact-origin CORS passed"
