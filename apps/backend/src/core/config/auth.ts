@@ -22,20 +22,30 @@ export interface AuthConfig {
  * also checked before startup in server.ts (and before migrate in Render).
  */
 export function validateNeonStagingAuthEnvironment(env: AuthEnv): string {
-  if (env.DSE_STAGING_ENVIRONMENT !== "true" ||
-      env.DSE_STAGING_DB_MARKER !== "DSE-PMS-STAGING:20261107-neon-verified-01" ||
-      env.DSE_STAGING_DB_NAME !== "neondb") {
+  const targets = [
+    {
+      host: "ep-purple-scene-a1py5uzt.ap-southeast-1.aws.neon.tech",
+      database: "neondb",
+      marker: "DSE-PMS-STAGING:20261107-neon-verified-01",
+      issuer: "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth",
+    },
+    {
+      host: "ep-young-voice-bif6nm9u.c-5.ap-southeast-1.aws.neon.tech",
+      database: "evidence1367",
+      marker: "DSE-PMS-STAGING:evidence1367-20261125-uat-v01",
+      issuer: "https://ep-young-voice-bif6nm9u.neonauth.c-5.ap-southeast-1.aws.neon.tech/evidence1367/auth",
+    },
+  ] as const;
+  const target = targets.find(t => t.host === env.DSE_STAGING_DB_HOST &&
+    t.database === env.DSE_STAGING_DB_NAME && t.marker === env.DSE_STAGING_DB_MARKER);
+  if (env.DSE_STAGING_ENVIRONMENT !== "true" || !target) {
     throw new Error("Neon staging auth requires the approved isolated staging database");
-  }
-  const host = "ep-purple-scene-a1py5uzt.ap-southeast-1.aws.neon.tech";
-  if (env.DSE_STAGING_DB_HOST !== host) {
-    throw new Error("Neon staging auth requires the approved isolated database host");
   }
   const actualDatabase = env.DATABASE_URL ?? "";
   let dbUrl: URL;
   try { dbUrl = new URL(actualDatabase); } catch { throw new Error("Neon staging database URL is invalid"); }
   if ((dbUrl.protocol !== "postgres:" && dbUrl.protocol !== "postgresql:") ||
-      dbUrl.hostname !== host || dbUrl.pathname !== "/neondb" ||
+      dbUrl.hostname !== target.host || dbUrl.pathname !== "/" + target.database ||
       !["require", "verify-full"].includes(dbUrl.searchParams.get("sslmode") ?? "")) {
     throw new Error("Neon staging auth cannot connect to a non-staging database");
   }
@@ -46,8 +56,7 @@ export function validateNeonStagingAuthEnvironment(env: AuthEnv): string {
     throw new Error("Neon staging auth requires an explicit CORS allowlist");
   }
   const base = requireHttpsUrl("NEON_AUTH_BASE_URL", env.NEON_AUTH_BASE_URL);
-  const expected = "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth";
-  if (base !== expected) {
+  if (base !== target.issuer) {
     throw new Error("Neon staging auth requires the approved branch issuer");
   }
   return base;
