@@ -3699,6 +3699,7 @@ model AssessmentEvidenceRevision {
   maxScore         Float
   sourceSnapshot   Json
   workReference    String?
+  attachment       Json?
   selectionReason  String
   reviewReason     String?
   actorId          String
