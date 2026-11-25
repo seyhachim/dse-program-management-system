@@ -3,10 +3,11 @@ import type { NextRequest } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const STAGING_HOST = "dse-pms-git-feat-student-opportuniti-650954-seyhachims-projects.vercel.app";
+// Exact trusted deployment hostname supplied by Vercel, never by the request.
+const STAGING_HOST = process.env.VERCEL_URL ?? "";
 const STAGING_ORIGIN = "https://" + STAGING_HOST;
-const STAGING_API = "https://dse-pms-staging-isolated-free.onrender.com";
-const NEON_AUTH = "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth";
+const STAGING_API = "https://dse-pms-telegram1364-uat.onrender.com";
+const NEON_AUTH = "https://ep-solitary-block-a1hm2c16.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth";
 
 /**
  * Keep the hosted Neon Auth upstream's actual Host. An external Next.js rewrite
@@ -18,12 +19,13 @@ const ALLOWED: Record<string, string> = {
   "get-session": "GET",
   token: "GET",
   "sign-in/email": "POST",
-  "sign-up/email": "POST",
   "sign-out": "POST",
 };
 
 function approved(request: NextRequest): boolean {
   return process.env.VERCEL_ENV === "preview" &&
+    process.env.DSE_REGISTRATION_UAT === "true" &&
+    /^[a-z0-9-]+\.vercel\.app$/.test(STAGING_HOST) &&
     process.env.NEXT_PUBLIC_STAGING_MODE === "true" &&
     process.env.NEXT_PUBLIC_AUTH_MODE === "neon-staging" &&
     process.env.NEXT_PUBLIC_API_URL === STAGING_API &&
@@ -54,7 +56,12 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<Respo
   headers.set("Origin", STAGING_ORIGIN);
   headers.set("Referer", STAGING_ORIGIN + "/login");
   const incomingCookie = request.headers.get("cookie");
-  if (incomingCookie) headers.set("Cookie", incomingCookie);
+  if (incomingCookie) {
+    // Never forward Vercel protection cookies to the identity provider.
+    const authCookies = incomingCookie.split(";").map((part) => part.trim())
+      .filter((part) => /^(?:__Secure-|__Host-)?(?:better-auth|neon-auth)\.[^=]+=/i.test(part));
+    if (authCookies.length) headers.set("Cookie", authCookies.join("; "));
+  }
   const userAgent = request.headers.get("user-agent");
   if (userAgent) headers.set("User-Agent", userAgent);
 
