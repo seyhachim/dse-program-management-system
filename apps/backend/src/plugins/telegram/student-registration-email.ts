@@ -47,8 +47,14 @@ export async function sendRegistrationEmail(verificationId: string, rawEmail: st
     const request=await requestForSession(tx,verificationId);
     if (request.emailVerifiedAt) return false;
     if (request.email && request.email!==email) throw new RegistrationEmailError(409,"Request a correction to change your submitted email");
-    // Lock the recipient across different Telegram identities, not only this application.
-    await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(${"registration-email:"+email},0))) locked`;
+    // Serialize challenge reservation globally for the pilot, preventing multiple
+    // Telegram identities from exhausting the shared sender quota concurrently.
+    await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended('registration-email-global',0))) locked`;
+    const quota=await tx.$queryRaw<Array<{hourly:number;daily:number}>>`
+      SELECT COUNT(*) FILTER (WHERE "createdAt">CURRENT_TIMESTAMP-INTERVAL '1 hour')::int AS "hourly", COUNT(*)::int AS "daily"
+      FROM "telegram_security"."StudentRegistrationEmailChallenge" WHERE "createdAt">CURRENT_TIMESTAMP-INTERVAL '1 day'
+    `;
+    if(quota[0]!.hourly>=30||quota[0]!.daily>=100) throw new RegistrationEmailError(429,"Verification email capacity reached. Please try again later.");
     const counts=await tx.$queryRaw<Array<{ perEmail: number; perRequest: number; recent: number }>>`
       SELECT
         COUNT(*) FILTER (WHERE "email"=${email} AND "createdAt">CURRENT_TIMESTAMP-INTERVAL '1 hour')::int AS "perEmail",
