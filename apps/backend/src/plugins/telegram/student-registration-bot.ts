@@ -24,7 +24,7 @@ export async function studentRegistrationBotReply(raw: unknown) {
     WHERE "telegramUserId" = ${action.telegramUserId} LIMIT 1
   `;
   const registrationUrl = new URL("/telegram/registration", config.miniAppUrl).toString();
-  const openRegistration = { keyboard: [[{ text: "Open registration", web_app: { url: registrationUrl } }]], resize_keyboard: true, one_time_keyboard: true };
+  const openRegistration = { inline_keyboard: [[{ text: "Open registration", web_app: { url: registrationUrl } }]] };
   if (pending[0] && pending[0].status !== "NEEDS_CORRECTION") return reply("You already submitted a registration. Open registration to check your status.", openRegistration);
   if (action.kind === "start") {
     await prisma.$executeRaw`
@@ -50,7 +50,6 @@ export async function studentRegistrationBotReply(raw: unknown) {
   if (changed !== 1) return reply("Your registration session is not active. Open PMS and choose Register with Telegram again.", removeKeyboard);
   // No authentication token or phone data is placed in this URL.
   return reply("Continue to the PMS Mini App to complete your student registration. Your registration requires staff approval.", {
-    keyboard: [[{ text: "Complete registration", web_app: { url: registrationUrl } }]],
-    resize_keyboard: true, one_time_keyboard: true,
+    inline_keyboard: [[{ text: "Complete registration", web_app: { url: registrationUrl } }]],
   });
 }
