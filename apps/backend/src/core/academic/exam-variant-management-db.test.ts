@@ -43,7 +43,7 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
         const course = await tx.course.create({ data: { programmeId: "dse", code: "EX-SVC-" + suffix, title: "Synthetic service exam" } });
         const spec = await tx.courseSpec.create({ data: { courseId: course.id, reviewStatus: "Approved", approvedAt: new Date(),
           clos: { create: [{ order: 0, description: "Synthetic analysis" }, { order: 1, description: "Synthetic practice" }] },
-          assessmentItems: { create: ["exam","race-grade-first","race-variant-first","race-serializable","legacy"].map((id,order) => ({ id, order, name: "Synthetic "+id, type: "Exam", mode: "Individual", status: "Active", weight: 20, cloCodes: ["CLO1", "CLO2"] })) } } });
+          assessmentItems: { create: ["exam","race-grade-first","race-variant-first","race-serializable","legacy"].map((id,order) => ({ id, order, name: "Synthetic "+id, type: "Exam", mode: "Individual" as const, status: "Active" as const, weight: 20, cloCodes: ["CLO1", "CLO2"] })) } } });
         const offering = await tx.offering.create({ data: { courseId: course.id, courseSpecId: spec.id, term: suffix, sectionCode: "M1", lecturerId: teacher.id, status: "Active" } });
         const other = await tx.offering.create({ data: { courseId: course.id, courseSpecId: spec.id, term: suffix, sectionCode: "M2", lecturerId: otherTeacher.id, status: "Active" } });
         const student = await tx.student.create({ data: { name: "Synthetic student", studentId: "EX-SVC-" + suffix } });
