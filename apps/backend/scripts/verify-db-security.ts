@@ -197,6 +197,7 @@ const EXPECTED_ATTENDANCE_TABLES = [
 const EXPECTED_TELEGRAM_SECURITY_TABLES = [
   "StudentRegistrationRequest",
   "StudentRegistrationBotConsent",
+  "StudentRegistrationReview",
   "TelegramInitVerification",
   "TelegramIdentity",
   "TelegramAuditEvent",
