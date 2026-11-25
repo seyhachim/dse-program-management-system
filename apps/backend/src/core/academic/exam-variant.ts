@@ -83,7 +83,7 @@ function sameVariant(a: VariantRef, b: VariantRef): boolean {
   return a.variantId === b.variantId && a.variantHash === b.variantHash;
 }
 function equalPoints(a: number, b: number): boolean {
-  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-9;
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= Math.max(Math.abs(a), Math.abs(b)) * 1e-12;
 }
 
 function validateDefinition(definition: ExamVariantDefinition): void {
