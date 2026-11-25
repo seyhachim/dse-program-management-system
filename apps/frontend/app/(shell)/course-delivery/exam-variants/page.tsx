@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { CourseDeliveryOffering, ExamWorkspace, ExamWorkspaceHistory, ExamWorkspacePrepare, ExamWorkspaceQuestion } from "@dse-pms/shared-types";
+import type { CourseDeliveryOffering, ExamWorkspace, ExamWorkspaceHistory, ExamWorkspacePrepare, ExamWorkspaceQuestion, ExamWorkspaceSnapshot } from "@dse-pms/shared-types";
 import { api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { courseDeliveryApi } from "@/lib/course-delivery";
@@ -47,6 +47,7 @@ function Workspace({offeringId,assessmentItemId}:{offeringId:string;assessmentIt
   const [rev,setRev]=useState("1");
   const [maximum,setMaximum]=useState("");
   const [maps,setMaps]=useState<Record<string,{cloCode:string;evidence:ExamWorkspaceQuestion["evidence"]}>>({});
+  const [preview,setPreview]=useState<{inputKey:string;snapshot:ExamWorkspaceSnapshot}|null>(null);
   const [decisionRef,setDecisionRef]=useState("");
   const [paperHash,setPaperHash]=useState("");
   const [chosen,setChosen]=useState<string[]>([]);
@@ -67,7 +68,15 @@ function Workspace({offeringId,assessmentItemId}:{offeringId:string;assessmentIt
   const paper=data.papers.find(p=>p.variantHash===paperHash&&p.permitted);
   const eligible=data.roster.filter(r=>r.eligible&&!r.hasResult&&r.assignment?.variantHash!==paperHash);
   const selected=eligible.filter(r=>chosen.includes(r.enrollmentId));
-  function submit(){const body:ExamWorkspacePrepare={...scope,instrumentId:instrument,variantId:variant.trim(),revision:Number(rev),examMaximum:max,mappings:questions.map(q=>({questionId:q.id,...maps[q.id]!}))};void run("submit",body,"Submitted for moderation.");}
+  const body:ExamWorkspacePrepare={...scope,instrumentId:instrument,variantId:variant.trim(),revision:Number(rev),examMaximum:max,mappings:questions.map(q=>({questionId:q.id,...maps[q.id]!}))};
+  const inputKey=JSON.stringify(body);
+  const verified=preview?.inputKey===inputKey?preview.snapshot:null;
+  async function verify(){
+    setBusy(true);setError("");setPreview(null);
+    try{const snapshot=await api.post<ExamWorkspaceSnapshot>(base+"preview",body);setPreview({inputKey,snapshot});}
+    catch(e){setError(e instanceof Error?e.message:"Preview unavailable");}finally{setBusy(false);}
+  }
+  function submit(){if(verified){setPreview(null);void run("submit",body,"Submitted for moderation.");}}
   function assign(){if(!paper)return;void run("assign",{...scope,entries:selected.map(r=>({enrollmentId:r.enrollmentId,variantId:paper.variantId,variantHash:paper.variantHash,expectedRevision:r.assignment?.revision??0,reason,evidenceRef}))},"Assignments confirmed atomically.");}
   return <div className="space-y-4">
     {notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}
@@ -76,7 +85,9 @@ function Workspace({offeringId,assessmentItemId}:{offeringId:string;assessmentIt
       <div className="grid gap-2 md:grid-cols-3"><label>Variant<input className={field} value={variant} onChange={e=>setVariant(e.target.value)}/></label><label>Revision<input className={field} type="number" min={1} value={rev} onChange={e=>setRev(e.target.value)}/></label><label>Exam maximum<input className={field} type="number" min={1} value={data.examMaximum??maximum} readOnly={data.examMaximum!==null} onChange={e=>setMaximum(e.target.value)}/></label></div>
       <p>Local preview · {questions.length} questions · {total} points</p>
       {questions.map(q=><div key={q.id} className="grid gap-2 md:grid-cols-3"><p>{q.id} · {q.maxPoints??"Invalid"} points</p><label>CLO<select className={field} value={maps[q.id]?.cloCode??""} onChange={e=>setMaps(m=>({...m,[q.id]:{cloCode:e.target.value,evidence:m[q.id]?.evidence??"supporting"}}))}><option value="">Choose CLO</option>{data.activeCloCodes.map(c=><option key={c}>{c}</option>)}</select></label><label>Evidence<select className={field} value={maps[q.id]?.evidence??"supporting"} onChange={e=>setMaps(m=>({...m,[q.id]:{cloCode:m[q.id]?.cloCode??"",evidence:e.target.value as ExamWorkspaceQuestion["evidence"]}}))}><option value="supporting">Supporting</option><option value="direct">Direct</option></select></label></div>)}
-      <button className={btn} disabled={busy||!ready} onClick={submit}>Submit for independent moderation</button></section>}
+      <div className="flex flex-wrap gap-2"><button className={btn} disabled={busy||!ready} onClick={()=>void verify()}>Verify exact preview</button>
+      <button className={btn} disabled={busy||!ready||!verified} onClick={submit}>Submit for independent moderation</button></div>
+      {verified&&<p className="break-all text-xs">Verified hash: {verified.variantHash}</p>}</section>}
     <section className={panel}><h2 className="font-semibold">Moderation queue</h2>{data.canReview&&<label>Decision reference or return reason<input className={field} value={decisionRef} onChange={e=>setDecisionRef(e.target.value)}/></label>}
       {!data.submissions.length&&<p>No submissions.</p>}{data.submissions.map(s=><article key={s.id} className="space-y-2 rounded border p-3"><p>{s.snapshot.variantId} · r{s.snapshot.revision} · {s.status}</p><p className="break-all text-xs">{s.snapshot.variantHash}</p><ul className="text-sm">{s.snapshot.questions.map(q=><li key={q.questionId}>{q.questionId}: {q.maxPoints} · {q.cloCode} · {q.evidence}</li>)}</ul>{s.decisionRef&&<p>{s.decisionRef}</p>}{data.canReview&&s.status==="Pending"&&s.submittedById!==data.actorId&&<div className="flex gap-2">{(["Approved","Returned"] as const).map(decision=><button key={decision} className={btn} disabled={busy||!decisionRef.trim()} onClick={()=>void run("decide",{...scope,submissionId:s.id,expectedHash:s.snapshot.variantHash,decision,decisionRef},decision)}>{decision==="Approved"?"Approve exact version":"Return"}</button>)}</div>}</article>)}
     </section>
