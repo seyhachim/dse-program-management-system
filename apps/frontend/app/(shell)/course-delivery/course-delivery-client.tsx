@@ -327,11 +327,47 @@ function ResultsPanel({ offering, onChanged }: PanelProps) {
       ) : assessment ? (
         <Panel title={assessment.name} description={allPublished ? "Published results are locked against ordinary edits." : `${draftCount} of ${assessment.results.length} student marks saved as drafts.`}>
           <div className="space-y-3">
-            {assessment.results.map((row) => <ResultRow key={row.enrollmentId} assessment={assessment} row={row} onChanged={onChanged} />)}
+            {assessment.results.map((row) => assessment.instrumentKind === "marking_scheme" ? <MarkingSchemeResultRow key={`${assessment.id}:${row.enrollmentId}`} assessment={assessment} row={row} onChanged={onChanged} /> : <ResultRow key={`${assessment.id}:${row.enrollmentId}`} assessment={assessment} row={row} onChanged={onChanged} />)}
             {!assessment.results.length ? <Muted>No students are enrolled in this section.</Muted> : null}
           </div>
         </Panel>
       ) : null}
+    </div>
+  );
+}
+
+function MarkingSchemeResultRow({ assessment, row, onChanged }: { assessment: CourseDeliveryAssessment; row: CourseDeliveryResultRow; onChanged: (message: string) => Promise<void> }) {
+  const [marks, setMarks] = useState<Record<string, string>>(Object.fromEntries(row.criterionScores.map((score) => [score.criterionId, String(score.score)])));
+  const [feedback, setFeedback] = useState(row.feedback);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const locked = Boolean(row.publishedAt || row.finalizedAt);
+  const questions = assessment.rubricCriteria;
+  const valid = questions.length > 0 && questions.every((q) => {
+    const value = marks[q.id];
+    return value !== undefined && value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= (q.maxPoints ?? 0) && (q.maxPoints ?? 0) > 0;
+  });
+  const maximum = questions.reduce((sum, q) => sum + (q.maxPoints ?? 0), 0);
+  const total = valid ? questions.reduce((sum, q) => sum + Number(marks[q.id]), 0) : null;
+  const save = async () => {
+    if (!valid || locked) return;
+    setSaving(true); setError(null);
+    try {
+      await courseDeliveryApi.saveCriterionScores({ enrollmentId: row.enrollmentId, assessmentItemId: assessment.id, scores: questions.map((q) => ({ criterionId: q.id, score: Number(marks[q.id]) })), feedback });
+      await onChanged(`${row.studentName}'s question marks saved as draft.`);
+    } catch (reason) { setError(messageFrom(reason, "Could not save marking scheme scores")); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div className="rounded-xl border border-border p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{row.studentName}</p><p className="text-xs text-muted-foreground">{row.studentCode}</p></div><span className="font-semibold">{total === null ? "Incomplete" : total} / {maximum} {locked ? "· Locked" : row.score !== null ? "· Draft saved" : ""}</span></div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {questions.map((q) => <Field key={q.id} label={`${q.name} (/${q.maxPoints})`}><Input type="number" min="0" max={q.maxPoints} step="any" value={marks[q.id] ?? ""} onChange={(e) => setMarks((old) => ({ ...old, [q.id]: e.target.value }))} disabled={locked || saving} placeholder="Not marked" /><span className="text-xs text-muted-foreground">{q.cloCodes.join(", ")}</span></Field>)}
+      </div>
+      <Field label="Student feedback"><Input value={feedback} onChange={(e) => setFeedback(e.target.value)} maxLength={5000} disabled={locked || saving} /></Field>
+      {!locked ? <Button type="button" onClick={save} disabled={!valid || saving}>{saving ? "Saving…" : "Save question marks"}</Button> : null}
+      {!valid && !locked ? <p className="text-xs text-muted-foreground">Enter every question mark before saving. Blank is not zero. The total is calculated automatically.</p> : null}
+      {error ? <InlineError>{error}</InlineError> : null}
     </div>
   );
 }

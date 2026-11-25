@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Pin, Save, X } from "lucide-react";
 import type { StudentSemesterNoteView } from "@dse-pms/shared-types";
 import { offeringsApi } from "@/lib/offerings";
@@ -41,6 +41,15 @@ export function SemesterNoteEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = draft.trim() !== (current?.note ?? "");
+
+  useEffect(() => {
+    if (!dirty || readOnly) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [dirty, readOnly]);
 
   function close() {
     if (saving) return;

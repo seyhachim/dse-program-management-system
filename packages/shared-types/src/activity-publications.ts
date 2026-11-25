@@ -87,6 +87,31 @@ export const CreateDseNewsSchema = z.object(NewsFields).strict().superRefine((va
 export const EditDseNewsSchema = z.object(NewsFields).partial().extend({
   expectedVersion: z.number().int().positive(),
 }).strict();
+export const ChangeDseNewsPublicStatusSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+  action: z.enum(["publish", "unpublish"]),
+  confirmPublicPermission: z.boolean().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.action === "publish" && value.confirmPublicPermission !== true) {
+    ctx.addIssue({ code: "custom", path: ["confirmPublicPermission"],
+      message: "Explicit permission review is required for unrestricted public access" });
+  }
+});
+export type ChangeDseNewsPublicStatusInput = z.infer<typeof ChangeDseNewsPublicStatusSchema>;
+
+export interface PublicDseNewsCard {
+  id: string;
+  title: string;
+  summary: string;
+  tags: string[];
+  publishedAt: string;
+  cover: { url: string; alt: string } | null;
+}
+export interface PublicDseNewsArticle extends PublicDseNewsCard {
+  body: string;
+  gallery: { url: string; alt: string }[];
+}
+
 export const ChangeDseNewsStatusSchema = z.object({
   expectedVersion: z.number().int().positive(),
   status: z.enum(["Draft", "Published", "Archived"]),
@@ -121,6 +146,7 @@ export interface DseNewsView {
   version: number;
   authorName: string;
   publishedAt: string | null;
+  publicPublishedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

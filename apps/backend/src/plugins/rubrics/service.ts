@@ -7,6 +7,7 @@ import type {
   RubricLevel,
   UpdateRubricInput,
 } from "@dse-pms/shared-types";
+import { validateInstrumentContent } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import type { AuthUser } from "../../core/auth/token.ts";
 import { prisma } from "../../core/db/prisma.ts";
@@ -32,6 +33,7 @@ export type RubricLifecycleSnapshot = {
   ownerId: string | null;
   status: Rubric["status"];
   assessmentUsageCount: number;
+  instrumentKind?: string;
 };
 
 export class RubricNotFoundError extends Error {}
@@ -51,12 +53,13 @@ export function canManageRubric(actor: RubricActor, ownerId: string | null): boo
  * Active rubrics are intentionally readable to authenticated rubric readers.
  * Draft/Archived rubrics are private to their owner and programme leadership.
  */
-export function canReadRubric(actor: RubricActor, snapshot: Pick<RubricLifecycleSnapshot, "ownerId" | "status">): boolean {
-  return snapshot.status === "Active" || canManageRubric(actor, snapshot.ownerId);
+export function canReadRubric(actor: RubricActor, snapshot: Pick<RubricLifecycleSnapshot, "ownerId" | "status" | "instrumentKind">): boolean {
+  return (snapshot.status === "Active" && snapshot.instrumentKind !== "marking_scheme") || canManageRubric(actor, snapshot.ownerId);
 }
 
 const CONTENT_FIELDS: Array<keyof UpdateRubricInput> = [
   "name",
+  "instrumentKind",
   "type",
   "description",
   "levels",
@@ -128,6 +131,7 @@ function lifecycleSnapshot(row: RubricRow): RubricLifecycleSnapshot {
     ownerId: row.ownerId,
     status: row.status,
     assessmentUsageCount: row._count.assessmentItems,
+    instrumentKind: row.instrumentKind,
   };
 }
 
@@ -139,6 +143,7 @@ function toRubric(row: RubricRow): Rubric {
     return {
       id: c.id,
       name: c.name,
+      ...(row.instrumentKind === "marking_scheme" && c.maxPoints !== null ? { maxPoints: c.maxPoints } : {}),
       descriptors: row.levelRows.map((l) => descriptorByLevelId.get(l.id) ?? ""),
     };
   });
@@ -146,6 +151,7 @@ function toRubric(row: RubricRow): Rubric {
     id: row.id,
     name: row.name,
     type: row.type as Rubric["type"],
+    instrumentKind: row.instrumentKind === "marking_scheme" ? "marking_scheme" : "rubric",
     description: row.description,
     levels,
     criteria,
@@ -198,7 +204,7 @@ export async function syncNormalizedRubricTables(
 
   if (criteria.length > 0) {
     await tx.rubricCriterion.createMany({
-      data: criteria.map((c, i) => ({ id: c.id, rubricId, name: c.name, order: i })),
+      data: criteria.map((c, i) => ({ id: c.id, rubricId, name: c.name, order: i, maxPoints: c.maxPoints ?? null })),
     });
   }
 
@@ -227,7 +233,7 @@ export const rubricService = {
           ? {}
           : {
               OR: [
-                { status: "Active" as const },
+                { status: "Active" as const, instrumentKind: "rubric" },
                 { ownerId: actor.id },
               ],
             }),
@@ -261,18 +267,21 @@ export const rubricService = {
   /** Public lookup is Active-only at the database boundary. */
   async getPublicById(id: string): Promise<PublicRubric | null> {
     const row = await prisma.rubric.findFirst({
-      where: { id, status: "Active" },
+      where: { id, status: "Active", instrumentKind: "rubric" },
       include: withNormalized,
     });
     return row ? toPublicRubric(toRubric(row)) : null;
   },
 
   async create(input: CreateRubricInput, actor: RubricActor): Promise<Rubric> {
+    const invalid = validateInstrumentContent(input);
+    if (invalid) throw new RubricConflictError(invalid);
     return prisma.$transaction(async (tx) => {
       const created = await tx.rubric.create({
         data: {
           name: input.name,
           type: input.type,
+          instrumentKind: input.instrumentKind ?? "rubric",
           description: input.description,
           status: input.status,
           ownerId: actor.id,
@@ -295,6 +304,7 @@ export const rubricService = {
         throw new RubricNotFoundError("Rubric not found");
       }
 
+      if (input.instrumentKind !== undefined && input.instrumentKind !== existing.instrumentKind) throw new RubricConflictError("An instrument kind is immutable; create a new instrument instead");
       const conflict = rubricUpdateConflict(lifecycleSnapshot(existing), input);
       if (conflict) throw new RubricConflictError(conflict);
 
@@ -306,6 +316,10 @@ export const rubricService = {
         finalCriteria ??= current.criteria;
       }
 
+      if (input.levels !== undefined || input.criteria !== undefined) {
+        const invalid = validateInstrumentContent({ instrumentKind: existing.instrumentKind === "marking_scheme" ? "marking_scheme" : "rubric", levels: finalLevels as RubricLevel[], criteria: finalCriteria as RubricCriterion[] });
+        if (invalid) throw new RubricConflictError(invalid);
+      }
       await tx.rubric.update({
         where: { id },
         data: {

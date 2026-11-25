@@ -17,6 +17,26 @@ describe("student cursor pagination", () => {
     });
   });
 
+  test("restricts cohort and section before roster paging; closed membership is excluded", () => {
+    const cohortId = "11111111-1111-4111-8111-111111111111";
+    const sectionId = "22222222-2222-4222-8222-222222222222";
+    const args = buildStudentPageFindManyArgs(
+      { activeOnly: true, limit: 10, cohortId, sectionId }, ["student-1"],
+    );
+    expect(args.where).toEqual({
+      status: "Active",
+      cohortMemberships: { some: { cohortId, exitedAt: null } },
+      id: { in: ["student-1"] },
+    });
+    expect(buildStudentPageFindManyArgs({ activeOnly: false, limit: 10, cohortId, sectionId }).where)
+      .toEqual({ cohortMemberships: { some: { cohortId, exitedAt: null } }, id: { in: [] } });
+  });
+
+  test("unassigned means no open canonical membership", () => {
+    expect(buildStudentPageFindManyArgs({ activeOnly: false, limit: 10, cohortId: "unassigned" }).where)
+      .toEqual({ cohortMemberships: { none: { exitedAt: null } } });
+  });
+
   test("applies search and active filters before application-level ordering and paging", () => {
     const cursor = Buffer.from(
       JSON.stringify({ id: "20000000-0000-4000-8000-000000000002" }),

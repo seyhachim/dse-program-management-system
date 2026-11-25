@@ -95,6 +95,48 @@ suite("Sindora trip participants and DSE News — isolated integration", () => {
     expect((await request("/api/student-portal/news",outsider)).status).toBe(403);
     expect((await request(statusPath,coordinator,"POST",{expectedVersion:1,status:"Draft"})).status).toBe(409);
     expect(await prisma.dseNewsAuditEvent.count({where:{articleId}})).toBe(2);
+    // Public website is a separate, explicit approval. Student Published does not imply public.
+    const publicList="/api/programme/public/programmes/dse/news";
+    const publicArticle=publicList+"/"+articleId;
+    const publicControl=path+"/"+articleId+"/public-status";
+    const beforePublic=await request(publicList,null);
+    expect(beforePublic.status).toBe(200);
+    expect(beforePublic.body.some((story:{id:string})=>story.id===articleId)).toBe(false);
+    expect((await request(publicArticle,null)).status).toBe(404);
+    expect((await request(publicControl,lecturer,"POST",{
+      expectedVersion:2,action:"publish",confirmPublicPermission:true,
+    })).status).toBe(403);
+    expect((await request(publicControl,coordinator,"POST",{
+      expectedVersion:2,action:"publish",
+    })).status).toBe(400);
+    const publiclyApproved=await request(publicControl,coordinator,"POST",{
+      expectedVersion:2,action:"publish",confirmPublicPermission:true,
+    });
+    expect(publiclyApproved.status).toBe(200);
+    expect(publiclyApproved.body.publicPublishedAt).toBeTruthy();
+    const publicStory=await request(publicArticle,null);
+    expect(publicStory.status).toBe(200);
+    expect(publicStory.body.title).toContain("Sindora");
+    expect(publicStory.body.body).toContain("regenerative farming");
+    for(const privateKey of ["activityId","studentId","authorId","updatedById","mediaApproved","uploadedMedia","source","goStatus","returnStatus"]) {
+      expect(Object.hasOwn(publicStory.body,privateKey)).toBe(false);
+    }
+    expect(JSON.stringify(publicStory.body)).not.toContain("Marked");
+    const cards=await request(publicList,null);
+    expect(cards.status).toBe(200);
+    expect(cards.body.some((story:{id:string})=>story.id===articleId)).toBe(true);
+    expect((await request(path+"/"+articleId,coordinator,"PATCH",{
+      expectedVersion:3,title:"Edited while public",
+    })).status).toBe(409);
+    // Revoking public approval does not unpublish to enrolled DSE students.
+    const revoked=await request(publicControl,coordinator,"POST",{
+      expectedVersion:3,action:"unpublish",
+    });
+    expect(revoked.status).toBe(200);
+    expect(revoked.body.publicPublishedAt).toBeNull();
+    expect((await request(publicArticle,null)).status).toBe(404);
+    expect((await request("/api/student-portal/news/"+articleId,student)).status).toBe(200);
+    expect(await prisma.dseNewsAuditEvent.count({where:{articleId}})).toBe(4);
   });
 });
 async function loadUser(email:string):Promise<AuthUser>{

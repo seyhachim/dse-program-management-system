@@ -3,6 +3,7 @@ import type {
   ListStudentsPageQuery,
   ListStudentsQuery,
   StudentPage,
+  StudentRosterCohortOverview,
   StudentProfileInput,
   StudentRef,
   StudentStatus,
@@ -120,9 +121,21 @@ function buildStudentListWhere(query: ListStudentsQuery) {
   };
 }
 
-export function buildStudentPageFindManyArgs(query: ListStudentsPageQuery) {
+export function buildStudentPageFindManyArgs(
+  query: ListStudentsPageQuery,
+  sectionStudentIds: string[] = [],
+) {
+  const where: Prisma.StudentWhereInput = {
+    ...buildStudentListWhere(query),
+    ...(query.cohortId === "unassigned"
+      ? { cohortMemberships: { none: { exitedAt: null } } }
+      : query.cohortId
+        ? { cohortMemberships: { some: { cohortId: query.cohortId, exitedAt: null } } }
+        : {}),
+    ...(query.sectionId ? { id: { in: sectionStudentIds } } : {}),
+  };
   return {
-    where: buildStudentListWhere(query),
+    where,
     select: STUDENT_LIST_ORDER_SELECT,
   };
 }
@@ -147,7 +160,7 @@ function compactStudentListRow(row: {
   };
 }
 
-async function currentRosterPlacements(studentIds: string[]) {
+async function currentRosterPlacements(studentIds: string[], cohortId?: string) {
   if (studentIds.length === 0) {
     return new Map<string, { currentStudyYear: 1 | 2 | 3 | 4 | null; currentClassCode: string | null }>();
   }
@@ -161,6 +174,7 @@ async function currentRosterPlacements(studentIds: string[]) {
       FROM "StudentCohortMembership" membership
       WHERE membership."exitedAt" IS NULL
         AND membership."studentId" IN (${Prisma.join(studentIds)})
+        ${cohortId ? Prisma.sql`AND membership."cohortId" = ${cohortId}` : Prisma.empty}
       ORDER BY membership."studentId", membership."joinedAt" DESC
     )
     SELECT
@@ -223,9 +237,52 @@ export const studentService = {
     return sortStudentRosterRows(rows).map(compactStudentListRow);
   },
 
+  async rosterCohorts(): Promise<StudentRosterCohortOverview> {
+    const [cohorts, unassignedCount] = await Promise.all([
+      prisma.$queryRaw<Array<{
+        id: string; code: string; name: string; intakeYear: number; status: string;
+        memberCount: bigint; activeCount: bigint; pendingCount: bigint;
+      }>>`
+        SELECT c."id", c."code", c."name", c."intakeYear", c."status"::text AS "status",
+          COUNT(DISTINCT s."id") AS "memberCount",
+          COUNT(DISTINCT s."id") FILTER (WHERE s."status" = 'Active') AS "activeCount",
+          COUNT(DISTINCT s."id") FILTER (WHERE s."status" = 'Pending') AS "pendingCount"
+        FROM "StudentCohort" c
+        LEFT JOIN "StudentCohortMembership" m
+          ON m."cohortId" = c."id" AND m."exitedAt" IS NULL
+        LEFT JOIN "Student" s ON s."id" = m."studentId"
+        WHERE c."programmeId" = 'dse'
+        GROUP BY c."id", c."code", c."name", c."intakeYear", c."status"
+        ORDER BY c."intakeYear" DESC, c."code" ASC
+      `,
+      prisma.student.count({ where: { cohortMemberships: { none: { exitedAt: null } } } }),
+    ]);
+    return {
+      cohorts: cohorts.map((c) => ({
+        ...c, memberCount: Number(c.memberCount), activeCount: Number(c.activeCount),
+        pendingCount: Number(c.pendingCount),
+      })),
+      unassignedCount,
+    };
+  },
+
   async listPage(query: ListStudentsPageQuery): Promise<StudentPage> {
     const cursor = query.cursor ? decodeStudentPageCursor(query.cursor) : null;
-    const rows = await prisma.student.findMany(buildStudentPageFindManyArgs(query));
+    // Resolve the selected class through authoritative, open section memberships.
+    // Both section and membership must belong to the selected cohort.
+    const sectionRows = query.sectionId
+      ? await prisma.$queryRaw<Array<{ studentId: string }>>`
+          SELECT DISTINCT m."studentId"
+          FROM "StudentCohortSectionMembership" m
+          JOIN "StudentCohortSection" s ON s."id" = m."sectionId"
+          WHERE m."exitedAt" IS NULL AND s."active" = TRUE
+            AND m."cohortId" = ${query.cohortId} AND s."cohortId" = ${query.cohortId}
+            AND s."id" = ${query.sectionId}
+        `
+      : [];
+    const rows = await prisma.student.findMany(
+      buildStudentPageFindManyArgs(query, sectionRows.map((row) => row.studentId)),
+    );
 
     let page;
     try {
@@ -238,7 +295,10 @@ export const studentService = {
     }
 
     const pageRows = page.items.map(compactStudentListRow);
-    const placements = await currentRosterPlacements(pageRows.map((row) => row.id));
+    const placements = await currentRosterPlacements(
+      pageRows.map((row) => row.id),
+      query.cohortId === "unassigned" ? undefined : query.cohortId,
+    );
     return {
       items: pageRows.map((row) => ({
         ...row,

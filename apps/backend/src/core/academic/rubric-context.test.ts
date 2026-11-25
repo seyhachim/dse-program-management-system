@@ -8,3 +8,12 @@ describe("rubric content hash", () => {
     expect(rubricContentHash(base)).not.toBe(rubricContentHash({ ...base, levelRows: base.levelRows.map((row) => row.id === "l1" ? { ...row, points: 4 } : row) }));
   });
 });
+
+test("marking scheme hash changes with question maxima while legacy hashes remain stable", () => {
+  const base = { id: "scheme", levelRows: [], criterionRows: [{ id: "q1", name: "Q1", order: 0, maxPoints: 6 }] };
+  const legacy = rubricContentHash(base);
+  expect(rubricContentHash({ ...base, instrumentKind: "rubric" })).toBe(legacy);
+  const scheme = { ...base, instrumentKind: "marking_scheme" };
+  expect(rubricContentHash(scheme)).toStartWith("marking-scheme-v1:");
+  expect(rubricContentHash({ ...scheme, criterionRows: [{ ...base.criterionRows[0]!, maxPoints: 8 }] })).not.toBe(rubricContentHash(scheme));
+});

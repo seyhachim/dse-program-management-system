@@ -9,7 +9,15 @@ export type FinalizedResultCorrectionSummary = z.infer<
   typeof FinalizedResultCorrectionSummarySchema
 >;
 
+export const FinalizedQuestionMarkSchema = z.object({
+  criterionId: z.string().min(1), criterionName: z.string(), score: z.number().finite().nonnegative(), maxScore: z.number().finite().positive(), cloCodes: z.array(z.string()),
+});
+export const FinalizedQuestionChangeSchema = z.object({
+  scoreId: z.string(), criterionId: z.string(), criterionName: z.string(), rubricId: z.string(), rubricContentHash: z.string(),
+  beforeScore: z.number().finite().nonnegative(), afterScore: z.number().finite().nonnegative(), maxScore: z.number().finite().positive(),
+});
 export const FinalizedResultCorrectionRowSchema = z.object({
+  questionMarks: z.array(FinalizedQuestionMarkSchema).optional(),
   assessmentResultId: z.string().uuid(),
   assessmentItemId: z.string().min(1),
   assessmentName: z.string().min(1),
@@ -44,6 +52,7 @@ export type FinalizedResultCorrectionWorkspace = z.infer<
 >;
 
 export const FinalizedResultCorrectionHistoryItemSchema = z.object({
+  questionChanges: z.array(FinalizedQuestionChangeSchema).optional(),
   correctionId: z.string().uuid(),
   beforeScore: z.number().min(0),
   beforeMaxScore: z.number().positive(),

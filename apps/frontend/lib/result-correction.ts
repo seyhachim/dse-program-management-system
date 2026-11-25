@@ -29,6 +29,7 @@ export type ResultCorrectionValidation = {
 export function validateResultCorrection(
   current: ResultCorrectionCurrent,
   draft: ResultCorrectionDraft,
+  options: { questionMarksChanged?: boolean } = {},
 ): ResultCorrectionValidation {
   const errors: ResultCorrectionValidation["errors"] = {};
   const scoreText = draft.score.trim();
@@ -65,6 +66,7 @@ export function validateResultCorrection(
       score !== current.score
       || maxScore !== current.maxScore
       || feedback !== current.feedback
+      || options.questionMarksChanged === true
     );
   if (!changed && !errors.score && !errors.maxScore) {
     errors.noChange = "Change the score, maximum score, or feedback before continuing.";

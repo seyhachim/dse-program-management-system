@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import { Prisma, type QaCloAttainmentSnapshot } from "@prisma/client";
 import { prisma } from "../../../core/db/prisma.ts";
+import { hasMarkingSchemeMappings, markingSchemeCloEvidence } from "../../../core/academic/marking-scheme-evidence.ts";
 
 export const CLO_ATTAINMENT_CALCULATION_VERSION = "clo-attainment-v1";
 export const DEFAULT_CLO_ATTAINMENT_THRESHOLD = 50;
+export const MARKING_SCHEME_ATTAINMENT_VERSION = "clo-attainment-v2-marking-schemes";
 
 export type GenerateCloAttainmentInput = {
   programmeId: string;
@@ -20,11 +22,10 @@ export async function generateCloAttainmentSnapshots(
   input: GenerateCloAttainmentInput,
 ): Promise<QaCloAttainmentSnapshot[]> {
   const thresholdPercentage = input.thresholdPercentage ?? DEFAULT_CLO_ATTAINMENT_THRESHOLD;
-  const calculationVersion = input.calculationVersion ?? CLO_ATTAINMENT_CALCULATION_VERSION;
   if (!Number.isFinite(thresholdPercentage) || thresholdPercentage < 0 || thresholdPercentage > 100) {
     throw new Error("CLO attainment threshold must be between 0 and 100");
   }
-  if (!calculationVersion.trim()) throw new Error("CLO attainment calculation version is required");
+  if (input.calculationVersion !== undefined && !input.calculationVersion.trim()) throw new Error("CLO attainment calculation version is required");
 
   const offering = await prisma.offering.findFirst({
     where: { id: input.offeringId, course: { programmeId: input.programmeId } },
@@ -76,6 +77,7 @@ export async function generateCloAttainmentSnapshots(
       select: {
         id: true,
         cloCodes: true,
+        rubric: { select: { instrumentKind: true } },
         criterionCloMappings: {
           select: { rubricId: true, criterionId: true, criterionName: true, rubricContentHash: true, cloCode: true },
         },
@@ -84,6 +86,10 @@ export async function generateCloAttainmentSnapshots(
     }),
   ]);
 
+  const isScheme = (assessment: (typeof assessments)[number]) => assessment.rubric?.instrumentKind === "marking_scheme" || hasMarkingSchemeMappings(assessment.criterionCloMappings);
+  const hasSchemes = assessments.some((assessment) => isScheme(assessment));
+  const calculationVersion = hasSchemes ? MARKING_SCHEME_ATTAINMENT_VERSION : input.calculationVersion ?? CLO_ATTAINMENT_CALCULATION_VERSION;
+  if (hasSchemes && input.calculationVersion !== undefined && input.calculationVersion !== MARKING_SCHEME_ATTAINMENT_VERSION) throw new Error("Marking schemes require the versioned points-based calculation");
   const snapshots: QaCloAttainmentSnapshot[] = [];
   for (const clo of clos) {
     const cloCode = `CLO${clo.order + 1}`;
@@ -106,6 +112,25 @@ export async function generateCloAttainmentSnapshots(
         if (result.courseSpecId !== offering.courseSpecId) continue;
         const assessment = relevantById.get(result.assessmentItemId);
         if (!assessment) continue;
+        if (isScheme(assessment)) {
+          const aggregate = markingSchemeCloEvidence(cloCode, assessment.criterionCloMappings, result.criterionScores, result);
+          if (!aggregate) continue;
+          percentages.push(aggregate.percentage);
+          usedResultIds.push(result.id);
+          for (const score of aggregate.rows) {
+            usedCriterionIds.push(score.id);
+            sources.push({
+              source: "criterion", instrumentKind: "marking_scheme", assessmentItemId: assessment.id, resultId: result.id, criterionScoreId: score.id,
+              rubricId: score.rubricId, criterionId: score.criterionId, rubricContentHash: score.rubricContentHash,
+              score: score.score, maxScore: score.maxScore, percentage: round2(score.score / score.maxScore * 100),
+              assessmentCloPercentage: aggregate.percentage, aggregationRule: "earned-over-maximum-per-assessment-clo-v1",
+              publishedAt: result.publishedAt?.toISOString() ?? null,
+              finalizedAt: result.finalizedAt?.toISOString() ?? null,
+              resultUpdatedAt: result.updatedAt.toISOString(), criterionUpdatedAt: score.updatedAt.toISOString(),
+            });
+          }
+          continue;
+        }
         const mappedCriteria = result.criterionScores.filter((score) =>
           assessment.criterionCloMappings.some(
             (mapping) => mapping.cloCode === cloCode && mapping.rubricId === score.rubricId && mapping.criterionId === score.criterionId,
@@ -148,7 +173,7 @@ export async function generateCloAttainmentSnapshots(
 
     const sourceAssessmentItemIds = uniqueSorted(relevant.map((assessment) => assessment.id));
     const sourceMappingKeys = uniqueSorted(relevant.flatMap((assessment) => [
-      ...(assessment.cloCodes.includes(cloCode) ? [`assessment:${offering.courseSpecId}:${assessment.id}:${cloCode}`] : []),
+      ...(!isScheme(assessment) && assessment.cloCodes.includes(cloCode) ? [`assessment:${offering.courseSpecId}:${assessment.id}:${cloCode}`] : []),
       ...assessment.criterionCloMappings
         .filter((mapping) => mapping.cloCode === cloCode)
         .map((mapping) => `criterion:${offering.courseSpecId}:${assessment.id}:${mapping.rubricId}:${mapping.criterionId}:${cloCode}:${mapping.rubricContentHash}`),
@@ -159,6 +184,7 @@ export async function generateCloAttainmentSnapshots(
     const thresholdRule = {
       kind: "studentMeanMappedEvidenceGte", thresholdPercentage, publishedAndFinalizedResultsOnly: true,
       criterionEvidencePreferred: true, emptyPopulationRate: null,
+      ...(hasSchemes ? { markingSchemeRule: "earned-over-maximum-per-assessment-clo-v1", requireCompleteScheme: true } : {}),
     };
     const sourceEvidence = {
       offering: { id: offering.id, term: offering.term, startDate: offering.startDate?.toISOString().slice(0, 10) ?? null, endDate: offering.endDate?.toISOString().slice(0, 10) ?? null },

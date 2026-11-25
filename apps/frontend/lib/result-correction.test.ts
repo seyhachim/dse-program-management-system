@@ -32,6 +32,17 @@ describe("finalized result correction UI helpers", () => {
     expect(missingReason.errors.reason).toContain("required");
   });
 
+  test("allows audited question redistribution with the same exam total, but still requires a reason and valid bounds", () => {
+    const draft = { score: "72", maxScore: "100", feedback: current.feedback, reason: "Corrected question allocation" };
+    const validation = validateResultCorrection(current, draft, { questionMarksChanged: true });
+    expect(validation.valid).toBe(true);
+    expect(validation.changed).toBe(true);
+    expect(validation.errors.noChange).toBeUndefined();
+    expect(validateResultCorrection(current, { ...draft, reason: " " }, { questionMarksChanged: true }).valid).toBe(false);
+    expect(validateResultCorrection(current, { ...draft, score: "101" }, { questionMarksChanged: true }).valid).toBe(false);
+    expect(validateResultCorrection(current, draft).valid).toBe(false);
+  });
+
   test("rejects invalid mark bounds", () => {
     expect(validateResultCorrection(current, {
       score: "-1",
