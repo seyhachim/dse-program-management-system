@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { PendingRegistrationReceipt, TelegramRegistrationBootstrap } from "@dse-pms/shared-types";
+import { EMPTY_STUDENT_CAREER_PROFILE, UniversityEmailSchema, type StudentCareerProfile, type PendingRegistrationReceipt, type TelegramRegistrationBootstrap } from "@dse-pms/shared-types";
+import { StudentCareerFields } from "@/components/student-career-fields";
 import { API_URL } from "../../../lib/api";
 import "../telegram-client";
 
@@ -20,6 +21,8 @@ export default function TelegramRegistrationPage() {
   const boot = useRef<Promise<TelegramRegistrationBootstrap> | null>(null);
   const [data, setData] = useState<TelegramRegistrationBootstrap | null>(null);
   const [fields, setFields] = useState(initial);
+  const [career, setCareer] = useState<StudentCareerProfile>(EMPTY_STUDENT_CAREER_PROFILE);
+  const [showCareer, setShowCareer] = useState(false);
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
@@ -41,11 +44,13 @@ export default function TelegramRegistrationPage() {
     e.preventDefault();
     if (!data || data.state !== "FORM" || busy.current) return;
     if (Date.parse(data.expiresAt) <= Date.now()) { setError("Your verified launch expired. Close and reopen the registration form."); return; }
+    const email = UniversityEmailSchema.safeParse(fields.email);
+    if (!email.success) { setError("Enter your university email ending in @rupp.edu.kh."); return; }
     busy.current = true; setSending(true); setError("");
     try {
       await post<PendingRegistrationReceipt>("requests", {
         ...fields, verificationId: data.verificationId,
-        officialStudentId: fields.officialStudentId.trim() || undefined, email: fields.email.trim() || undefined,
+        officialStudentId: fields.officialStudentId.trim() || undefined, email: email.data, careerProfile: showCareer ? career : undefined,
       });
       setDone(true); setFields(initial);
     } catch (e) { setError(e instanceof Error ? e.message : "Submission failed"); }
@@ -74,7 +79,10 @@ export default function TelegramRegistrationPage() {
       <label className="block space-y-1 text-sm font-medium">Generation<select className={fieldClass} required value={fields.cohortId} onChange={e => setField("cohortId",e.target.value)}><option value="">Select generation</option>{cohorts.map(c => <option key={c.cohortId} value={c.cohortId}>{c.cohortCode} — {c.cohortName}</option>)}</select></label>
       <label className="block space-y-1 text-sm font-medium">Class section<select className={fieldClass} required disabled={!fields.cohortId} value={fields.sectionId} onChange={e => setField("sectionId",e.target.value)}><option value="">Select section</option>{sections.map(s => <option key={s.sectionId} value={s.sectionId}>{s.sectionCode}</option>)}</select></label>
       <label className="block space-y-1 text-sm font-medium">Official student ID (if issued)<input className={fieldClass} maxLength={100} value={fields.officialStudentId} onChange={e => setField("officialStudentId",e.target.value)} /></label>
-      <label className="block space-y-1 text-sm font-medium">Email (optional)<input type="email" className={fieldClass} maxLength={254} value={fields.email} onChange={e => setField("email",e.target.value)} /></label>
+      <label className="block space-y-1 text-sm font-medium">University email (required)<input type="email" required placeholder="student@rupp.edu.kh" className={fieldClass} maxLength={254} value={fields.email} onChange={e => setField("email",e.target.value)} /></label>
+      <p className="text-xs text-slate-600">Use the university email that belongs to you. Staff must verify ownership before approval.</p>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showCareer} onChange={e=>setShowCareer(e.target.checked)} /> Add optional interests and career preferences</label>
+      {showCareer && <StudentCareerFields value={career} onChange={setCareer} disabled={sending}/>}
       {!cohorts.length && <p className="text-sm text-red-700">No active classes are available. Contact your coordinator.</p>}
       <button disabled={sending || !cohorts.length} className="min-h-11 w-full rounded-xl bg-blue-700 px-4 py-3 font-medium text-white disabled:opacity-50" type="submit">{sending ? "Submitting…" : "Submit for approval"}</button>
     </form>}
