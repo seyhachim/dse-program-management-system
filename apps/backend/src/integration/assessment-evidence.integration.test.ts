@@ -21,12 +21,21 @@ isolated("assessment evidence protected API and immutable history", () => {
     const u = await prisma.user.findUniqueOrThrow({ where: { email } });
     return { id: u.id, email, roles: [role], programmeRoles: [{ role, programmeId }] };
   }
+  type TestBody = {
+    id: string; status: string;
+    suggestions: { eligibleCount: number };
+    evidence: { effectiveStatus: string; attachment: { filename: string; objectKey?: string } }[];
+    revisions: { revision: number }[];
+    eligibleResults: { resultId: string; memberEnrollmentIds: string[] }[];
+    totalOfferings: number;
+    rows: { assessments: { state: string; population: string; verified: number; stale: number; gap: number }[] }[];
+  };
   async function request(url: string, actor: AuthUser | null, body?: object) {
     const headers = new Headers();
     if (actor) headers.set("Authorization", "Bearer " + signToken(actor));
     if (body) headers.set("Content-Type", "application/json");
     const res = await fetch(origin + url, { method: body ? "POST" : "GET", headers, body: body ? JSON.stringify(body) : undefined });
-    return { status: res.status, body: await res.json(), cache: res.headers.get("cache-control") };
+    return { status: res.status, body: await res.json() as TestBody, cache: res.headers.get("cache-control") };
   }
   beforeAll(async () => {
     const host = new URL(process.env.DATABASE_URL ?? "postgresql://invalid:invalid@remote.invalid/db").hostname;
@@ -70,7 +79,7 @@ isolated("assessment evidence protected API and immutable history", () => {
     origin = "http://127.0.0.1:" + (server.address() as AddressInfo).port;
   });
   afterAll(async () => {
-    if (server?.listening) await new Promise<void>((resolve, reject) => server!.close(err => err ? reject(err) : resolve()));
+    if (server?.listening) await new Promise<void>((resolve, reject) => { server!.close(err => err ? reject(err) : resolve()); server!.closeAllConnections(); });
     // Immutable records intentionally remain in the disposable CI database.
     await prisma.$disconnect();
   });
@@ -131,8 +140,8 @@ isolated("assessment evidence protected API and immutable history", () => {
     const history = await request(base + "/results/" + sourceId + "/history", lecturer);
     expect(history.body.revisions.map((row: { revision: number }) => row.revision)).toEqual([6, 5, 4, 3, 2, 1]);
     expect((await request(base, coordinator)).body.evidence[0].effectiveStatus).toBe("verified");
-    await expect(prisma.assessmentEvidenceRevision.update({ where: { id: created.body.id }, data: { selectionReason: "tamper" } })).rejects.toThrow();
-    await expect(prisma.assessmentEvidenceRevision.delete({ where: { id: created.body.id } })).rejects.toThrow();
+    await expect(async () => { await prisma.assessmentEvidenceRevision.update({ where: { id: created.body.id }, data: { selectionReason: "tamper" } }); }).toThrow(/append-only/i);
+    await expect(async () => { await prisma.assessmentEvidenceRevision.delete({ where: { id: created.body.id } }); }).toThrow(/append-only/i);
     const official = await prisma.assessmentResult.findUniqueOrThrow({ where: { id: sourceId } });
     expect(official).toMatchObject({ score: 7, maxScore: 10, feedback: "Synthetic feedback" });
     await resultsLifecycleService.correctFinalized(lecturer.id, false, {
@@ -266,10 +275,10 @@ isolated("assessment evidence protected API and immutable history", () => {
     const stored = await prisma.assessmentEvidenceRevision.findFirstOrThrow({ where: { groupScoreId: groupSource, revision: 3 } });
     expect(stored.resultId).toBeNull();
     expect(stored.componentId).toBeNull();
-    await expect(prisma.assessmentEvidenceRevision.create({ data: {
+    await expect(async () => { await prisma.assessmentEvidenceRevision.create({ data: {
       resultId: sourceId, groupScoreId: groupSource, offeringId: offering.id, courseSpecId: spec.id, assessmentItemId: itemId,
       revision: 4, status: "draft", action: "revise", sourceHash: stored.sourceHash, sourceSnapshot: stored.sourceSnapshot as Prisma.InputJsonObject,
       score: 85, maxScore: 100, selectionReason: "Invalid mixed source", actorId: lecturer.id,
-    } })).rejects.toThrow();
+    } }); }).toThrow();
   }, 60000);
 });
