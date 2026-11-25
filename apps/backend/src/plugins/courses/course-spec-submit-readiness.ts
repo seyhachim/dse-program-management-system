@@ -63,7 +63,10 @@ export function courseSpecSubmissionGaps(
     { teachingLearningProfile: source.teachingLearning },
   );
 
+  // Preserve the existing Review & Submit contract (five authoring gates
+  // plus alignment). Full authoring progress still tracks all ten sections.
+  const submissionGateIds = new Set(["courseInfo", "clos", "teachingLearning", "assessmentPlan", "slt", "mapping"]);
   return COURSE_SPEC_AUTHORING_SECTIONS
-    .filter((section) => currentStatus[section.id] !== "complete")
+    .filter((section) => submissionGateIds.has(section.id) && currentStatus[section.id] !== "complete")
     .map((section) => section.title);
 }

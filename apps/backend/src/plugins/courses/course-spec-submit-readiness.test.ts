@@ -135,6 +135,14 @@ describe("CourseSpec authoritative submission readiness", () => {
     })).toContain("CLO Alignment Mapping");
   });
 
+  test("keeps full authoring progress separate from the existing six submission gates", () => {
+    expect(courseSpecSubmissionGaps({
+      ...ready,
+      sections: ready.sections.filter(section =>
+        !["resources", "references", "policy", "responsibility"].includes(section.sectionKey)),
+    })).toEqual([]);
+  });
+
   test("rejects an unsaved mandatory assessment section", () => {
     expect(courseSpecSubmissionGaps({
       ...ready,

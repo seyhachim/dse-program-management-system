@@ -1,5 +1,6 @@
 import {
   COMPLETABLE_SPEC_SECTIONS,
+  CONSTRUCTIVE_ALIGNMENT_REQUIRED_ERROR,
   teachingLearningIsReady,
   type AssessmentPlanSection,
   type ClosSection,
@@ -32,7 +33,10 @@ import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 import { assertCourseSpecEditable } from "./spec-lock.ts";
 import { courseSpecSubmissionGaps } from "./course-spec-submit-readiness.ts";
-import { specificationDateForSubmission } from "./automatic-specification-date.ts";
+import {
+  MISSING_RESUBMISSION_SPECIFICATION_DATE_ERROR,
+  specificationDateForSubmission,
+} from "./automatic-specification-date.ts";
 import { uniqueActiveCurriculumPlacement } from "./course-spec-progress-placement.ts";
 import {
   buildCourseInfoSnapshot,
@@ -468,50 +472,66 @@ export const courseService = {
       );
     }
 
-    // Use the same source-derived authoring rules as Overview and Review & Submit.
-    // Persisted Complete/Draft flags cannot hide current Weekly Plan, CLO or
-    // Teaching & Learning gaps; preserved assessment-only weeks are ignored.
+    // Source-derived readiness; the Review & Submit gates are a subset of
+    // full authoring progress. Never trust stale instructional section flags.
     const readinessGaps = courseSpecSubmissionGaps(spec);
     if (readinessGaps.length > 0) {
+      if (readinessGaps.length === 1 && readinessGaps[0] === "CLO Alignment Mapping") {
+        throw new ReferenceError(CONSTRUCTIVE_ALIGNMENT_REQUIRED_ERROR);
+      }
       throw new ReferenceError(
         `Complete all required sections before submitting: ${readinessGaps.join(", ")}`,
       );
     }
 
-    // The first submitted version receives its canonical Cambodia date.
-    // A revision cannot silently acquire a new date on resubmission.
-    const specificationDate = specificationDateForSubmission({
-      reviewStatus:
-        spec.reviewStatus === "ChangesRequested" ? "ChangesRequested" : "Draft",
-      existingDate: spec.specDate,
-      now: new Date(),
-    });
+    const submittedAt = new Date();
+    let specificationDate: Date;
+    try {
+      specificationDate = specificationDateForSubmission({
+        reviewStatus: spec.reviewStatus === "ChangesRequested" ? "ChangesRequested" : "Draft",
+        existingDate: spec.specDate,
+        now: submittedAt,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === MISSING_RESUBMISSION_SPECIFICATION_DATE_ERROR) {
+        throw new ReferenceError(error.message);
+      }
+      throw error;
+    }
 
     const nextVersion = spec.submissionVersion + 1;
     const nextStatus =
       spec.reviewStatus === "ChangesRequested" ? "Resubmitted" : "Submitted";
-    const updated = await prisma.courseSpec.update({
-      where: { id: spec.id },
-      data: {
-        reviewStatus: nextStatus,
-        specDate: specificationDate,
-        submissionVersion: nextVersion,
-        submittedAt: new Date(),
-        submittedById,
-        submissionNote: note.trim(),
-        reviewActions: {
-          create: {
-            submissionVersion: nextVersion,
-            action: nextStatus === "Resubmitted" ? "Resubmitted" : "Submitted",
-            actorId: submittedById,
-            note: note.trim(),
+    // Preserve the existing atomic date-section and review-action writes.
+    await prisma.$transaction([
+      prisma.courseSpecSection.upsert({
+        where: { courseSpecId_sectionKey: { courseSpecId: spec.id, sectionKey: "date" } },
+        create: { courseSpecId: spec.id, sectionKey: "date", status: "Complete" },
+        update: { status: "Complete" },
+      }),
+      prisma.courseSpec.update({
+        where: { id: spec.id },
+        data: {
+          reviewStatus: nextStatus,
+          specDate: specificationDate,
+          submissionVersion: nextVersion,
+          submittedAt,
+          submittedById,
+          submissionNote: note.trim(),
+          reviewActions: {
+            create: {
+              submissionVersion: nextVersion,
+              action: nextStatus,
+              actorId: submittedById,
+              note: note.trim(),
+            },
           },
         },
-      },
-      include: SPEC_INCLUDE,
-    });
-    const { data, status } = reassembleSpec(updated);
-    return { courseId, data, status, review: reviewEnvelope(updated) };
+      }),
+    ]);
+    const updated = await courseService.getSpec(courseId);
+    if (!updated) throw new ReferenceError("Course specification has not been started");
+    return updated;
   },
 
   async requestSpecChanges(courseId: string, reviewerId: string, note: string) {

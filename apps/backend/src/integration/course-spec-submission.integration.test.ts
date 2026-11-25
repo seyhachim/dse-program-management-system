@@ -122,7 +122,10 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
     const response = await fetch(baseUrl + "/api/courses/" + courseId + "/spec" + suffix, {
       method, headers, body: JSON.stringify(data),
     });
-    return { status: response.status, body: await response.json() };
+    return {
+      status: response.status,
+      body: await response.json() as { error?: string; review?: { status: string }; status?: Record<string, string>; data?: { date?: { date?: string } } },
+    };
   }
 
   async function snapshot() {
@@ -135,7 +138,7 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
     expect((await request("/submit", unrelated)).status).toBe(403);
     const rejected = await request("/submit", lecturer);
     expect(rejected.status).toBe(400);
-    expect(rejected.body.error).toContain("Teaching & Learning");
+    expect(rejected.body.error ?? "").toContain("Teaching & Learning");
     const before = await snapshot();
     expect(before.reviewStatus).toBe("Draft");
     expect(before.submissionVersion).toBe(0);
@@ -150,7 +153,7 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
     });
     const misaligned = await request("/submit", lecturer);
     expect(misaligned.status).toBe(400);
-    expect(misaligned.body.error).toContain("CLO Alignment Mapping");
+    expect(misaligned.body.error ?? "").toContain("Constructive Alignment");
     expect((await snapshot()).reviewActions).toHaveLength(0);
     await prisma.courseSpecAssessmentItem.updateMany({
       where: { courseSpecId: specId }, data: { status: "Active" },
@@ -159,11 +162,13 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
     const dateBefore = localDate(new Date());
     const submitted = await request("/submit", lecturer);
     expect(submitted.status).toBe(200);
-    expect(submitted.body.review.status).toBe("submitted");
+    expect(submitted.body.review?.status).toBe("submitted");
     const first = await snapshot();
     expect(first.reviewStatus).toBe("Submitted");
     expect(first.submissionVersion).toBe(1);
-    expect([dateBefore, localDate(new Date())]).toContain(first.specDate?.toISOString().slice(0, 10));
+    expect([dateBefore, localDate(new Date())]).toContain(first.specDate?.toISOString().slice(0, 10) ?? "");
+    expect(submitted.body.status?.date).toBe("complete");
+    expect(submitted.body.data?.date?.date).toBe(first.specDate?.toISOString().slice(0, 10));
     expect(first.reviewActions).toHaveLength(1);
     expect(first.reviewActions[0]?.actorId).toBe(lecturer.id);
     expect(first.reviewActions[0]?.action).toBe("Submitted");
@@ -174,7 +179,7 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
     expect((await request("/review/request-changes", lecturer)).status).toBe(403);
     const changes = await request("/review/request-changes", reviewer);
     expect(changes.status).toBe(200);
-    expect(changes.body.review.status).toBe("changesRequested");
+    expect(changes.body.review?.status).toBe("changesRequested");
 
     const week = await prisma.courseSpecWeek.findFirstOrThrow({
       where: { courseSpecId: specId, order: 0 },
@@ -189,7 +194,7 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
     });
     const failedResubmit = await request("/submit", lecturer);
     expect(failedResubmit.status).toBe(400);
-    expect(failedResubmit.body.error).toContain("Weekly Plan");
+    expect(failedResubmit.body.error ?? "").toContain("Weekly Plan");
     expect((await snapshot()).submissionVersion).toBe(1);
     expect((await snapshot()).reviewActions).toHaveLength(2);
     await prisma.courseSpecWeek.update({
@@ -199,7 +204,7 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
 
     const resubmitted = await request("/submit", lecturer);
     expect(resubmitted.status).toBe(200);
-    expect(resubmitted.body.review.status).toBe("resubmitted");
+    expect(resubmitted.body.review?.status).toBe("resubmitted");
     const final = await snapshot();
     expect(final.submissionVersion).toBe(2);
     expect(final.specDate?.toISOString()).toBe(first.specDate?.toISOString());
