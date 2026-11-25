@@ -84,6 +84,28 @@ isolated("assessment evidence protected API and immutable history", () => {
     expect(overview.body.suggestions.eligibleCount).toBe(1);
     expect(overview.body.evidence).toEqual([]);
     expect((await request(url, coordinator, draft)).status).toBe(403);
+    const upload = async (actor: AuthUser | null, resultId: string, file: string, filename = "sample.pdf") => {
+      const headers = new Headers({ "Content-Type": "application/octet-stream", "x-evidence-filename": encodeURIComponent(filename), "x-evidence-mime": "application/pdf", "x-evidence-revision": "0", "x-evidence-reason": "Synthetic sample" });
+      if (actor) headers.set("Authorization", "Bearer " + signToken(actor));
+      const res = await fetch(origin + base + "/results/" + resultId + "/attachment", { method: "POST", headers, body: file });
+      return res.status;
+    };
+    expect(await upload(null, sourceId, "%PDF-1.4")).toBe(401);
+    expect(await upload(student, sourceId, "%PDF-1.4")).toBe(404);
+    expect(await upload(unrelated, sourceId, "%PDF-1.4")).toBe(404);
+    expect(await upload(coordinator, sourceId, "%PDF-1.4")).toBe(403);
+    expect(await upload(lecturer, otherResultId, "%PDF-1.4")).toBe(404);
+    expect(await upload(lecturer, sourceId, "not a pdf")).toBe(400);
+    expect(await upload(lecturer, sourceId, "%PDF-1.4", "../sample.pdf")).toBe(400);
+    const originalUploadFlag = process.env.ASSESSMENT_EVIDENCE_UPLOADS_ENABLED;
+    try {
+      process.env.ASSESSMENT_EVIDENCE_UPLOADS_ENABLED = "false";
+      expect(await upload(lecturer, sourceId, "%PDF-1.4")).toBe(503);
+    } finally {
+      if (originalUploadFlag === undefined) delete process.env.ASSESSMENT_EVIDENCE_UPLOADS_ENABLED;
+      else process.env.ASSESSMENT_EVIDENCE_UPLOADS_ENABLED = originalUploadFlag;
+    }
+    expect((await request(base, lecturer)).body.evidence).toEqual([]);
     const created = await request(url, lecturer, draft);
     expect(created.status).toBe(201);
     expect(created.body.status).toBe("draft");
