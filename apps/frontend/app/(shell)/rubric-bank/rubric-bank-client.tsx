@@ -41,6 +41,8 @@ import {
   typeChipClass,
 } from "@/lib/rubrics";
 
+import { InstitutionalPolicyPanel, type PolicyCitation } from "./institutional-policy-panel";
+
 function blankCriterion(levelCount: number): RubricCriterion {
   return { id: crypto.randomUUID(), name: "", descriptors: Array.from({ length: levelCount }, () => "") };
 }
@@ -65,6 +67,7 @@ function message(error: unknown, fallback: string): string {
 
 export function RubricBankClient() {
   const { me } = useMe();
+  const [reference, setReference] = useState<PolicyCitation | null>(null);
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"" | RubricStatus>("");
@@ -106,7 +109,9 @@ export function RubricBankClient() {
 
   const openCreate = (kind: AssessmentInstrumentKind) => {
     setEditing(null);
-    setDraft(blankDraft(kind));
+    const next = blankDraft(kind);
+    if (kind === "rubric" && reference) next.levels = [{label:"Exceeds Expectation",points:3},{label:"Meets Expectation",points:2},{label:"Developing Expectation",points:1},{label:"Below Expectation",points:0}];
+    setDraft(next);
     setMutationError(null);
     setDialogOpen(true);
   };
@@ -224,6 +229,8 @@ export function RubricBankClient() {
         </div>
       </section>
 
+      {me ? <InstitutionalPolicyPanel key={me.id} onVerifiedObe={setReference} /> : null}
+
       <section className="rounded-xl border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row">
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, description, or type" className="sm:max-w-md" aria-label="Search rubrics" />
@@ -281,6 +288,8 @@ export function RubricBankClient() {
               <div className="space-y-2"><Label htmlFor="rubric-type">Assessment type</Label><select id="rubric-type" value={draft.type} onChange={(e) => setDraft((current) => ({ ...current, type: e.target.value as RubricType }))} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground">{RUBRIC_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></div>
             </div>
             <div className="space-y-2"><Label htmlFor="rubric-description">Description</Label><textarea id="rubric-description" value={draft.description} onChange={(e) => setDraft((current) => ({ ...current, description: e.target.value }))} className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" /></div>
+
+            {me && reference && draft.instrumentKind !== "marking_scheme" ? <aside className="rounded-md border border-border p-3 text-sm"><strong>Institutional reference — internal use only</strong><p>{reference.title} · {reference.version} · {reference.locator}</p><p className="text-xs text-muted-foreground">For new drafts, use the verified institutional scale. Existing instruments retain their original scale.</p>{!editing ? <Button variant="outline" size="sm" onClick={() => setDraft(current => ({...current, levels: [{label:"Exceeds Expectation",points:3},{label:"Meets Expectation",points:2},{label:"Developing Expectation",points:1},{label:"Below Expectation",points:0}], criteria:current.criteria.map(c=>({...c,descriptors:["","","",""]}))}))}>Use four-level OBE scale (resets descriptors)</Button> : null}</aside> : null}
 
             {draft.instrumentKind === "marking_scheme" ? (
               <div className="space-y-3">
