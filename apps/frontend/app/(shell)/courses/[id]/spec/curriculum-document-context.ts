@@ -12,7 +12,8 @@ export function resolveBoundDocumentCode(bindings: CurriculumCourseSpecBindings,
   }
   const match = bindings.bindings.find((row) => row.placementId === context.placementId &&
     row.courseId === context.courseId && row.linkedVersion?.id === context.versionId &&
-    row.linkedVersion.courseId === context.courseId);
+    row.linkedVersion.courseId === context.courseId &&
+    row.eligibleVersions.some((spec) => spec.id === context.versionId && spec.courseId === context.courseId));
   if (!match?.courseCode.trim()) throw new Error("CourseSpec does not match the selected curriculum placement");
   return match.courseCode;
 }

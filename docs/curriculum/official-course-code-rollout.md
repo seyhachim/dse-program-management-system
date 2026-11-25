@@ -40,14 +40,14 @@ Draft implementation; no release or production import is authorized.
 - Teaching-session monitor and lecturer portfolio teaching projections resolve exact offering codes. Existing portal/Telegram schedule and attendance screens use the contextual portal or offering projections; schedule-impact rows remain ID-based.
 - CLO attainment evidence candidate display and published result aggregates expose contextual codes without mutating stored evidence or changing aggregate keys. Mixed or unbound result sets retain the catalogue label and expose code coverage.
 - Student handbook source is published curriculum totals, not course rows; export already freezes published source snapshots, so no handbook data rewrite is appropriate. No dedicated transcript implementation found in the inspected tree. Standalone reports without exact context retain catalogue labels; annual lecturer export is owned by #1299 and needs coordination, not a competing patch.
-- Added context validation unit tests and expanded portal DB regression for exact bound code, document filename, announcement, legacy completed fallback and unauthorized access. Full cross-generation browser verification remains a release gate.
+- Added context validation unit tests and expanded portal DB regression for exact bound code, document filename, announcement, legacy completed fallback and unauthorized access. Added synthetic two-generation offering/QA candidate test and contextual CLO attainment/published results regression. Full cross-generation browser verification remains a release gate.
 
 ## Remaining merge blockers
 
 1. Validate the new version-wide constraint and duplicate preflight on isolated staging, including detached legacy snapshots. No production migration or data correction authorized.
 2. Verify import/export round trip and error UI, additional conflict/concurrency cases and browser smoke; official document export must not display internal aliases.
-3. Verify Phase 3 editor, clone, comparison and audit regressions, including authorization and browser checks. Integrity diagnostics and contextual offering/CourseSpec/student/report displays remain Phase 4.
-4. Add G5 approved/G6 draft and approved delivery regressions, duplicate/rollback/security cases and browser verification. Validate staging before any release.
+3. Verify Phase 4B CI, staff contextual PDF/Word browser output and authorization, and remaining direct reports. Coordinate annual lecturer export #1299; no dedicated transcript implementation was found.
+4. Run cross-generation synthetic regressions and duplicate/rollback/security cases, then isolated staging and browser verification before any release.
 5. Keep G6 v3.0 Draft until academic review resolves 132-credit research/industry routes against 130-credit limit. No import or approval in this PR until the full feature is verified.
 6. Coordinate additive migration ordering and rebase with #1354, #1362, #1299, #1364 and #1352. This initial slice intentionally avoids their changed files. No Vercel configuration changes; retain existing preview/deployment policy.
 

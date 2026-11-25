@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { PrismaClient } from "@prisma/client";
 import { generateCloAttainmentSnapshots } from "./clo-attainment.ts";
 import { getQaEvidenceCandidates } from "./service.ts";
+import { retrieveEvidenceCandidates } from "./registry.ts";
 
 const enabled = process.env.CLO_ATTAINMENT_DB_TESTS === "1";
 const db = new PrismaClient();
@@ -20,6 +21,19 @@ describe.skipIf(!enabled)("CLO attainment snapshot integrity", () => {
     await db.courseSpecAssessmentItem.create({ data: { id: ids.assessment3, courseSpecId: ids.spec2, order: 0, name: "A1 revised", type: "Exam", cloCodes: ["CLO1"] } });
     await db.offering.create({ data: { id: ids.offering1, courseId: ids.course, courseSpecId: ids.spec1, term: "2026-S1", sectionCode: "A" } });
     await db.offering.create({ data: { id: ids.offering2, courseId: ids.course, courseSpecId: ids.spec2, term: "2027-S1", sectionCode: "B" } });
+    const actor = await db.user.create({ data: { name: "Synthetic QA actor", email: `qa-${ids.course}@example.test` } });
+    const curriculum = await db.programmeCurriculum.create({ data: { programmeId: "dse", code: `QA-${ids.course.slice(0, 8)}`, name: "Synthetic QA curriculum" } });
+    const version = await db.programmeCurriculumVersion.create({ data: { curriculumId: curriculum.id, createdById: actor.id } });
+    const placement = await db.programmeCurriculumCourse.create({ data: {
+      curriculumVersionId: version.id, courseId: ids.course, courseSpecVersionId: ids.spec1,
+      yearLevel: 1, semester: "First", creditsSnapshot: 3, courseTypeSnapshot: "Core",
+    } });
+    await db.$executeRaw`UPDATE curriculum_artifact."CourseSnapshot" SET "courseCodeSnapshot" = ${`OFF-${ids.course.slice(0, 6)}`} WHERE "placementId" = ${placement.id}`;
+    await db.programmeCurriculumVersion.update({ where: { id: version.id }, data: { status: "Approved", approvedAt: new Date() } });
+    await db.$executeRaw`
+      INSERT INTO offering_governance."OfferingCurriculumBinding" ("offeringId", "curriculumCourseId", "boundByUserId", "updatedByUserId")
+      VALUES (${ids.offering1}, ${placement.id}, ${actor.id}, ${actor.id})
+    `;
     await db.student.create({ data: { id: ids.student1, name: "S1", email: `i303-${ids.student1}@example.test`, studentId: `I303-${ids.student1.slice(0,8)}` } });
     await db.student.create({ data: { id: ids.student2, name: "S2", email: `i303-${ids.student2}@example.test`, studentId: `I303-${ids.student2.slice(0,8)}` } });
     await db.student.create({ data: { id: ids.student3, name: "S3", email: `i303-${ids.student3}@example.test`, studentId: `I303-${ids.student3.slice(0,8)}` } });
@@ -71,6 +85,16 @@ describe.skipIf(!enabled)("CLO attainment snapshot integrity", () => {
     expect(snapshots[0]?.achievedRate).toBeNull();
   });
 
+  test("published results use the official code when every included offering is exactly bound", async () => {
+    const evidence = await retrieveEvidenceCandidates("dse", {
+      id: "synthetic-results", evidenceType: "published-results", sourceDomain: "assessment",
+    });
+    const row = evidence.candidates.find((item) => item.entityId === `${ids.spec1}:${ids.assessment1}`);
+    expect(row?.attributes.courseCode).toBe(`OFF-${ids.course.slice(0, 6)}`);
+    expect(row?.attributes.unboundResultCount).toBe(0);
+    expect(row?.attributes.resultCount).toBe(2);
+  });
+
   test("Criteria 4 and 8 retrieval cite the same exact snapshot scope and lineage", async () => {
     for (const expectedEvidenceId of [
       "aun-qa-v4:4.5:research:c4-e05:evidence:3",
@@ -84,6 +108,7 @@ describe.skipIf(!enabled)("CLO attainment snapshot integrity", () => {
       expect(candidate?.periodKey).toBe("2026-S1");
       expect(candidate?.provenance?.authority).toBe("controlledInternalRecord");
       expect(candidate?.attributes.calculationHash).toBeTruthy();
+      expect(candidate?.attributes.courseCode).toBe(`OFF-${ids.course.slice(0, 6)}`);
     }
   });
 });

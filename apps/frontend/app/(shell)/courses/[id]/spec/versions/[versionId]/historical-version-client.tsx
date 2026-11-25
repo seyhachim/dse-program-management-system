@@ -47,7 +47,7 @@ export function HistoricalVersionClient({ courseId, versionId, curriculumContext
     ]).then(([exact, history, methodList, programmeConfig, rubricList, bindings]) => {
       if (cancelled) return;
       if (contextRequested) {
-        if (!bindings || !curriculumVersionId || !placementId) throw new Error("Missing curriculum context");
+        if (!bindings || !curriculumVersionId || !placementId || exact.version.reviewStatus !== "Approved") throw new Error("Missing or unapproved curriculum context");
         setOfficialCode(resolveBoundDocumentCode(bindings, { courseId, versionId, curriculumVersionId, placementId }));
       }
       setVersion(exact);

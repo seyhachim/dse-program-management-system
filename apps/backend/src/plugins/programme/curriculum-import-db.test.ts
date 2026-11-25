@@ -6,6 +6,8 @@ import { curriculumDraftService, CurriculumDraftConflictError } from "./curricul
 import { curriculumHistoryService } from "./curriculum-history-service.ts";
 import { curriculumCourseSpecService } from "./curriculum-course-spec-service.ts";
 import { offeringCurriculumService } from "./offering-curriculum-service.ts";
+import { loadOfferingOfficialCodes } from "../../core/academic/offering-official-code.ts";
+import { retrieveEvidenceCandidates } from "../qa/evidence/registry.ts";
 
 const dbTestsEnabled = process.env.CURRICULUM_DB_TESTS === "1";
 const describeDb = dbTestsEnabled ? describe : describe.skip;
@@ -332,6 +334,40 @@ describeDb("curriculum JSON import and artifact persistence", () => {
     `)).rejects.toThrow("23505");
     const after = await curriculumImportService.artifact(g6.id);
     expect(after.courses.find((course) => course.courseId === f.research.id)?.code).toBe(f.research.code);
+
+    // Disposable DB only: simulate a future approved G6 to exercise delivery,
+    // without changing the production G6 Draft or any real academic record.
+    const oldPlacement = await prisma.programmeCurriculumCourse.findFirstOrThrow({
+      where: { curriculumVersionId: f.version.id, courseId: f.common.id },
+    });
+    await prisma.programmeCurriculumVersion.update({
+      where: { id: g6.id }, data: { status: "Approved", approvedAt: new Date() },
+    });
+    const oldOffering = await prisma.offering.create({
+      data: { courseId: f.common.id, term: `G5-${f.token}`, sectionCode: "M1" },
+    });
+    const newOffering = await prisma.offering.create({
+      data: { courseId: g6Course.id, term: `G6-${f.token}`, sectionCode: "M1" },
+    });
+    const unboundOffering = await prisma.offering.create({
+      data: { courseId: g6Course.id, term: `LEGACY-${f.token}`, sectionCode: "M1" },
+    });
+    await prisma.$executeRaw`
+      INSERT INTO offering_governance."OfferingCurriculumBinding" ("offeringId", "curriculumCourseId", "boundByUserId", "updatedByUserId")
+      VALUES (${oldOffering.id}, ${oldPlacement.id}, ${f.user.id}, ${f.user.id}),
+             (${newOffering.id}, ${placement.id}, ${f.user.id}, ${f.user.id})
+    `;
+    const codes = await loadOfferingOfficialCodes([oldOffering.id, newOffering.id, unboundOffering.id]);
+    expect(codes.get(oldOffering.id)).toBe(f.common.code);
+    expect(codes.get(newOffering.id)).toBe(f.common.code);
+    expect(codes.has(unboundOffering.id)).toBe(false);
+    expect(newOffering.courseId).not.toBe(oldOffering.courseId);
+    const evidence = await retrieveEvidenceCandidates(f.programme.id, {
+      id: "synthetic-assignments", evidenceType: "lecturer-assignments", sourceDomain: "assessment",
+    });
+    expect(evidence.candidates.find((row) => row.entityId === oldOffering.id)?.attributes.courseCode).toBe(f.common.code);
+    expect(evidence.candidates.find((row) => row.entityId === newOffering.id)?.attributes.courseCode).toBe(f.common.code);
+    expect(evidence.candidates.find((row) => row.entityId === unboundOffering.id)?.attributes.courseCode).toBe(g6Course.code);
   });
 
   test("draft official-code edits are audited, clone correctly and compare all pathways", async () => {
