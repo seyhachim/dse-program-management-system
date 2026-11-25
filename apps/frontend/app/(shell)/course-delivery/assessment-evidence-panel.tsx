@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { CourseDeliveryOffering } from "@dse-pms/shared-types";
 import { Button, Input } from "@dse-pms/ui";
 import { api, ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
@@ -10,7 +9,8 @@ import { protectedQueryKey } from "@/lib/query-client";
 
 export type EvidencePopulation = "individual" | "group" | "component";
 export type EvidenceSelection = { offeringId: string; assessmentItemId: string; population: EvidencePopulation };
-type Context = { courseSpecId: string; assessments: { id: string; name: string; mode: string }[] };
+type EvidenceStudent = { enrollmentId: string; studentName: string; studentCode: string | null };
+type Context = { courseSpecId: string; assessments: { id: string; name: string; mode: string }[]; students: EvidenceStudent[] };
 type Attachment = { filename: string; mimeType: string; sizeBytes: number; sha256: string };
 type Revision = {
   id: string; resultId: string; revision: number; status: string; effectiveStatus?: string;
@@ -27,24 +27,23 @@ function message(error: unknown) { return error instanceof ApiError ? error.mess
 const selectStyle = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm";
 const panelStyle = "rounded-xl border border-border bg-card p-4 space-y-3";
 
-export function AssessmentEvidencePanel({ offering, initial }: { offering: CourseDeliveryOffering; initial?: EvidenceSelection }) {
+export function AssessmentEvidencePanel({ offeringId, initial }: { offeringId: string; initial?: EvidenceSelection }) {
   const { me } = useMe();
-  const root = "/api/qa/assessment-evidence/offerings/" + encodeURIComponent(offering.offeringId);
+  const root = "/api/qa/assessment-evidence/offerings/" + encodeURIComponent(offeringId);
   const context = useQuery({
-    queryKey: protectedQueryKey({ userId: me?.id ?? "pending" }, "assessment-evidence", offering.offeringId, "context"),
+    queryKey: protectedQueryKey({ userId: me?.id ?? "pending" }, "assessment-evidence", offeringId, "context"),
     queryFn: () => api.get<Context>(root + "/context"),
     enabled: !!me?.id, staleTime: 0, gcTime: 0, retry: false,
   });
   if (context.isError) return <section className={panelStyle}><h2 className="font-semibold">Assessment Evidence</h2><p role="alert" className="text-sm text-destructive">{message(context.error)}</p><Button variant="outline" onClick={() => void context.refetch()}>Retry</Button></section>;
   if (!context.data) return <p className="text-sm text-muted-foreground">Loading authorized assessment context…</p>;
-  return <EvidenceAssessmentPicker key={(me?.id ?? "pending") + ":" + offering.offeringId + ":" + context.data.courseSpecId} offering={offering} context={context.data} root={root} userId={me?.id ?? "pending"} initial={initial} />;
+  return <EvidenceAssessmentPicker key={(me?.id ?? "pending") + ":" + offeringId + ":" + context.data.courseSpecId} context={context.data} root={root} userId={me?.id ?? "pending"} initial={initial} />;
 }
-function EvidenceAssessmentPicker({ offering, context, root, userId, initial }: { offering: CourseDeliveryOffering; context: Context; root: string; userId: string; initial?: EvidenceSelection }) {
+function EvidenceAssessmentPicker({ context, root, userId, initial }: { context: Context; root: string; userId: string; initial?: EvidenceSelection }) {
   const [selected, setSelected] = useState(initial?.assessmentItemId ?? context.assessments[0]?.id ?? "");
   const [groupPopulation, setGroupPopulation] = useState<EvidencePopulation>(initial?.population === "component" ? "component" : "group");
   const assessment = context.assessments.find(x => x.id === selected);
   const population: EvidencePopulation = assessment?.mode === "Individual" ? "individual" : assessment?.mode === "GroupIndividual" ? groupPopulation : "group";
-  const deliveryAssessment = offering.assessments.find(x => x.id === selected);
   return <section className={panelStyle}>
     <h2 className="text-lg font-semibold">Assessment Evidence</h2>
     <p className="text-sm text-muted-foreground">Private marked work for AUN-QA. Suggested samples are relative ranks, not official achievement levels. Only published and finalized source marks are eligible. Shared group work and individual contributions are collected separately.</p>
@@ -58,11 +57,11 @@ function EvidenceAssessmentPicker({ offering, context, root, userId, initial }: 
       <select className={selectStyle} value={groupPopulation} onChange={e => setGroupPopulation(e.target.value as EvidencePopulation)}>
         <option value="group">Shared group work</option><option value="component">Individual contribution / defence</option>
       </select></label>}
-    {assessment ? <EvidenceRows key={assessment.id + ":" + population} base={root + "/specs/" + encodeURIComponent(context.courseSpecId) + "/assessments/" + encodeURIComponent(assessment.id) + "/populations/" + population} population={population} userId={userId} students={deliveryAssessment?.results ?? []} /> :
+    {assessment ? <EvidenceRows key={assessment.id + ":" + population} base={root + "/specs/" + encodeURIComponent(context.courseSpecId) + "/assessments/" + encodeURIComponent(assessment.id) + "/populations/" + population} population={population} userId={userId} students={context.students} /> :
       <p className="text-sm text-muted-foreground">Select an assessment to start.</p>}
   </section>;
 }
-function EvidenceRows({ base, userId, students, population }: { base: string; userId: string; population: EvidencePopulation; students: { enrollmentId: string; studentName: string; studentCode: string | null }[] }) {
+function EvidenceRows({ base, userId, students, population }: { base: string; userId: string; population: EvidencePopulation; students: EvidenceStudent[] }) {
   const [chosen, setChosen] = useState("");
   const query = useQuery({ queryKey: protectedQueryKey({ userId }, "assessment-evidence", base),
     queryFn: () => api.get<Overview>(base), staleTime: 0, gcTime: 0, retry: false });
