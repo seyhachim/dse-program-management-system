@@ -9,14 +9,16 @@ const valid = {
   latinGivenName: "Dara",
   cohortId: "cohort-test",
   sectionId: "section-test",
+  email: " Student@RUPP.EDU.KH ",
 };
 
 describe("Telegram student pending registration contract", () => {
-  test("accepts bilingual names without a student ID or email", () => {
+  test("accepts bilingual names without a student ID, with normalized university email", () => {
     const parsed = TelegramStudentRegistrationInputSchema.parse(valid);
     expect(parsed.latinFamilyName).toBe("Sok");
     expect(parsed.officialStudentId).toBeUndefined();
-    expect(parsed.email).toBeUndefined();
+    expect(parsed.email).toBe("student@rupp.edu.kh");
+    expect(parsed.careerProfile).toBeUndefined();
   });
 
   for (const extra of [
@@ -40,6 +42,9 @@ describe("Telegram student pending registration contract", () => {
       { cohortId: "" },
       { sectionId: "" },
       { email: "invalid" },
+      { email: undefined },
+      { email: "student@gmail.com" },
+      { email: "student@rupp.edu.kh.evil.example" },
     ]) {
       expect(TelegramStudentRegistrationInputSchema.safeParse({ ...valid, ...patch }).success).toBe(false);
     }
