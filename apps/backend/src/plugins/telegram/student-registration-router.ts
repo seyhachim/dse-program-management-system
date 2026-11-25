@@ -1,5 +1,7 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
+import { UniversityEmailSchema } from "@dse-pms/shared-types";
+import { sendRegistrationEmail, verifyRegistrationEmail, RegistrationEmailError } from "./student-registration-email.ts";
 import { TelegramInitDataVerifyRequestSchema, TelegramRegistrationReviewSchema, TelegramRegistrationStatusSchema, type TelegramRegistrationBootstrap, type TelegramRegistrationPlacement, type TelegramRegistrationStatus } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
 import { requireAuth } from "../../core/auth/middleware.ts";
@@ -31,8 +33,8 @@ export function createStudentRegistrationRouter(): Router {
       if (!config.enabled || !config.webhookSecret) return void res.status(503).json({ error: "Registration is unavailable" });
       const verified = await telegramService.verifyInitData(parsed.data.initData);
       const telegramId = verified.telegramUser.id;
-      const requests = await prisma.$queryRaw<Array<{ status: TelegramRegistrationStatus }>>`
-        SELECT "status" FROM "telegram_security"."StudentRegistrationRequest"
+      const requests = await prisma.$queryRaw<Array<{ status: TelegramRegistrationStatus; email: string | null; emailVerifiedAt: Date | null }>>`
+        SELECT "status","email","emailVerifiedAt" FROM "telegram_security"."StudentRegistrationRequest"
         WHERE "telegramUserId"=${telegramId} AND "programmeId"=${DEFAULT_PROGRAMME_ID}
       `;
       const links = await prisma.$queryRaw<Array<{ id: string }>>`
@@ -55,11 +57,30 @@ export function createStudentRegistrationRouter(): Router {
         WHERE c."programmeId"=${DEFAULT_PROGRAMME_ID} AND c."status"='Active' AND s."active"=TRUE
         ORDER BY c."intakeYear" DESC, s."code" ASC
       ` : [];
-      const result: TelegramRegistrationBootstrap = { verificationId: verified.verificationId, expiresAt: verified.expiresAt, state, placements };
+      if (state === "FORM" || state === "PENDING") {
+        await prisma.$executeRaw`INSERT INTO "telegram_security"."StudentRegistrationEmailSession" ("verificationId") VALUES (${verified.verificationId}) ON CONFLICT DO NOTHING`;
+      }
+      const result: TelegramRegistrationBootstrap = { verificationId: verified.verificationId, expiresAt: verified.expiresAt, state, placements, ...(state === "PENDING" ? {email:requests[0]?.email ?? null,emailVerified:Boolean(requests[0]?.emailVerifiedAt)} : {}) };
       res.json(result);
     } catch {
       res.status(401).json({ error: "Could not verify registration. Close and reopen the form from the official bot." });
     }
+  });
+  const emailRequest = z.object({ verificationId:z.string().uuid(), email:UniversityEmailSchema }).strict();
+  const codeRequest = z.object({ verificationId:z.string().uuid(), code:z.string().regex(/^\d{6}$/) }).strict();
+  router.post("/registration/email/send", async (req,res) => {
+    if (process.env.TELEGRAM_STUDENT_REGISTRATION_ENABLED !== "true") return void res.status(503).json({error:"Registration unavailable"});
+    const parsed=emailRequest.safeParse(req.body);
+    if(!parsed.success)return void res.status(400).json({error:"Valid university email required"});
+    try {res.json(await sendRegistrationEmail(parsed.data.verificationId,parsed.data.email));}
+    catch(e){if(e instanceof RegistrationEmailError)return void res.status(e.status).json({error:e.message});res.status(503).json({error:"Email verification unavailable"});}
+  });
+  router.post("/registration/email/verify", async (req,res) => {
+    if (process.env.TELEGRAM_STUDENT_REGISTRATION_ENABLED !== "true") return void res.status(503).json({error:"Registration unavailable"});
+    const parsed=codeRequest.safeParse(req.body);
+    if(!parsed.success)return void res.status(400).json({error:"Enter the six-digit code"});
+    try {res.json(await verifyRegistrationEmail(parsed.data.verificationId,parsed.data.code));}
+    catch(e){if(e instanceof RegistrationEmailError)return void res.status(e.status).json({error:e.message});res.status(503).json({error:"Email verification unavailable"});}
   });
   router.get("/registration/staff/requests", requireAuth, async (req, res) => {
     const parsed = ListQuery.safeParse(req.query);
