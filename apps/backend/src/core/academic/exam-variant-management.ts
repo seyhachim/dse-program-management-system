@@ -2,7 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import type { AuthUser } from "../auth/token.ts";
-import { createExamVariantSnapshot, resolveExamVariant, verifyExamVariantSnapshot } from "./exam-variant.ts";
+import { createExamVariantSnapshot, resolveExamVariant, summarizeExamVariantScores, verifyExamVariantSnapshot } from "./exam-variant.ts";
 import { rubricContentHash } from "./rubric-context.ts";
 
 const id = z.string().min(1).max(256).refine((s) => s.trim() === s);
@@ -23,6 +23,14 @@ const assignmentEntrySchema = z.object({
 }).strict();
 const assignSchema = scopeSchema.merge(assignmentEntrySchema);
 const resolveSchema = scopeSchema.extend({ enrollmentId: id });
+const gradeSchema = resolveSchema.extend({
+  assignmentId: id, assignmentRevision: z.number().int().min(1).max(2147483647),
+  variantHash: hash, expectedGradeRevision: z.number().int().min(0).max(2147483646),
+  marks: z.array(z.object({ questionId: id, score: z.number().finite().nonnegative().nullable() }).strict()).max(1000),
+});
+type GradeMark = { questionId: string; maxPoints: number; score: number | null };
+type GradeRevision = { revision: number; marks: GradeMark[]; complete: boolean; earnedPoints: number | null; maximumPoints: number; actorId: string; savedAt: Date };
+
 const proposalSchema = z.object({
   purpose: z.literal("exam-variant-proposal-v1"), offeringId: id,
   preparerId: id, expiresAt: z.number().int(), snapshot: z.unknown(),
@@ -158,8 +166,47 @@ async function assignment(tx: Tx, ctx: Context, enrollmentId: string): Promise<A
   return rows[0];
 }
 
+async function gradeRevision(tx: Tx, assignmentId: string): Promise<GradeRevision | undefined> {
+  const rows = await tx.$queryRaw<GradeRevision[]>`SELECT revision,marks,complete,"earnedPoints","maximumPoints","actorId","savedAt"
+    FROM exam_variant."ExamGradeRevision" WHERE "assignmentId"=${assignmentId} ORDER BY revision DESC LIMIT 1`;
+  return rows[0];
+}
+async function gradeContext(tx: Tx, actorId: string, request: z.infer<typeof resolveSchema>, write: boolean) {
+  const ctx = await context(tx, actorId, request, write ? "teacher" : "read");
+  if (write && ctx.offering.status !== "Active") conflict("Active offering required for grading");
+  const student = await enrollment(tx, ctx, request.enrollmentId, write);
+  const current = await assignment(tx, ctx, request.enrollmentId);
+  if (!current) conflict("Confirmed assignment unavailable");
+  // Archived immutable instruments remain readable and gradeable by exact hash.
+  const snapshot = await paper(tx, ctx, current, false);
+  if (!(await permission(tx, ctx, snapshot))) deny();
+  const scope = { ...ctx.scope, offeringId: ctx.offering.id, enrollmentId: request.enrollmentId };
+  const v = { variantId: current.variantId, variantHash: current.variantHash };
+  const resolution = {
+    context: { ...scope, examMaximum: snapshot.examMaximum, activeCloCodes: ctx.activeCloCodes },
+    variants: [snapshot],
+    permissions: [{ ...ctx.scope, offeringId: ctx.offering.id, ...v }],
+    assignment: { ...scope, ...v, confirmed: true },
+  };
+  return { ctx, current, snapshot: resolveExamVariant(resolution), scope, v, resolution,
+    canEdit: ctx.teacher && ctx.offering.status === "Active" && student.student.status === "Active" && Boolean(student.student.studentId) };
+}
+function gradeResponse(g: Awaited<ReturnType<typeof gradeContext>>, row: GradeRevision | undefined) {
+  const summary = summarizeExamVariantScores(g.resolution, { ...g.scope, ...g.v, marks: row?.marks ?? [] });
+  if (row && (row.complete !== summary.complete || row.maximumPoints !== summary.maximumPoints ||
+      (row.earnedPoints === null ? summary.earnedPoints !== null :
+        summary.earnedPoints === null || Math.abs(row.earnedPoints-summary.earnedPoints)>Math.max(Math.abs(row.earnedPoints),Math.abs(summary.earnedPoints))*1e-12))) {
+    conflict("Stored grade integrity mismatch");
+  }
+  return { assignment: g.current, snapshot: g.snapshot, canEdit: g.canEdit,
+    gradeRevision: row?.revision ?? 0, complete: summary.complete,
+    earnedPoints: summary.earnedPoints, maximumPoints: summary.maximumPoints,
+    marks: summary.rows.map(q=>({ questionId:q.questionId,maxPoints:q.maxPoints,score:q.score })),
+    savedAt: row?.savedAt.toISOString() ?? null };
+}
+
 /** Inactive service factory. Dedicated secret injected by trusted server composition;
- * no environment defaults, singleton, router, feature flag, grade writes or deployment.
+ * no environment defaults, singleton or deployment. Private draft grades only; no release.
  * Signed proposals authenticate the preparer and reviewed mapping, not external evidence.
  */
 export function createExamVariantManagementService(db: PrismaClient, proposalSecret: Uint8Array) {
@@ -250,6 +297,7 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         if ((existing?.revision ?? 0) !== request.expectedRevision) conflict("Stale assignment revision");
         const { courseSpecId, assessmentItemId } = ctx.scope;
         if (await tx.assessmentResult.findFirst({ where: { enrollmentId: request.enrollmentId, courseSpecId, assessmentItemId }, select: { id: true } })) conflict("Existing result blocks assignment or reassignment");
+        if (existing && await gradeRevision(tx, existing.id)) conflict("Saved question marks lock the paper assignment");
         if (existing) {
           if (existing.variantId === snapshot.variantId && existing.variantHash === snapshot.variantHash) conflict("Assignment is unchanged");
           const changed = await tx.$executeRaw`UPDATE exam_variant."ExamPaperAssignment" SET revision=${existing.revision + 1},
@@ -265,6 +313,43 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         return { id: assignmentId, revision: 1, variantId: snapshot.variantId, variantHash: snapshot.variantHash };
   }
   return {
+    async gradeWorkspace(actor: AuthUser, input: unknown) {
+      const request = resolveSchema.parse(input);
+      return transact(async tx => {
+        const g = await gradeContext(tx, actor.id, request, false);
+        return gradeResponse(g, await gradeRevision(tx, g.current.id));
+      });
+    },
+    async saveGradeDraft(actor: AuthUser, input: unknown) {
+      const request = gradeSchema.parse(input);
+      return transact(async tx => {
+        const g = await gradeContext(tx, actor.id, request, true);
+        if (request.assignmentId !== g.current.id || request.assignmentRevision !== g.current.revision ||
+            request.variantHash !== g.current.variantHash) conflict("Paper assignment changed; reload the markbook");
+        const previous = await gradeRevision(tx, g.current.id);
+        if ((previous?.revision ?? 0) !== request.expectedGradeRevision) conflict("Grade changed; reload the markbook");
+        const maxima = new Map(g.snapshot.questions.map(q => [q.questionId,q.maxPoints]));
+        const submitted = request.marks.map(m => {
+          const maxPoints = maxima.get(m.questionId);
+          if (maxPoints === undefined) conflict("Unknown question for assigned paper");
+          return { ...m, maxPoints };
+        });
+        // Require a full replacement, including explicit nulls. Omission must not silently erase saved marks.
+        if (submitted.length !== maxima.size || new Set(submitted.map(m=>m.questionId)).size !== maxima.size) conflict("Include each assigned question exactly once");
+        if (submitted.some(m=>m.score!==null && m.score>m.maxPoints)) conflict("Question score exceeds maximum");
+        const summary = summarizeExamVariantScores(g.resolution,{ ...g.scope,...g.v,marks:submitted });
+        const marks = summary.rows.map(q=>({questionId:q.questionId,maxPoints:q.maxPoints,score:q.score}));
+        if (previous && JSON.stringify(previous.marks.map(q=>[q.questionId,q.maxPoints,q.score]))===JSON.stringify(marks.map(q=>[q.questionId,q.maxPoints,q.score]))) return gradeResponse(g,previous);
+        const revision = request.expectedGradeRevision+1;
+        await tx.$executeRaw`INSERT INTO exam_variant."ExamGradeRevision"
+          ("assignmentId","assignmentRevision","variantId","variantHash",revision,marks,complete,"earnedPoints","maximumPoints","actorId")
+          VALUES (${g.current.id},${g.current.revision},${g.current.variantId},${g.current.variantHash},${revision},
+            ${JSON.stringify(marks)}::jsonb,${summary.complete},${summary.earnedPoints},${summary.maximumPoints},${g.ctx.user.id})`;
+        const saved = await gradeRevision(tx,g.current.id);
+        if (!saved || saved.revision!==revision) conflict("Grade save could not be confirmed");
+        return gradeResponse(g,saved);
+      });
+    },
     async submit(actor: AuthUser, input: unknown) {
       const request = prepareSchema.extend({ expectedHash: hash }).parse(input);
       return transact(async (tx) => {
@@ -348,6 +433,12 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         const assignments = await tx.$queryRaw<Array<Assignment & { enrollmentId: string }>>`SELECT id,"enrollmentId",revision,"variantId","variantHash"
           FROM exam_variant."ExamPaperAssignment" WHERE "offeringId"=${offeringId} AND "courseSpecId"=${courseSpecId} AND "assessmentItemId"=${assessmentItemId}`;
         const results = await tx.assessmentResult.findMany({ where: { courseSpecId, assessmentItemId, enrollment: { offeringId } }, select: { enrollmentId: true } });
+        const gradeRows = await tx.$queryRaw<Array<{ enrollmentId: string; revision: number; complete: boolean }>>`
+          SELECT DISTINCT ON (a."enrollmentId") a."enrollmentId",g.revision,g.complete
+          FROM exam_variant."ExamPaperAssignment" a JOIN exam_variant."ExamGradeRevision" g ON g."assignmentId"=a.id
+          WHERE a."offeringId"=${offeringId} AND a."courseSpecId"=${courseSpecId} AND a."assessmentItemId"=${assessmentItemId}
+          ORDER BY a."enrollmentId",g.revision DESC`;
+        const grades = new Map(gradeRows.map(g=>[g.enrollmentId,{revision:g.revision,complete:g.complete}]));
         const instruments = ctx.teacher ? await tx.rubric.findMany({ where: { ownerId: ctx.user.id, status: "Active", instrumentKind: "marking_scheme" },
           orderBy: { name: "asc" }, take: 201, select: { id: true, name: true, criterionRows: { orderBy: [{order:"asc"},{id:"asc"}], select: { id: true, maxPoints: true } } } }) : [];
         if (rawPapers.length > 200 || rawSubmissions.length > 200 || roster.length > 500 || instruments.length > 200) conflict("Workspace exceeds pilot limits");
@@ -361,7 +452,7 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
           canAssign: ctx.teacher && ctx.offering.status === "Active", activeCloCodes: ctx.activeCloCodes, examMaximum: cfg?.examMaximum ?? null,
           instruments, papers, submissions, roster: roster.map((r) => ({ enrollmentId: r.id, name: r.student.name,
             studentId: r.student.studentId, eligible: r.student.status === "Active" && Boolean(r.student.studentId),
-            hasResult: withResult.has(r.id), assignment: byEnrollment.get(r.id) ?? null })) };
+            hasResult: withResult.has(r.id), grade: grades.get(r.id) ?? null, assignment: byEnrollment.get(r.id) ?? null })) };
       });
     },
     async history(actor: AuthUser, input: unknown) {
