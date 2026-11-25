@@ -131,8 +131,8 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       const afterReview = await service.workspace(reviewer, scope);
       expect(afterReview.submissions.find(s => s.id === returned.id)?.status).toBe("Returned");
       expect(afterReview.papers.find(p => p.variantId === "C")?.permitted).toBe(true);
-      await expect(db.$executeRaw`UPDATE exam_variant."ExamModerationSubmission" SET "decisionRef"='forged' WHERE id=${submitted.id}`).rejects.toThrow();
-      await expect(db.$executeRaw`DELETE FROM exam_variant."ExamModerationSubmission" WHERE id=${submitted.id}`).rejects.toThrow();
+      await expect((async () => await db.$executeRaw`UPDATE exam_variant."ExamModerationSubmission" SET "decisionRef"='forged' WHERE id=${submitted.id}`)()).rejects.toThrow("Moderation submission is immutable");
+      await expect((async () => await db.$executeRaw`DELETE FROM exam_variant."ExamModerationSubmission" WHERE id=${submitted.id}`)()).rejects.toThrow("Moderation history is immutable");
       const probeStudent = await db.student.create({ data: { name: "Synthetic batch probe", studentId: "BATCH-" + suffix } });
       const probe = await db.enrollment.create({ data: { offeringId: f.offering.id, studentId: probeStudent.id } });
       const entry = { enrollmentId: probe.id, variantId: "C", variantHash: submitted.snapshot.variantHash, expectedRevision: 0, reason: "Verified actual paper", evidenceRef: "synthetic-batch" };
