@@ -48,13 +48,13 @@ function EvidenceAssessmentPicker({ context, root, userId, initial }: { context:
     <h2 className="text-lg font-semibold">Assessment Evidence</h2>
     <p className="text-sm text-muted-foreground">Private marked work for AUN-QA. Suggested samples are relative ranks, not official achievement levels. Only published and finalized source marks are eligible. Shared group work and individual contributions are collected separately.</p>
     <label className="block text-sm font-medium">Assessment
-      <select className={selectStyle} value={selected} onChange={e => setSelected(e.target.value)}>
+      <select aria-label="Assessment" className={selectStyle} value={selected} onChange={e => setSelected(e.target.value)}>
         <option value="">Select assessment</option>
         {context.assessments.map(a => <option key={a.id} value={a.id}>{a.name}{a.mode === "GroupIndividual" ? " (group + individual)" : a.mode === "Group" ? " (group)" : ""}</option>)}
       </select>
     </label>
     {assessment?.mode === "GroupIndividual" && <label className="block text-sm font-medium">Evidence population
-      <select className={selectStyle} value={groupPopulation} onChange={e => setGroupPopulation(e.target.value as EvidencePopulation)}>
+      <select aria-label="Evidence population" className={selectStyle} value={groupPopulation} onChange={e => setGroupPopulation(e.target.value as EvidencePopulation)}>
         <option value="group">Shared group work</option><option value="component">Individual contribution / defence</option>
       </select></label>}
     {assessment ? <EvidenceRows key={assessment.id + ":" + population} base={root + "/specs/" + encodeURIComponent(context.courseSpecId) + "/assessments/" + encodeURIComponent(assessment.id) + "/populations/" + population} population={population} userId={userId} students={context.students} /> :
