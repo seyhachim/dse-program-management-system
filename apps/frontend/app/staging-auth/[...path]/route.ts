@@ -3,10 +3,10 @@ import type { NextRequest } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const STAGING_HOST = "dse-pms-git-feat-student-opportuniti-650954-seyhachims-projects.vercel.app";
+const STAGING_HOST = "dse-pms-git-uat-annual1299-seyhachims-projects.vercel.app";
 const STAGING_ORIGIN = "https://" + STAGING_HOST;
-const STAGING_API = "https://dse-pms-staging-isolated-free.onrender.com";
-const NEON_AUTH = "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth";
+const STAGING_API = "https://dse-pms-annual1299-uat.onrender.com";
+const NEON_AUTH = "https://ep-old-thunder-a1vt6lwv.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth";
 
 /**
  * Keep the hosted Neon Auth upstream's actual Host. An external Next.js rewrite

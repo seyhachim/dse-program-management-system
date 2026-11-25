@@ -23,11 +23,11 @@ export interface AuthConfig {
  */
 export function validateNeonStagingAuthEnvironment(env: AuthEnv): string {
   if (env.DSE_STAGING_ENVIRONMENT !== "true" ||
-      env.DSE_STAGING_DB_MARKER !== "DSE-PMS-STAGING:20261107-neon-verified-01" ||
+      env.DSE_STAGING_DB_MARKER !== "DSE-PMS-STAGING:20261125-annual-1299-uat" ||
       env.DSE_STAGING_DB_NAME !== "neondb") {
     throw new Error("Neon staging auth requires the approved isolated staging database");
   }
-  const host = "ep-purple-scene-a1py5uzt.ap-southeast-1.aws.neon.tech";
+  const host = "ep-old-thunder-a1vt6lwv.ap-southeast-1.aws.neon.tech";
   if (env.DSE_STAGING_DB_HOST !== host) {
     throw new Error("Neon staging auth requires the approved isolated database host");
   }
@@ -46,7 +46,7 @@ export function validateNeonStagingAuthEnvironment(env: AuthEnv): string {
     throw new Error("Neon staging auth requires an explicit CORS allowlist");
   }
   const base = requireHttpsUrl("NEON_AUTH_BASE_URL", env.NEON_AUTH_BASE_URL);
-  const expected = "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth";
+  const expected = "https://ep-old-thunder-a1vt6lwv.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth";
   if (base !== expected) {
     throw new Error("Neon staging auth requires the approved branch issuer");
   }
