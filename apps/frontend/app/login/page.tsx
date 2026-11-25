@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button, FormFieldLabel, Input } from "@dse-pms/ui";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
+import { API_URL } from "@/lib/api";
 import { getStagingAuth, notifyStagingAuthChange } from "@/lib/staging-auth";
 
 function safeReturnPath(value: string | null): string {
@@ -49,6 +50,7 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [telegramRegistrationUrl, setTelegramRegistrationUrl] = useState<string | null>(null);
   const canSubmit = email.trim().length > 0 && password.length > 0 && !submitting;
 
   useEffect(() => {
@@ -68,6 +70,23 @@ function LoginForm() {
         if (data.session) router.replace(returnPath);
       });
   }, [returnPath, router]);
+
+  useEffect(() => {
+    if (telegramLinking || AUTH_MODE === "dev") return;
+    const controller = new AbortController();
+    void fetch(`${API_URL}/api/telegram/registration/config`, {
+      cache: "no-store", signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) return;
+      const config = await response.json() as { enabled?: unknown; registrationUrl?: unknown };
+      if (!controller.signal.aborted && config.enabled === true
+          && typeof config.registrationUrl === "string"
+          && /^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}\?start=student_register$/.test(config.registrationUrl)) {
+        setTelegramRegistrationUrl(config.registrationUrl);
+      }
+    }).catch(() => { /* Email sign-in remains available if registration config is unavailable. */ });
+    return () => controller.abort();
+  }, [telegramLinking]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -262,6 +281,17 @@ function LoginForm() {
                 )}
               </Button>
             </form>
+
+            {!telegramLinking && telegramRegistrationUrl ? (
+              <div className="mt-5 space-y-2 border-t border-border pt-5">
+                <p className="text-sm text-muted-foreground">New DSE student?</p>
+                <a href={telegramRegistrationUrl} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <MessageCircle className="size-4" aria-hidden="true" />
+                  Register with Telegram
+                </a>
+                <p className="text-xs leading-5 text-muted-foreground">Opens the official DSE PMS bot. Your registration requires coordinator approval.</p>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
