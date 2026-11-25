@@ -103,8 +103,11 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       expect(events).toEqual([{ revision: 1, actorId: teacher.id, previousVariantId: null, variantId: "A" },
         { revision: 2, actorId: teacher.id, previousVariantId: "A", variantId: "B" }]);
       // Phase 2C: durable queue, one terminal decision, exact offering scope.
-      const submitted = await service.submit(teacher, { ...prepare, variantId: "C" });
-      await expect(service.submit(teacher, { ...prepare, variantId: "C" })).rejects.toBeInstanceOf(ExamVariantConflictError);
+      const previewC = await service.prepare(teacher, { ...prepare, variantId: "C" });
+      const requestC = { ...prepare, variantId: "C", expectedHash: previewC.snapshot.variantHash };
+      await expect(service.submit(teacher, { ...requestC, expectedHash: a.snapshot.variantHash })).rejects.toBeInstanceOf(ExamVariantConflictError);
+      const submitted = await service.submit(teacher, requestC);
+      await expect(service.submit(teacher, requestC)).rejects.toBeInstanceOf(ExamVariantConflictError);
       const decision = { ...scope, submissionId: submitted.id, expectedHash: submitted.snapshot.variantHash,
         decision: "Approved", decisionRef: "synthetic-moderation-C" };
       await expect(service.decide(teacher, decision)).rejects.toBeInstanceOf(ExamVariantAccessError);
@@ -118,10 +121,12 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       expect((await service.workspace(otherTeacher, { ...scope, offeringId: f.other.id })).submissions).toHaveLength(0);
       expect(await service.decide(reviewer, decision)).toEqual({ id: submitted.id, status: "Approved" });
       await expect(service.decide(reviewer, decision)).rejects.toBeInstanceOf(ExamVariantConflictError);
-      const returned = await service.submit(teacher, { ...prepare, variantId: "D" });
+      const previewD = await service.prepare(teacher, { ...prepare, variantId: "D" });
+      const requestD = { ...prepare, variantId: "D", expectedHash: previewD.snapshot.variantHash };
+      const returned = await service.submit(teacher, requestD);
       await service.decide(reviewer, { ...decision, submissionId: returned.id, expectedHash: returned.snapshot.variantHash,
         decision: "Returned", decisionRef: "Review CLO mapping" });
-      const resubmitted = await service.submit(teacher, { ...prepare, variantId: "D" });
+      const resubmitted = await service.submit(teacher, requestD);
       expect(resubmitted.id).not.toBe(returned.id);
       const afterReview = await service.workspace(reviewer, scope);
       expect(afterReview.submissions.find(s => s.id === returned.id)?.status).toBe("Returned");
