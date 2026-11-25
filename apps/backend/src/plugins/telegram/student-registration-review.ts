@@ -120,10 +120,11 @@ export async function reviewRegistration(user: AuthUser, requestId: string, inpu
       SET "status"=${status}, "approvedStudentId"=${approvedStudentId}, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${requestId} AND "programmeId"=${DEFAULT_PROGRAMME_ID}
     `;
+    const reviewId=randomUUID();
     await tx.$executeRaw`
-      INSERT INTO "telegram_security"."StudentRegistrationReview" ("id","requestId","actorId","decision","reason")
-      VALUES (${randomUUID()},${requestId},${user.id},${input.decision},${input.reason})
+      INSERT INTO "telegram_security"."StudentRegistrationReview" ("id","requestId","actorId","decision","reason","notificationState","notificationUpdatedAt")
+      VALUES (${reviewId},${requestId},${user.id},${input.decision},${input.reason},'PENDING',CURRENT_TIMESTAMP)
     `;
-    return { status };
+    return { status, reviewId };
   }, { isolationLevel: "Serializable" });
 }
