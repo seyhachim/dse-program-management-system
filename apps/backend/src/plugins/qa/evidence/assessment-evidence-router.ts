@@ -16,7 +16,8 @@ class EvidenceError extends Error {
 const ContextSchema = z.object({
   offeringId: z.string().uuid(),
   courseSpecId: z.string().uuid(),
-  assessmentItemId: z.string().uuid(),
+  // CourseSpec item IDs can be imported or legacy (e.g. seed-assessment-1).
+  assessmentItemId: z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/),
 });
 type Context = z.infer<typeof ContextSchema>;
 const ResultId = z.string().uuid();
