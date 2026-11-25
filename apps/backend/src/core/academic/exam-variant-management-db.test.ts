@@ -151,6 +151,11 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
         VALUES (${f.spec.id},${itemId},${f.offering.courseId},'dse',100,${f.reviewer.id})`;
       await expect((async () => await rawMark(db,"exam"))()).rejects.toThrow("variant-aware grading");
       await expect((async () => await rawMark(db,"exam",f.foreign.id))()).rejects.toThrow("variant-aware grading");
+      const { resultsLifecycleService } = await import("../../plugins/student-portal/results-lifecycle.ts");
+      await expect(resultsLifecycleService.saveDraft(f.teacher.id, false, { enrollmentId: f.enrolled.id, assessmentItemId: "exam", score: 80, maxScore: 100, feedback: "" })).rejects.toThrow("variant-aware grading");
+      await expect(resultsLifecycleService.saveCriterionScores(f.teacher.id, false, { enrollmentId: f.enrolled.id, assessmentItemId: "exam", scores: [] })).rejects.toThrow("variant-aware grading");
+      await expect(resultsLifecycleService.publishAssessment(f.teacher.id, false, scope)).rejects.toThrow("variant-aware grading");
+      await expect(resultsLifecycleService.finalizeAssessment(f.teacher.id, false, scope)).rejects.toThrow("variant-aware grading");
       // The original legacy workflow remains writable, publishable and finalizable.
       const mark = await db.assessmentResult.create({ data: { enrollmentId: f.enrolled.id, courseSpecId: f.spec.id, assessmentItemId: "legacy", score: 80, maxScore: 100 } });
       const edited = await db.assessmentResult.update({ where: { id: mark.id }, data: { score: 81 } });
