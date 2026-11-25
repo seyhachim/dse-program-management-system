@@ -78,7 +78,15 @@ export async function submitTelegramStudentRegistration(
         ${input.officialStudentId ?? null}, ${input.email ?? null},
         ${consent.phone}, ${consent.consentAt}
       )
-      ON CONFLICT ("telegramUserId") DO NOTHING
+      ON CONFLICT ("telegramUserId") DO UPDATE SET
+        "khmerFamilyName"=EXCLUDED."khmerFamilyName", "khmerGivenName"=EXCLUDED."khmerGivenName",
+        "latinFamilyName"=EXCLUDED."latinFamilyName", "latinGivenName"=EXCLUDED."latinGivenName",
+        "cohortId"=EXCLUDED."cohortId", "sectionId"=EXCLUDED."sectionId",
+        "officialStudentId"=EXCLUDED."officialStudentId", "email"=EXCLUDED."email",
+        "telegramPhone"=EXCLUDED."telegramPhone", "phoneConsentAt"=EXCLUDED."phoneConsentAt",
+        "status"='PENDING', "updatedAt"=CURRENT_TIMESTAMP
+      WHERE "StudentRegistrationRequest"."status"='NEEDS_CORRECTION'
+        AND "StudentRegistrationRequest"."programmeId"=EXCLUDED."programmeId"
       RETURNING "id"
     `;
     if (!inserted.length) throw new TelegramStudentRegistrationError("ALREADY_SUBMITTED");
@@ -96,6 +104,6 @@ export async function submitTelegramStudentRegistration(
       WHERE "telegramUserId" = ${verification.telegramUserId}
     `;
 
-    return { requestId, status: "PENDING" as const };
+    return { requestId: inserted[0]!.id, status: "PENDING" as const };
   });
 }
