@@ -29,6 +29,34 @@ type ApprovedSpecVersion = {
   version: string;
 };
 
+type CompetencyContext = {
+  context: {
+    state: "ready" | "missing" | "ambiguous";
+    message: string;
+    source: { frameworkName: string } | null;
+    expectations: Array<{ competencyId: string; code: string; name: string }>;
+  };
+};
+
+type DraftWeek = {
+  id: string;
+  week: number;
+  topic: string;
+  cloCodes: string[];
+  lloItems?: string[];
+  lessonLearningOutcomes?: Array<{ id: string; description: string }>;
+  activities?: string[];
+  studentLearningActivities?: Array<{ id: string; title: string }>;
+  lectureHours?: number | null;
+  tutorialHours?: number | null;
+  practiceHours?: number | null;
+  otherHours?: number | null;
+  selfStudyHours?: number | null;
+  teachingMethodIds?: string[];
+  assessmentMethodIds?: string[];
+  assessment?: string;
+};
+
 async function apiFor(tokenName: string): Promise<APIRequestContext> {
   const token = process.env[tokenName]?.trim();
   if (!token) throw new Error(`${tokenName} is required`);
@@ -49,13 +77,13 @@ async function expectOk(
 
 test("#1203 CourseSpec programme competency evidence link, clear, mobile, and historical smoke", async ({
   browser,
-}) => {
+}, testInfo) => {
   const adminApi = await apiFor("BROWSER_SMOKE_ADMIN_TOKEN");
 
   const coursesResponse = await adminApi.get("/api/courses");
   expect(coursesResponse.ok(), await coursesResponse.text()).toBeTruthy();
   const courses = (await coursesResponse.json()) as Course[];
-  const course = courses.find((item) => item.code === "CS101") ?? courses[0];
+  const course = courses.find((item) => item.code === "CS101");
   if (!course) throw new Error("Seeded browser-smoke course is missing");
 
   const approvedSpecsResponse = await adminApi.get(
@@ -74,108 +102,133 @@ test("#1203 CourseSpec programme competency evidence link, clear, mobile, and hi
     );
   }
 
-  const createCurriculum = await adminApi.post(
-    "/api/programme/curricula/programmes/dse",
-    {
-      data: {
-        code: `BROWSER-CS-COMP-${Date.now()}`,
-        name: "Browser CourseSpec Competency Curriculum",
-        cohortLabel: "Browser CourseSpec Competency Cohort",
-        intakeYear: 2026,
-        academicYear: "2026",
-        effectiveFrom: "2026-09-01",
-      },
-    },
-  );
-  expect(
-    createCurriculum.ok(),
-    await createCurriculum.text(),
-  ).toBeTruthy();
-  const curriculum = (await createCurriculum.json()) as CurriculumRead;
-
-  const addCourse = await adminApi.post(
-    `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/courses`,
-    {
-      data: {
-        courseId: course.id,
-        yearLevel: 1,
-        semester: "First",
-        sortOrder: 0,
-      },
-    },
-  );
-  expect(addCourse.ok(), await addCourse.text()).toBeTruthy();
-
-  const frameworkResponse = await adminApi.post(
-    "/api/programme/competency-frameworks/programmes/dse",
-    {
-      data: {
-        code: `browser-course-spec-${Date.now()}`,
-        name: "Browser CourseSpec Competencies",
-        changeNote: "#1203 Playwright smoke",
-      },
-    },
-  );
-  expect(
-    frameworkResponse.ok(),
-    await frameworkResponse.text(),
-  ).toBeTruthy();
-  const framework = (await frameworkResponse.json()) as Framework;
-  const competency = framework.competencies[0];
-  if (!competency) throw new Error("Framework snapshot has no competencies");
-
-  const bindFramework = await adminApi.put(
-    `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/competency-framework`,
-    { data: { frameworkVersionId: framework.frameworkVersionId } },
-  );
-  expect(
-    bindFramework.ok(),
-    await bindFramework.text(),
-  ).toBeTruthy();
-
-  const mapResponse = await adminApi.get(
-    `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/competency-map`,
-  );
-  expect(mapResponse.ok(), await mapResponse.text()).toBeTruthy();
-  const competencyMap = (await mapResponse.json()) as CompetencyMap;
-  const placement = competencyMap.courses.find(
-    (item) => item.courseId === course.id,
-  );
-  if (!placement) throw new Error("Curriculum course placement is missing");
-
-  const saveProgrammeMapping = await adminApi.put(
-    `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/competency-map/courses/${placement.placementId}/competencies/${competency.id}`,
-    {
-      data: {
-        teachLevel: "Basic",
-        useLevel: "Intermediate",
-        assessLevel: "Advanced",
-        note: "#1203 browser smoke expectation",
-      },
-    },
-  );
-  expect(
-    saveProgrammeMapping.ok(),
-    await saveProgrammeMapping.text(),
-  ).toBeTruthy();
-
-  const bindCourseSpec = await adminApi.put(
-    `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/courses/${placement.placementId}/course-spec-version`,
-    { data: { courseSpecVersionId: sourceSpec.id } },
-  );
-  expect(bindCourseSpec.ok(), await bindCourseSpec.text()).toBeTruthy();
-
-  for (const [action, comment] of [
-    ["submit", "Browser CourseSpec competency review"],
-    ["approve", "Browser CourseSpec competency approval"],
-    ["activate", "Browser CourseSpec competency activation"],
-  ] as const) {
-    const response = await adminApi.post(
-      `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/workflow/${action}`,
-      { data: { comment } },
-    );
-    await expectOk(response);
+  // Playwright retries share the same disposable database. Reuse this
+  // smoke's already activated curriculum rather than creating a second
+  // authoritative placement for CS101, which would make the context ambiguous.
+  const evidenceUrl = `/api/courses/${course.id}/spec/competency-evidence`;
+  let competency: Framework["competencies"][number] | undefined;
+  if (testInfo.retry > 0) {
+    const existingResponse = await adminApi.get(evidenceUrl);
+    await expectOk(existingResponse);
+    const existing = (await existingResponse.json()) as CompetencyContext;
+    if (existing.context.state === "ambiguous") {
+      throw new Error(existing.context.message);
+    }
+    if (existing.context.state === "ready" &&
+        existing.context.source?.frameworkName === "Browser CourseSpec Competencies") {
+      const prior = existing.context.expectations[0];
+      if (!prior) throw new Error("Previously activated smoke mapping is missing");
+      competency = { id: prior.competencyId, code: prior.code, name: prior.name };
+    }
   }
+
+  if (!competency) {
+    const createCurriculum = await adminApi.post(
+      "/api/programme/curricula/programmes/dse",
+      {
+        data: {
+          code: `BROWSER-CS-COMP-${Date.now()}`,
+          name: "Browser CourseSpec Competency Curriculum",
+          cohortLabel: "Browser CourseSpec Competency Cohort",
+          intakeYear: 2026,
+          academicYear: "2026",
+          effectiveFrom: "2026-09-01",
+        },
+      },
+    );
+    expect(
+      createCurriculum.ok(),
+      await createCurriculum.text(),
+    ).toBeTruthy();
+    const curriculum = (await createCurriculum.json()) as CurriculumRead;
+
+    const addCourse = await adminApi.post(
+      `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/courses`,
+      {
+        data: {
+          courseId: course.id,
+          yearLevel: 1,
+          semester: "First",
+          sortOrder: 0,
+        },
+      },
+    );
+    expect(addCourse.ok(), await addCourse.text()).toBeTruthy();
+
+    const frameworkResponse = await adminApi.post(
+      "/api/programme/competency-frameworks/programmes/dse",
+      {
+        data: {
+          code: `browser-course-spec-${Date.now()}`,
+          name: "Browser CourseSpec Competencies",
+          changeNote: "#1203 Playwright smoke",
+        },
+      },
+    );
+    expect(
+      frameworkResponse.ok(),
+      await frameworkResponse.text(),
+    ).toBeTruthy();
+    const framework = (await frameworkResponse.json()) as Framework;
+    competency = framework.competencies[0];
+    if (!competency) throw new Error("Framework snapshot has no competencies");
+
+    const bindFramework = await adminApi.put(
+      `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/competency-framework`,
+      { data: { frameworkVersionId: framework.frameworkVersionId } },
+    );
+    expect(
+      bindFramework.ok(),
+      await bindFramework.text(),
+    ).toBeTruthy();
+
+    const mapResponse = await adminApi.get(
+      `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/competency-map`,
+    );
+    expect(mapResponse.ok(), await mapResponse.text()).toBeTruthy();
+    const competencyMap = (await mapResponse.json()) as CompetencyMap;
+    const placement = competencyMap.courses.find(
+      (item) => item.courseId === course.id,
+    );
+    if (!placement) throw new Error("Curriculum course placement is missing");
+
+    const saveProgrammeMapping = await adminApi.put(
+      `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/competency-map/courses/${placement.placementId}/competencies/${competency.id}`,
+      {
+        data: {
+          teachLevel: "Basic",
+          useLevel: "Intermediate",
+          assessLevel: "Advanced",
+          note: "#1203 browser smoke expectation",
+        },
+      },
+    );
+    expect(
+      saveProgrammeMapping.ok(),
+      await saveProgrammeMapping.text(),
+    ).toBeTruthy();
+
+    const bindCourseSpec = await adminApi.put(
+      `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/courses/${placement.placementId}/course-spec-version`,
+      { data: { courseSpecVersionId: sourceSpec.id } },
+    );
+    expect(bindCourseSpec.ok(), await bindCourseSpec.text()).toBeTruthy();
+
+    for (const [action, comment] of [
+      ["submit", "Browser CourseSpec competency review"],
+      ["approve", "Browser CourseSpec competency approval"],
+      ["activate", "Browser CourseSpec competency activation"],
+    ] as const) {
+      const response = await adminApi.post(
+        `/api/programme/curricula/versions/${curriculum.selectedVersion.id}/workflow/${action}`,
+        { data: { comment } },
+      );
+      await expectOk(response);
+    }
+
+  }
+
+  if (!competency) throw new Error("Smoke competency is missing");
 
   const createRevision = await adminApi.post(
     `/api/courses/${course.id}/spec/revisions`,
@@ -209,10 +262,9 @@ test("#1203 CourseSpec programme competency evidence link, clear, mobile, and hi
     expect(revisionBody).toContain("open academic revision");
   }
 
-  // The seeded approved spec intentionally leaves two authoring-readiness
-  // details unfinished. Complete those details on the isolated Draft revision
-  // through the normal CourseSpec APIs so the smoke can exercise the real
-  // submit/approve lock transition rather than mutating workflow state directly.
+  // The seeded approved specification is a minimal historical fixture.
+  // Complete actual authoring sources on the editable isolated revision via
+  // normal APIs, not by forcing flags or rewriting the approved snapshot.
   const methodsResponse = await adminApi.get("/api/methods");
   expect(methodsResponse.ok(), await methodsResponse.text()).toBeTruthy();
   const methods = (await methodsResponse.json()) as {
@@ -231,6 +283,7 @@ test("#1203 CourseSpec programme competency evidence link, clear, mobile, and hi
   const draftSpec = (await draftSpecResponse.json()) as {
     data: {
       courseInfo?: { prerequisites?: string; description?: string };
+      slt?: { weeks?: DraftWeek[] };
       clos?: {
         items?: Array<{
           id: string;
@@ -279,6 +332,62 @@ test("#1203 CourseSpec programme competency evidence link, clear, mobile, and hi
     },
   );
   expect(saveClos.ok(), await saveClos.text()).toBeTruthy();
+
+  // The stricter canonical submission guard now evaluates the persisted
+  // Teaching & Learning profile and the real weekly rows, not saved flags.
+  const saveTeachingLearning = await adminApi.put(
+    `/api/teaching-learning/${course.id}`,
+    {
+      data: {
+        philosophyTags: ["Student-centred"],
+        philosophyStatement: "Students practise and explain programming through guided lab exercises.",
+        teachingMethodIds: [teachingMethod.id],
+        activeLearningStrategyIds: ["data-investigation"],
+        independentLearningTypes: [],
+        resourceTypes: [],
+        technologyTypes: [],
+      },
+    },
+  );
+  await expectOk(saveTeachingLearning);
+
+  const weeks = draftSpec.data.slt?.weeks ?? [];
+  if (weeks.length === 0) throw new Error("Draft CourseSpec has no weekly plan");
+  const saveWeeks = await adminApi.put(
+    `/api/courses/${course.id}/spec/slt`,
+    {
+      data: {
+        weeks: weeks.map((week) => {
+          // Keep legacy examination rows unchanged; this fixture's
+          // instructional programming week needs real teaching evidence.
+          if (/^(?:mid[- ]?term|final)\s+(?:exam|quiz|assessment)$/i.test(week.topic.trim())) return week;
+          return {
+            ...week,
+            lectureHours: week.lectureHours || 2,
+            practiceHours: week.practiceHours || 2,
+            selfStudyHours: week.selfStudyHours || 2,
+            teachingMethodIds: week.teachingMethodIds?.length ? week.teachingMethodIds : [teachingMethod.id],
+            assessment: week.assessment || "Formative programming exercise",
+          };
+        }),
+      },
+    },
+  );
+  await expectOk(saveWeeks);
+
+  // A failed first attempt may have restored its CLO links before submit.
+  // Reset only this smoke's mapping on the editable draft through its API.
+  // Never clear the historical approved version or a different competency.
+  const currentEvidence = await adminApi.get(evidenceUrl);
+  await expectOk(currentEvidence);
+  const currentContext = (await currentEvidence.json()) as CompetencyContext;
+  expect(currentContext.context.state, currentContext.context.message).toBe("ready");
+  expect(currentContext.context.expectations.some(item => item.competencyId === competency.id)).toBe(true);
+  const resetEvidence = await adminApi.put(
+    `${evidenceUrl}/${competency.id}`,
+    { data: { cloIds: [] } },
+  );
+  await expectOk(resetEvidence);
 
   const writer = await newRoleContext(browser, "admin");
   const page = await writer.newPage();
