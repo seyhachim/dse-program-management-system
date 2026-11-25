@@ -50,6 +50,7 @@ type ArtifactCourseRow = {
   placementId: string | null;
   courseId: string | null;
   courseCodeSnapshot: string;
+  catalogueCode: string | null;
   courseTitleSnapshot: string;
   yearLevel: number;
   semester: "First" | "Second";
@@ -279,6 +280,25 @@ function appendDeclaredTotalWarnings(
   }
 }
 
+// Decisions remain keyed by unique official code for backward compatibility.
+function catalogueCodeFor(course: CurriculumImportCourse): string {
+  return course.catalogueCode ?? course.code;
+}
+
+function hasExplicitAlias(course: CurriculumImportCourse): boolean {
+  return catalogueCodeFor(course) !== course.code;
+}
+
+function hasDifferentTitleMatch(
+  course: CurriculumImportCourse,
+  candidates: ReadonlyArray<{ code: string; title: string }>,
+): boolean {
+  return candidates.some((candidate) =>
+    candidate.code !== catalogueCodeFor(course) &&
+    normalizeTitle(candidate.title) === normalizeTitle(course.title)
+  );
+}
+
 function decisionsByCode(decisions: CurriculumImportDecision[]) {
   return new Map(decisions.map((decision) => [decision.courseCode, decision]));
 }
@@ -349,21 +369,38 @@ async function buildPreview(
     }
   }
 
-  const codes = [...distinctByCode.keys()];
+  const codes = [...distinctByCode.values()].map(catalogueCodeFor);
+  const titles = [...distinctByCode.values()].map((course) => normalizeTitle(course.title));
   const existing = await prisma.course.findMany({
-    where: { programmeId: target.programmeId, code: { in: codes } },
+    where: {
+      programmeId: target.programmeId,
+      OR: [{ code: { in: codes } }, { title: { in: titles } }],
+    },
     select: { id: true, code: true, title: true, courseType: true, credits: true },
   });
   const byCode = new Map(existing.map((course) => [course.code, course]));
 
   const courses = data.courses.map((course) => {
-    const current = byCode.get(course.code) ?? null;
+    const current = byCode.get(catalogueCodeFor(course)) ?? null;
     const decision = decisionMap.get(course.code) ?? null;
     let matchStatus: "matched" | "conflict" | "missing" | "blocked" = "matched";
     let requiredDecision: "create-course" | "keep-existing-course" | null = null;
     let message = "Exact canonical course match";
 
-    if (!current) {
+    if (!current && hasExplicitAlias(course)) {
+      matchStatus = "blocked";
+      message = `Explicit catalogue code ${catalogueCodeFor(course)} must identify an existing Course in this programme`;
+      blockers.push(`${course.code}: ${message}`);
+    } else if ((!current || normalizeTitle(current.title) !== normalizeTitle(course.title)) &&
+      hasDifferentTitleMatch(course, existing)) {
+      matchStatus = "blocked";
+      message = "A different canonical Course matches the source title; supply its explicit catalogueCode";
+      blockers.push(`${course.code}: ${message}`);
+    } else if (current && hasExplicitAlias(course) && normalizeTitle(current.title) !== normalizeTitle(course.title)) {
+      matchStatus = "blocked";
+      message = "Explicit catalogue identity has a conflicting title; correct the catalogueCode or source";
+      blockers.push(`${course.code}: ${message}`);
+    } else if (!current) {
       matchStatus = "missing";
       const createType = typedCreateCourseType(course, decision);
       if (course.courseType && decision?.action === "create-course" && decision.courseType !== course.courseType) {
@@ -504,14 +541,16 @@ async function artifactRows(versionId: string) {
       ORDER BY "sortOrder", "code"
     `,
     prisma.$queryRaw<ArtifactCourseRow[]>`
-      SELECT "id", "curriculumVersionId", "scopeCode", "placementId", "courseId",
-             "courseCodeSnapshot", "courseTitleSnapshot", "yearLevel", "semester"::text AS semester,
-             "sortOrder", "weeklyHoursTotal", "weeklyLectureHours", "weeklyLabHours",
-             "weeklyFieldVisitHours", "creditsTotal", "creditLecture", "creditLab",
-             "creditFieldVisit", "lecturerText"
-      FROM curriculum_artifact."CourseSnapshot"
-      WHERE "curriculumVersionId" = ${versionId}
-      ORDER BY "yearLevel", "semester", "scopeCode", "sortOrder", "courseCodeSnapshot"
+      SELECT snapshot."id", snapshot."curriculumVersionId", snapshot."scopeCode", snapshot."placementId", snapshot."courseId",
+             snapshot."courseCodeSnapshot", catalogue."code" AS "catalogueCode",
+             snapshot."courseTitleSnapshot", snapshot."yearLevel", snapshot."semester"::text AS semester,
+             snapshot."sortOrder", snapshot."weeklyHoursTotal", snapshot."weeklyLectureHours", snapshot."weeklyLabHours",
+             snapshot."weeklyFieldVisitHours", snapshot."creditsTotal", snapshot."creditLecture", snapshot."creditLab",
+             snapshot."creditFieldVisit", snapshot."lecturerText"
+      FROM curriculum_artifact."CourseSnapshot" snapshot
+      LEFT JOIN public."Course" catalogue ON catalogue."id" = snapshot."courseId"
+      WHERE snapshot."curriculumVersionId" = ${versionId}
+      ORDER BY snapshot."yearLevel", snapshot."semester", snapshot."scopeCode", snapshot."sortOrder", snapshot."courseCodeSnapshot"
     `,
     prisma.$queryRaw<ImportSourceRow[]>`
       SELECT "fileName", "sha256", "formatVersion", "importedAt", "importedById", "decisions", "warnings"
@@ -542,9 +581,13 @@ async function resolveCanonicalCourses(
 ): Promise<Map<string, CanonicalCourseResolution>> {
   const sourceByCode = new Map<string, CurriculumImportCourse>();
   for (const course of courses) if (!sourceByCode.has(course.code)) sourceByCode.set(course.code, course);
-  const codes = [...sourceByCode.keys()];
+  const codes = [...sourceByCode.values()].map(catalogueCodeFor);
+  const titles = [...sourceByCode.values()].map((course) => normalizeTitle(course.title));
   const current = await tx.course.findMany({
-    where: { programmeId, code: { in: codes } },
+    where: {
+      programmeId,
+      OR: [{ code: { in: codes } }, { title: { in: titles } }],
+    },
     select: { id: true, code: true, title: true, courseType: true },
   });
   const currentByCode = new Map(current.map((course) => [course.code, course]));
@@ -552,8 +595,14 @@ async function resolveCanonicalCourses(
   const resolved = new Map<string, CanonicalCourseResolution>();
 
   for (const [code, source] of sourceByCode) {
-    const existing = currentByCode.get(code);
+    const existing = currentByCode.get(catalogueCodeFor(source));
     const decision = decisionMap.get(code);
+    if (
+      ((!existing || normalizeTitle(existing.title) !== normalizeTitle(source.title)) && hasDifferentTitleMatch(source, current)) ||
+      (hasExplicitAlias(source) && (!existing || normalizeTitle(existing.title) !== normalizeTitle(source.title)))
+    ) {
+      throw new CurriculumImportConflictError(`${code}: explicit catalogue identity is missing, ambiguous or conflicts with the source title; re-preview`);
+    }
     if (!existing) {
       const createType = typedCreateCourseType(source, decision ?? null);
       if (!createType) {
@@ -625,6 +674,9 @@ export const curriculumImportService = {
     await prisma.$transaction(
       async (tx) => {
         await assertTransactionDraft(tx, versionId);
+        // Placement INSERT triggers may initially copy predecessor/catalogue codes.
+        // Validate uniqueness of final official snapshots at transaction commit.
+        await tx.$executeRaw`SET CONSTRAINTS curriculum_artifact."CourseSnapshot_version_official_code_key" DEFERRED`;
         const resolvedCourses = await resolveCanonicalCourses(
           tx,
           target.programmeId,
@@ -742,6 +794,13 @@ export const curriculumImportService = {
               sourceFileName: upload.fileName,
               sourceSha256: sha256,
               courseRows: data.courses.length,
+              officialCodeMappings: data.courses
+                .filter(hasExplicitAlias)
+                .map((course) => ({
+                  officialCode: course.code,
+                  catalogueCode: catalogueCodeFor(course),
+                  courseId: resolvedCourses.get(course.code)?.courseId ?? null,
+                })),
               pathways: data.pathways.map((pathway) => ({
                 code: pathway.code,
                 name: pathway.name,
@@ -777,6 +836,9 @@ export const curriculumImportService = {
     const defaultPathway = pathways.find((pathway) => pathway.isDefault) ?? null;
     const courses = rows.courses.map((course) => ({
       code: course.courseCodeSnapshot,
+      ...(course.catalogueCode && course.catalogueCode !== course.courseCodeSnapshot
+        ? { catalogueCode: course.catalogueCode }
+        : {}),
       title: course.courseTitleSnapshot,
       yearLevel: course.yearLevel,
       semester: course.semester,

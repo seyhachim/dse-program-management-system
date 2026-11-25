@@ -348,7 +348,7 @@ export function CurriculumImportExportPanel() {
                   <table className="w-full text-left text-xs">
                     <thead className="sticky top-0 bg-muted">
                       <tr>
-                        <th className="px-3 py-2">Code</th>
+                        <th className="px-3 py-2">Official code / catalogue</th>
                         <th className="px-3 py-2">Course</th>
                         <th className="px-3 py-2">Pathway</th>
                         <th className="px-3 py-2">Match</th>
@@ -360,7 +360,12 @@ export function CurriculumImportExportPanel() {
                         const decision = decisions[course.code];
                         return (
                           <tr key={`${course.pathwayCode ?? "common"}:${course.code}`} className="border-t border-border align-top">
-                            <td className="px-3 py-2 font-mono">{course.code}</td>
+                            <td className="px-3 py-2 font-mono">
+                              <div>{course.code}</div>
+                              {course.catalogueCode && course.catalogueCode !== course.code && (
+                                <div className="mt-1 text-[11px] text-muted-foreground">Catalogue: {course.catalogueCode}</div>
+                              )}
+                            </td>
                             <td className="px-3 py-2">
                               <div>{course.title}</div>
                               <div className="mt-1 text-[11px] text-muted-foreground">{course.message}</div>

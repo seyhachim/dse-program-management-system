@@ -272,26 +272,33 @@ describeDb("curriculum JSON import and artifact persistence", () => {
         academicYear: "2026",
       },
     });
-    const placement = await prisma.programmeCurriculumCourse.create({
-      data: {
-        curriculumVersionId: g6.id,
-        courseId: g6Course.id,
-        yearLevel: 1,
-        semester: "First",
-        creditsSnapshot: 3,
-        courseTypeSnapshot: CourseType.Core,
-      },
+    await prisma.programmeCurriculumVersion.update({
+      where: { id: f.version.id },
+      data: { status: "Approved", approvedAt: new Date() },
     });
+    const json = JSON.parse(upload.jsonText);
+    json.curriculum.version = "3.0";
+    json.courses[0].title = g6Course.title;
+    const ambiguousUpload = { ...upload, jsonText: JSON.stringify(json) };
+    const ambiguous = await curriculumImportService.preview(g6.id, ambiguousUpload);
+    expect(ambiguous.canApply).toBe(false);
+    expect(ambiguous.courses[0]?.matchStatus).toBe("blocked");
+    await expect(curriculumImportService.apply(g6.id, f.user.id, {
+      ...ambiguousUpload,
+      decisions: [{ courseCode: f.common.code, action: "keep-existing-course" }],
+    })).rejects.toThrow("blocking issues");
 
-    // Synthetic draft fixture only: the next slice will expose a validated importer.
-    const updated = await prisma.$executeRaw`
-      UPDATE curriculum_artifact."CourseSnapshot"
-      SET "courseCodeSnapshot" = ${f.common.code}
-      WHERE "placementId" = ${placement.id}
-        AND "curriculumVersionId" = ${g6.id}
-        AND "courseId" = ${g6Course.id}
-    `;
-    expect(updated).toBe(1);
+    json.courses[0].catalogueCode = g6Course.code;
+    const scopedUpload = { ...upload, jsonText: JSON.stringify(json) };
+    const preview = await curriculumImportService.preview(g6.id, scopedUpload);
+    expect(preview.canApply).toBe(true);
+    expect(preview.courses[0]?.existingCourseId).toBe(g6Course.id);
+    const applied = await curriculumImportService.apply(g6.id, f.user.id, applyInput(scopedUpload));
+    const placement = await prisma.programmeCurriculumCourse.findFirstOrThrow({
+      where: { curriculumVersionId: g6.id, courseId: g6Course.id },
+    });
+    expect(applied.courses.find((course) => course.placementId === placement.id)?.catalogueCode).toBe(g6Course.code);
+    expect(applied.curriculum.status).toBe("Draft");
 
     const readOld = await curriculumService.getById(f.curriculum.id, f.version.id);
     const readNew = await curriculumService.getById(f.curriculum.id, g6.id);
@@ -310,6 +317,19 @@ describeDb("curriculum JSON import and artifact persistence", () => {
     expect(canonical.code).toBe(g6Course.code);
     const artifact = await curriculumImportService.artifact(g6.id);
     expect(artifact.courses.find((course) => course.placementId === placement.id)?.code).toBe(f.common.code);
+    expect(artifact.courses.find((course) => course.placementId === placement.id)?.catalogueCode).toBe(g6Course.code);
+    expect((await curriculumImportService.artifactForExport(f.version.id)).curriculum.status).toBe("Approved");
+    await expect(curriculumImportService.apply(f.version.id, f.user.id, applyInput(scopedUpload))).rejects.toThrow("blocking issues");
+
+    // Direct database writes cannot create a duplicate official code even across pathways.
+    await expect(prisma.$executeRaw`
+      UPDATE curriculum_artifact."CourseSnapshot"
+      SET "courseCodeSnapshot" = ${f.common.code}
+      WHERE "curriculumVersionId" = ${g6.id}
+        AND "courseId" = ${f.research.id}
+    `).rejects.toThrow();
+    const after = await curriculumImportService.artifact(g6.id);
+    expect(after.courses.find((course) => course.courseId === f.research.id)?.code).toBe(f.research.code);
   });
 
   test("title conflicts require an explicit keep-existing decision", async () => {
