@@ -16,10 +16,12 @@ const prepareSchema = scopeSchema.extend({
   mappings: z.array(z.object({ questionId: id, cloCode: id, evidence: z.enum(["direct", "supporting"]) }).strict()).min(1).max(1000),
 });
 const approvalSchema = z.object({ token: z.string().min(1).max(500000), moderationRef: ref, expectedHash: hash }).strict();
-const assignSchema = versionSchema.extend({
+const assignmentEntrySchema = z.object({
+  variantId: id, variantHash: hash,
   enrollmentId: id, expectedRevision: z.number().int().min(0).max(2147483646),
   reason: z.string().trim().min(5).max(500), evidenceRef: ref,
-});
+}).strict();
+const assignSchema = scopeSchema.merge(assignmentEntrySchema);
 const resolveSchema = scopeSchema.extend({ enrollmentId: id });
 const proposalSchema = z.object({
   purpose: z.literal("exam-variant-proposal-v1"), offeringId: id,
@@ -192,10 +194,7 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
       throw error;
     }
   }
-  return {
-    async prepare(actor: AuthUser, input: unknown) {
-      const request = prepareSchema.parse(input);
-      return transact(async (tx) => {
+  async function prepareSnapshot(tx: Tx, actor: AuthUser, request: z.infer<typeof prepareSchema>) {
         const ctx = await context(tx, actor.id, request, "teacher");
         writable(ctx);
         const row = await scheme(tx, request.instrumentId, true);
@@ -212,16 +211,10 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         const snapshot = createExamVariantSnapshot({ ...ctx.scope, variantId: request.variantId, revision: request.revision,
           instrumentId: row.id, instrumentHash: rubricContentHash(row), examMaximum: request.examMaximum, questions });
         validateQuestions(ctx, row, snapshot);
-        const expiresAt = Date.now() + 30 * 60 * 1000;
-        return { snapshot, expiresAt, token: sign({ purpose: "exam-variant-proposal-v1",
-          offeringId: ctx.offering.id, preparerId: ctx.user.id, expiresAt, snapshot }) };
-      });
-    },
-    async approve(actor: AuthUser, input: unknown) {
-      const request = approvalSchema.parse(input);
-      const proposal = open(request.token);
-      if (proposal.snapshot.variantHash !== request.expectedHash) conflict("Reviewed paper hash mismatch");
-      return transact(async (tx) => {
+
+        return { ctx, snapshot };
+  }
+  async function approveSnapshot(tx: Tx, actor: AuthUser, proposal: { offeringId: string; preparerId: string; snapshot: Snapshot }, moderationRef: string) {
         const ctx = await context(tx, actor.id, { offeringId: proposal.offeringId, assessmentItemId: proposal.snapshot.assessmentItemId }, "reviewer");
         writable(ctx);
         if (ctx.user.id === proposal.preparerId) deny();
@@ -243,24 +236,11 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         await tx.$executeRaw`INSERT INTO exam_variant."ExamPaperVersion"
           ("courseSpecId","assessmentItemId","variantId",revision,"variantHash","instrumentId","instrumentHash",questions,"preparedById","approvedById","moderationRef")
           VALUES (${courseSpecId},${assessmentItemId},${s.variantId},${s.revision},${s.variantHash},${s.instrumentId},${s.instrumentHash},
-            ${JSON.stringify(s.questions)}::jsonb,${teacher.user.id},${ctx.user.id},${request.moderationRef})`;
+            ${JSON.stringify(s.questions)}::jsonb,${teacher.user.id},${ctx.user.id},${moderationRef})`;
         await permit(tx, ctx, s);
         return s;
-      });
-    },
-    async permitOffering(actor: AuthUser, input: unknown) {
-      const request = versionSchema.parse(input);
-      return transact(async (tx) => {
-        const ctx = await context(tx, actor.id, request, "reviewer");
-        writable(ctx);
-        const snapshot = await paper(tx, ctx, request, true);
-        await permit(tx, ctx, snapshot);
-        return snapshot;
-      });
-    },
-    async assign(actor: AuthUser, input: unknown) {
-      const request = assignSchema.parse(input);
-      return transact(async (tx) => {
+  }
+  async function assignOne(tx: Tx, actor: AuthUser, request: z.infer<typeof assignSchema>) {
         const ctx = await context(tx, actor.id, request, "teacher");
         if (ctx.offering.status !== "Active") conflict("Active offering required");
         await enrollment(tx, ctx, request.enrollmentId, true);
@@ -283,6 +263,152 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
           (id,"enrollmentId","offeringId","courseSpecId","assessmentItemId","variantId","variantHash","actorId",reason,"evidenceRef")
           VALUES (${assignmentId},${request.enrollmentId},${ctx.offering.id},${courseSpecId},${assessmentItemId},${snapshot.variantId},${snapshot.variantHash},${ctx.user.id},${request.reason},${request.evidenceRef})`;
         return { id: assignmentId, revision: 1, variantId: snapshot.variantId, variantHash: snapshot.variantHash };
+  }
+  return {
+    async submit(actor: AuthUser, input: unknown) {
+      const request = prepareSchema.extend({ expectedHash: hash }).parse(input);
+      return transact(async (tx) => {
+        const { ctx, snapshot } = await prepareSnapshot(tx, actor, request);
+        if (request.expectedHash !== snapshot.variantHash) conflict("Preview changed; verify again before submission");
+        const { courseSpecId, assessmentItemId, programmeId } = ctx.scope;
+        const latest = await tx.$queryRaw<Array<{ revision: number }>>`SELECT revision FROM exam_variant."ExamPaperVersion"
+          WHERE "courseSpecId"=${courseSpecId} AND "assessmentItemId"=${assessmentItemId} AND "variantId"=${snapshot.variantId} ORDER BY revision DESC LIMIT 1`;
+        if (snapshot.revision !== (latest[0]?.revision ?? 0) + 1) conflict("Stale paper revision");
+        const pending = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM exam_variant."ExamModerationSubmission"
+          WHERE "courseSpecId"=${courseSpecId} AND "assessmentItemId"=${assessmentItemId} AND "variantId"=${snapshot.variantId}
+          AND revision=${snapshot.revision} AND status='Pending'`;
+        if (pending.length) conflict("Paper revision already pending moderation");
+        const submissionId = randomUUID();
+        await tx.$executeRaw`INSERT INTO exam_variant."ExamModerationSubmission"
+          (id,"offeringId","courseId","programmeId","courseSpecId","assessmentItemId","variantId",revision,"variantHash","instrumentId",snapshot,"submittedById")
+          VALUES (${submissionId},${ctx.offering.id},${ctx.offering.courseId},${programmeId},${courseSpecId},${assessmentItemId},${snapshot.variantId},
+          ${snapshot.revision},${snapshot.variantHash},${snapshot.instrumentId},${JSON.stringify(snapshot)}::jsonb,${ctx.user.id})`;
+        return { id: submissionId, snapshot };
+      });
+    },
+    async decide(actor: AuthUser, input: unknown) {
+      const request = scopeSchema.extend({ submissionId: id, expectedHash: hash, decision: z.enum(["Approved","Returned"]),
+        decisionRef: z.string().trim().min(1).max(500) }).parse(input);
+      if (request.decision === "Approved" && !ref.safeParse(request.decisionRef).success) conflict("Opaque moderation reference required");
+      return transact(async (tx) => {
+        const ctx = await context(tx, actor.id, request, "reviewer");
+        writable(ctx);
+        const { courseSpecId, assessmentItemId, programmeId } = ctx.scope;
+        const rows = await tx.$queryRaw<Array<{ id: string; submittedById: string; status: string; variantHash: string; snapshot: unknown }>>`
+          SELECT id,"submittedById",status,"variantHash",snapshot FROM exam_variant."ExamModerationSubmission"
+          WHERE id=${request.submissionId} AND "offeringId"=${ctx.offering.id} AND "courseSpecId"=${courseSpecId}
+          AND "assessmentItemId"=${assessmentItemId} AND "programmeId"=${programmeId} FOR UPDATE`;
+        const row = rows[0];
+        if (!row || row.submittedById === ctx.user.id) deny();
+        if (row.status !== "Pending" || row.variantHash !== request.expectedHash) conflict("Stale moderation decision");
+        const snapshot = verifyExamVariantSnapshot(row.snapshot);
+        if (snapshot.variantHash !== row.variantHash || snapshot.courseSpecId !== courseSpecId ||
+          snapshot.assessmentItemId !== assessmentItemId || snapshot.programmeId !== programmeId) conflict("Moderation snapshot scope mismatch");
+        if (request.decision === "Approved") await approveSnapshot(tx, actor,
+          { offeringId: ctx.offering.id, preparerId: row.submittedById, snapshot }, request.decisionRef);
+        const changed = await tx.$executeRaw`UPDATE exam_variant."ExamModerationSubmission"
+          SET status=${request.decision},"decidedById"=${ctx.user.id},"decidedAt"=clock_timestamp(),"decisionRef"=${request.decisionRef}
+          WHERE id=${row.id} AND status='Pending'`;
+        if (changed !== 1) conflict("Stale moderation decision");
+        return { id: row.id, status: request.decision };
+      });
+    },
+    async assignBulk(actor: AuthUser, input: unknown) {
+      const request = scopeSchema.extend({ entries: z.array(assignmentEntrySchema).min(1).max(50) }).parse(input);
+      if (new Set(request.entries.map((e) => e.enrollmentId)).size !== request.entries.length) conflict("Duplicate enrollment in batch");
+      return transact(async (tx) => {
+        const results = [];
+        for (const entry of [...request.entries].sort((a,b) => a.enrollmentId.localeCompare(b.enrollmentId))) {
+          results.push(await assignOne(tx, actor, { offeringId: request.offeringId, assessmentItemId: request.assessmentItemId, ...entry }));
+        }
+        return results;
+      });
+    },
+    async workspace(actor: AuthUser, input: unknown) {
+      const request = scopeSchema.parse(input);
+      return transact(async (tx) => {
+        const ctx = await context(tx, actor.id, request, "read");
+        const { courseSpecId, assessmentItemId } = ctx.scope;
+        const offeringId = ctx.offering.id;
+        const cfg = await config(tx, ctx);
+        const rawPapers = await tx.$queryRaw<Array<{ variantId: string; variantHash: string; revision: number; permitted: boolean }>>`
+          SELECT p."variantId",p."variantHash",p.revision, EXISTS(SELECT 1 FROM exam_variant."ExamOfferingPermission" g
+            WHERE g."offeringId"=${offeringId} AND g."courseSpecId"=p."courseSpecId" AND g."assessmentItemId"=p."assessmentItemId"
+            AND g."variantId"=p."variantId" AND g."variantHash"=p."variantHash") AS permitted
+          FROM exam_variant."ExamPaperVersion" p WHERE p."courseSpecId"=${courseSpecId} AND p."assessmentItemId"=${assessmentItemId}
+          AND (${ctx.reviewer} OR EXISTS(SELECT 1 FROM exam_variant."ExamOfferingPermission" g WHERE g."offeringId"=${offeringId}
+            AND g."courseSpecId"=p."courseSpecId" AND g."assessmentItemId"=p."assessmentItemId" AND g."variantId"=p."variantId" AND g."variantHash"=p."variantHash"))
+          ORDER BY p."variantId",p.revision LIMIT 201`;
+        const rawSubmissions = await tx.$queryRaw<Array<{ id: string; submittedById: string; submittedAt: Date; status: "Pending"|"Approved"|"Returned"; decidedById: string|null; decidedAt: Date|null; decisionRef: string|null; snapshot: unknown }>>`
+          SELECT id,"submittedById","submittedAt",status,"decidedById","decidedAt","decisionRef",snapshot FROM exam_variant."ExamModerationSubmission"
+          WHERE "offeringId"=${offeringId} AND "courseSpecId"=${courseSpecId} AND "assessmentItemId"=${assessmentItemId}
+          AND (${ctx.reviewer} OR "submittedById"=${ctx.user.id}) ORDER BY "submittedAt" DESC,id LIMIT 201`;
+        const roster = await tx.enrollment.findMany({ where: { offeringId }, orderBy: { id: "asc" }, take: 501,
+          select: { id: true, student: { select: { name: true, studentId: true, status: true } } } });
+        const assignments = await tx.$queryRaw<Array<Assignment & { enrollmentId: string }>>`SELECT id,"enrollmentId",revision,"variantId","variantHash"
+          FROM exam_variant."ExamPaperAssignment" WHERE "offeringId"=${offeringId} AND "courseSpecId"=${courseSpecId} AND "assessmentItemId"=${assessmentItemId}`;
+        const results = await tx.assessmentResult.findMany({ where: { courseSpecId, assessmentItemId, enrollment: { offeringId } }, select: { enrollmentId: true } });
+        const instruments = ctx.teacher ? await tx.rubric.findMany({ where: { ownerId: ctx.user.id, status: "Active", instrumentKind: "marking_scheme" },
+          orderBy: { name: "asc" }, take: 201, select: { id: true, name: true, criterionRows: { orderBy: [{order:"asc"},{id:"asc"}], select: { id: true, maxPoints: true } } } }) : [];
+        if (rawPapers.length > 200 || rawSubmissions.length > 200 || roster.length > 500 || instruments.length > 200) conflict("Workspace exceeds pilot limits");
+        const papers = rawPapers.map((p) => ({ ...p }));
+        const submissions = rawSubmissions.map((p) => ({ ...p, snapshot: verifyExamVariantSnapshot(p.snapshot),
+          submittedAt: p.submittedAt.toISOString(), decidedAt: p.decidedAt?.toISOString() ?? null }));
+        const byEnrollment = new Map(assignments.map((a) => [a.enrollmentId,a]));
+        const withResult = new Set(results.map((r) => r.enrollmentId));
+        return { actorId: ctx.user.id, offeringId, assessmentItemId, offeringStatus: ctx.offering.status,
+          canPrepare: ctx.teacher && ctx.offering.status !== "Completed", canReview: ctx.reviewer && ctx.offering.status !== "Completed",
+          canAssign: ctx.teacher && ctx.offering.status === "Active", activeCloCodes: ctx.activeCloCodes, examMaximum: cfg?.examMaximum ?? null,
+          instruments, papers, submissions, roster: roster.map((r) => ({ enrollmentId: r.id, name: r.student.name,
+            studentId: r.student.studentId, eligible: r.student.status === "Active" && Boolean(r.student.studentId),
+            hasResult: withResult.has(r.id), assignment: byEnrollment.get(r.id) ?? null })) };
+      });
+    },
+    async history(actor: AuthUser, input: unknown) {
+      const request = resolveSchema.parse(input);
+      return transact(async (tx) => {
+        const ctx = await context(tx, actor.id, request, "read");
+        await enrollment(tx, ctx, request.enrollmentId, false);
+        const current = await assignment(tx, ctx, request.enrollmentId);
+        if (!current) return [];
+        const events = await tx.$queryRaw<Array<{ revision: number; previousVariantId: string|null; previousVariantHash: string|null; variantId: string; variantHash: string; actorId: string; reason: string; evidenceRef: string; changedAt: Date }>>`
+          SELECT revision,"previousVariantId","previousVariantHash","variantId","variantHash","actorId",reason,"evidenceRef","changedAt"
+          FROM exam_variant."ExamAssignmentEvent" WHERE "assignmentId"=${current.id} ORDER BY revision LIMIT 501`;
+        if (events.length > 500) conflict("Assignment history exceeds pilot limits");
+        return events.map((e) => ({ ...e, changedAt: e.changedAt.toISOString() }));
+      });
+    },
+    async prepare(actor: AuthUser, input: unknown) {
+      const request = prepareSchema.parse(input);
+      return transact(async (tx) => {
+        const { ctx, snapshot } = await prepareSnapshot(tx, actor, request);
+        const expiresAt = Date.now() + 30 * 60 * 1000;
+        return { snapshot, expiresAt, token: sign({ purpose: "exam-variant-proposal-v1",
+          offeringId: ctx.offering.id, preparerId: ctx.user.id, expiresAt, snapshot }) };
+      });
+    },
+    async approve(actor: AuthUser, input: unknown) {
+      const request = approvalSchema.parse(input);
+      const proposal = open(request.token);
+      if (proposal.snapshot.variantHash !== request.expectedHash) conflict("Reviewed paper hash mismatch");
+      return transact(async (tx) => {
+        return approveSnapshot(tx, actor, proposal, request.moderationRef);
+      });
+    },
+    async permitOffering(actor: AuthUser, input: unknown) {
+      const request = versionSchema.parse(input);
+      return transact(async (tx) => {
+        const ctx = await context(tx, actor.id, request, "reviewer");
+        writable(ctx);
+        const snapshot = await paper(tx, ctx, request, true);
+        await permit(tx, ctx, snapshot);
+        return snapshot;
+      });
+    },
+    async assign(actor: AuthUser, input: unknown) {
+      const request = assignSchema.parse(input);
+      return transact(async (tx) => {
+        return assignOne(tx, actor, request);
       });
     },
     async resolve(actor: AuthUser, input: unknown) {

@@ -12,6 +12,9 @@ export default function CourseDeliveryPage() {
         <LockKeyhole className="h-4 w-4" />
         Result access
       </Link>
+      {process.env.NEXT_PUBLIC_EXAM_VARIANT_WORKSPACE_ENABLED === "true" && (
+        <Link href="/course-delivery/exam-variants" className="mx-4 mt-3 inline-flex rounded-lg border border-border px-3 py-2 text-sm">Examination workspace (isolated pilot)</Link>
+      )}
       <CourseDeliveryClient />
     </div>
   );
