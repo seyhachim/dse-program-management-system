@@ -181,9 +181,19 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
     if (payload.expiresAt <= Date.now()) conflict("Moderation proposal expired");
     return { ...payload, snapshot: verifyExamVariantSnapshot(payload.snapshot) };
   }
-  const transact = <T>(fn: (tx: Tx) => Promise<T>) => db.$transaction(fn, { isolationLevel: "Serializable", timeout: 30000 });
+  async function transact<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+    try {
+      return await db.$transaction(fn, { isolationLevel: "Serializable", timeout: 30000 });
+    } catch (error) {
+      const e = error as { code?: string; meta?: { code?: string } } | undefined;
+      if (e?.code === "P2034" || (e?.code === "P2010" && ["40001", "40P01"].includes(e.meta?.code ?? ""))) {
+        conflict("Concurrent academic change; reload before retrying");
+      }
+      throw error;
+    }
+  }
   return {
-    prepare(actor: AuthUser, input: unknown) {
+    async prepare(actor: AuthUser, input: unknown) {
       const request = prepareSchema.parse(input);
       return transact(async (tx) => {
         const ctx = await context(tx, actor.id, request, "teacher");
@@ -207,7 +217,7 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
           offeringId: ctx.offering.id, preparerId: ctx.user.id, expiresAt, snapshot }) };
       });
     },
-    approve(actor: AuthUser, input: unknown) {
+    async approve(actor: AuthUser, input: unknown) {
       const request = approvalSchema.parse(input);
       const proposal = open(request.token);
       if (proposal.snapshot.variantHash !== request.expectedHash) conflict("Reviewed paper hash mismatch");
@@ -238,7 +248,7 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         return s;
       });
     },
-    permitOffering(actor: AuthUser, input: unknown) {
+    async permitOffering(actor: AuthUser, input: unknown) {
       const request = versionSchema.parse(input);
       return transact(async (tx) => {
         const ctx = await context(tx, actor.id, request, "reviewer");
@@ -248,7 +258,7 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         return snapshot;
       });
     },
-    assign(actor: AuthUser, input: unknown) {
+    async assign(actor: AuthUser, input: unknown) {
       const request = assignSchema.parse(input);
       return transact(async (tx) => {
         const ctx = await context(tx, actor.id, request, "teacher");
@@ -275,7 +285,7 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         return { id: assignmentId, revision: 1, variantId: snapshot.variantId, variantHash: snapshot.variantHash };
       });
     },
-    resolve(actor: AuthUser, input: unknown) {
+    async resolve(actor: AuthUser, input: unknown) {
       const request = resolveSchema.parse(input);
       return transact(async (tx) => {
         const ctx = await context(tx, actor.id, request, "read");
