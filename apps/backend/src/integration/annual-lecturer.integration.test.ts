@@ -257,6 +257,17 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
     expect((await request(reviewPath,rt,"POST",{...decision,decision:"needs_changes"})).status).toBe(204);
     expect(((await request(`/api/lecturers/annual/${yearId}/summary`,rt)).body as Report).staff.find(s=>s.lecturerId===contributor.id)?.submissionStatus).toBe("needs_changes");
     expect((await request(`/api/lecturers/annual/${yearId}/release`,rt,"POST",{})).status).toBe(400);
+    // Updating and re-verifying evidence is not a replacement for lecturer resubmission.
+    expect((await request(`/api/lecturers/me/portfolio-items/${pubId}`,ct,"PATCH",{
+      description:"Corrected contribution to student research",
+    })).status).toBe(200);
+    expect((await request(`/api/lecturers/${contributor.id}/portfolio-items/${pubId}/review`,rt,
+      "POST",{action:"verified",note:"Corrected evidence checked"})).status).toBe(200);
+    const edited=((await request(`/api/lecturers/annual/${yearId}/summary`,rt)).body as Report).staff.find(s=>s.lecturerId===contributor.id)!;
+    expect(edited.submissionStatus).toBe("needs_changes");
+    expect(edited.submissionFingerprint).not.toBe(submission.submissionFingerprint);
+    expect((await request(reviewPath,rt,"POST",{...decision,fingerprint:edited.submissionFingerprint})).status).toBe(400);
+    expect((await request(`/api/lecturers/annual/${yearId}/release`,rt,"POST",{})).status).toBe(400);
     expect((await request(`/api/lecturers/annual/${yearId}/me/submit`,ct,"POST",{note:"Corrected annual record"})).status).toBe(204);
     expect((await request(reviewPath,rt,"POST",decision)).status).toBe(400);
     const current=((await request(`/api/lecturers/annual/${yearId}/summary`,rt)).body as Report).staff.find(s=>s.lecturerId===contributor.id)!;
@@ -279,6 +290,13 @@ integrationDescribe("annual lecturer activity and report lifecycle (#1298)", () 
     for (const id of [offeringId, pubId, coauthorId, "unreported"])
       expect(files.csv).toContain(id);
     expect(files.excelXml).toContain("<Workbook");
+    // Concurrent releases must allocate distinct versions from consistent snapshots.
+    const concurrent=await Promise.all([
+      request(`/api/lecturers/annual/${yearId}/release`,rt,"POST",{}),
+      request(`/api/lecturers/annual/${yearId}/release`,rt,"POST",{}),
+    ]);
+    expect(concurrent.map(r=>r.status)).toEqual([201,201]);
+    expect(concurrent.map(r=>(r.body as Report).releaseVersion).sort()).toEqual([2,3]);
 
     const released = await prisma.$queryRaw<Array<{ id: string }>>`
       SELECT "id" FROM lecturer_annual."AnnualReportRelease"

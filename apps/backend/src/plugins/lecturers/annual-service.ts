@@ -15,7 +15,7 @@ export class AnnualValidationError extends Error {}
 type ReviewRow = { id:string; offeringId:string; lecturerId:string; verdict:"confirmed"|"not_delivered"; evidenceUrl:string };
 type EvidenceRow = { role:string; description:string; updatedAt:Date; lecturerId:string; itemId:string; kind:string; title:string; organization:string; identifier:string; url:string; startDate:Date|null; endDate:Date|null; verificationStatus:"SelfDeclared"|"Verified"|"Rejected"; verifiedByEventId:string|null };
 type SubmissionRow = { lecturerId:string; revision:string; note:string };
-type SubmissionReviewRow = { id:string; lecturerId:string; fingerprint:string; decision:"verified"|"needs_changes"; reason:string; reviewedAt:Date };
+type SubmissionReviewRow = { id:string; lecturerId:string; fingerprint:string; decision:"verified"|"needs_changes"; reason:string; reviewedAt:Date; awaitingResubmission:boolean };
 type PeriodRow = { startDate:Date; endDate:Date; evidenceUrl:string; reviewedAt:Date };
 type StaffReviewRow = { lecturerId:string; employmentType:string; qualification:string; eventId:string|null };
 const dateOnly = (value:Date|null):string|null => value?.toISOString().slice(0,10)??null;
@@ -25,20 +25,42 @@ const matchesYear = (o:{term:string;academicCalendarPeriod:{calendar:{academicYe
   o.academicCalendarPeriod ? o.academicCalendarPeriod.calendar.academicYearId===y.id
     : normalized(o.term).includes(normalized(y.label));
 
-async function getYear(id:string):Promise<AnnualYear> {
-  const year=await prisma.academicYear.findFirst({where:{id,programmeId:DEFAULT_PROGRAMME_ID},
+async function getYear(id:string,db:Prisma.TransactionClient=prisma):Promise<AnnualYear> {
+  const year=await db.academicYear.findFirst({where:{id,programmeId:DEFAULT_PROGRAMME_ID},
     select:{id:true,label:true,startYear:true,endYear:true}});
   if(!year) throw new AnnualNotFoundError("Academic year not found for DSE");
   return year;
 }
 
-async function getReportingWindow(yearId:string):Promise<AnnualReportingWindow|null> {
-  const rows=await prisma.$queryRaw<PeriodRow[]>`
+async function getReportingWindow(yearId:string,db:Prisma.TransactionClient=prisma):Promise<AnnualReportingWindow|null> {
+  const rows=await db.$queryRaw<PeriodRow[]>`
     SELECT "startDate","endDate","evidenceUrl","reviewedAt"
     FROM lecturer_annual."AnnualReportingWindow" WHERE "academicYearId"=${yearId}`;
   const row=rows[0];
   return row?{startDate:dateOnly(row.startDate)!,endDate:dateOnly(row.endDate)!,
     evidenceUrl:row.evidenceUrl,reviewedAt:row.reviewedAt.toISOString()}:null;
+}
+
+// One consistent snapshot for source validation and the append-only write.
+// PostgreSQL may abort competing serializable writers; retry only known
+// transient conflicts, never bypass validation or publish a partial report.
+async function consistentAnnualWrite<T>(
+  yearId:string,work:(tx:Prisma.TransactionClient)=>Promise<T>,release=false,
+):Promise<T>{
+  for(let attempt=0;;attempt++){
+    try{
+      return await prisma.$transaction(async tx=>{
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${yearId}))::text AS "locked"`;
+        return work(tx);
+      },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable,timeout:30000});
+    }catch(error){
+      const e=error as {code?:string;meta?:{code?:string}};
+      const retryable=e.code==="P2034"||
+        e.code==="P2010"&&(["40001","40P01"].includes(e.meta?.code??"")||
+          release&&e.meta?.code==="23505");
+      if(!retryable||attempt>=2)throw error;
+    }
+  }
 }
 
 export const lecturerAnnualService = {
@@ -48,25 +70,25 @@ export const lecturerAnnualService = {
       orderBy:[{startYear:"desc"},{endYear:"desc"}]});
   },
 
-  async summary(yearId:string):Promise<AnnualSummary> {
-    const year=await getYear(yearId);
+  async summary(yearId:string,db:Prisma.TransactionClient=prisma):Promise<AnnualSummary> {
+    const year=await getYear(yearId,db);
     const [people,offerings,reviews,links,submissions,period,staffReviews,submissionReviews]=await Promise.all([
-      prisma.user.findMany({where:{roleAssignments:{some:{role:{slug:"lecturer"},
+      db.user.findMany({where:{roleAssignments:{some:{role:{slug:"lecturer"},
         OR:[{programmeId:DEFAULT_PROGRAMME_ID},{programmeId:null}]}}},
         select:{id:true,name:true},
         orderBy:{name:"asc"}}),
-      prisma.offering.findMany({where:{course:{programmeId:DEFAULT_PROGRAMME_ID},
+      db.offering.findMany({where:{course:{programmeId:DEFAULT_PROGRAMME_ID},
         OR:[{academicCalendarPeriod:{calendar:{academicYearId:year.id}}},
           {academicCalendarPeriodId:null,term:{contains:normalized(year.label)}},
           {academicCalendarPeriodId:null,term:{contains:year.label}}]},
         select:{id:true,term:true,sectionCode:true,lecturerId:true,
           course:{select:{code:true,title:true}},coLecturers:{select:{lecturerId:true}},
           academicCalendarPeriod:{select:{calendar:{select:{academicYearId:true}}}}}}),
-      prisma.$queryRaw<ReviewRow[]>`
+      db.$queryRaw<ReviewRow[]>`
         SELECT "id","offeringId","lecturerId","verdict","evidenceUrl"
         FROM lecturer_annual."AnnualTeachingReview"
         WHERE "academicYearId"=${year.id}`,
-      prisma.$queryRaw<EvidenceRow[]>`
+      db.$queryRaw<EvidenceRow[]>`
         SELECT l."lecturerId",l."itemId",p."kind"::text AS "kind",p."title",
           p."organization",p."identifier",p."url",p."startDate",p."endDate",p."role",p."description",p."updatedAt",
           p."verificationStatus"::text AS "verificationStatus",
@@ -76,24 +98,27 @@ export const lecturerAnnualService = {
         FROM lecturer_annual."AnnualEvidenceLink" l
         JOIN lecturer_portfolio."LecturerPortfolioItem" p ON p."id"=l."itemId"
         WHERE l."academicYearId"=${year.id}`,
-      prisma.$queryRaw<SubmissionRow[]>`
+      db.$queryRaw<SubmissionRow[]>`
         SELECT "lecturerId","revision","note" FROM lecturer_annual."AnnualSubmission"
         WHERE "academicYearId"=${year.id}`,
-      getReportingWindow(year.id),
-      prisma.$queryRaw<StaffReviewRow[]>`
+      getReportingWindow(year.id,db),
+      db.$queryRaw<StaffReviewRow[]>`
         SELECT s."lecturerId",s."employmentType",s."qualification",
           (SELECT e."id" FROM lecturer_annual."AnnualStaffReviewEvent" e
            WHERE e."academicYearId"=s."academicYearId" AND e."lecturerId"=s."lecturerId"
            ORDER BY e."createdAt" DESC,e."id" DESC LIMIT 1) AS "eventId"
         FROM lecturer_annual."AnnualStaffReview" s WHERE s."academicYearId"=${year.id}`,
-      prisma.$queryRaw<SubmissionReviewRow[]>`
-        SELECT DISTINCT ON ("lecturerId") "id","lecturerId","fingerprint","decision","reason","reviewedAt"
-        FROM lecturer_annual."AnnualSubmissionReviewEvent" WHERE "academicYearId"=${year.id}
-        ORDER BY "lecturerId","reviewedAt" DESC,"id" DESC`,
+      db.$queryRaw<SubmissionReviewRow[]>`
+        SELECT DISTINCT ON (e."lecturerId") e."id",e."lecturerId",e."fingerprint",e."decision",e."reason",e."reviewedAt",
+          (e."decision"='needs_changes' AND s."submittedAt"<=e."reviewedAt") AS "awaitingResubmission"
+        FROM lecturer_annual."AnnualSubmissionReviewEvent" e
+        JOIN lecturer_annual."AnnualSubmission" s ON s."academicYearId"=e."academicYearId" AND s."lecturerId"=e."lecturerId"
+        WHERE e."academicYearId"=${year.id}
+        ORDER BY e."lecturerId",e."reviewedAt" DESC,e."id" DESC`,
     ]);
     const eligible=offerings.filter(o=>matchesYear(o,year));
     const ids=eligible.map(o=>o.id);
-    const delivered:DeliveryRow[]=ids.length ? await prisma.$queryRaw<DeliveryRow[]>(Prisma.sql`
+    const delivered:DeliveryRow[]=ids.length ? await db.$queryRaw<DeliveryRow[]>(Prisma.sql`
       SELECT d."offeringId",l."lecturerId",d."id" AS "sessionId"
       FROM pms_attendance."TeachingSessionDelivery" d
       JOIN pms_attendance."TeachingSessionDeliveryLecturer" l ON l."deliveryId"=d."id"
@@ -111,7 +136,7 @@ export const lecturerAnnualService = {
     ].filter((id):id is string=>Boolean(id)))];
     const missing=relevantIds.filter(id=>!staff.has(id));
     if(missing.length) {
-      const historical=await prisma.user.findMany({where:{id:{in:missing}},
+      const historical=await db.user.findMany({where:{id:{in:missing}},
         select:{id:true,name:true}});
       for(const p of historical) staff.set(p.id,{lecturerId:p.id,name:p.name,
         qualification:null,employmentType:null,staffSnapshotStatus:"missing",
@@ -190,14 +215,16 @@ export const lecturerAnnualService = {
       if(review){
         const stale=review.fingerprint!==fingerprint;
         person.submissionReview={id:review.id,reason:review.reason,reviewedAt:review.reviewedAt.toISOString(),stale};
-        person.submissionStatus=stale?"submitted":review.decision;
+        // Editing a source is not a lecturer declaration. A returned record stays
+        // returned until a new explicit submit, even when its fingerprint changes.
+        person.submissionStatus=review.awaitingResubmission?"needs_changes":stale?"submitted":review.decision;
       }
     }
     result.statistics.evidenceGaps=result.staff.filter(p=>p.submissionStatus!=="verified" ||
       p.staffSnapshotStatus==="missing"&&p.classification!=="unconfirmed" ||
       p.evidence.some(e=>e.attribution!=="in_period") ||
       p.teaching.some(t=>t.discrepancy||!t.confirmed&&t.verdict===null)).length;
-    result.notes.push("Annual submission review applies to the current source fingerprint; a changed source or resubmission requires a fresh review.");
+    result.notes.push("Annual submission review applies to the current source fingerprint. Returned records require explicit lecturer resubmission; changed verified records require a fresh review.");
     return result;
   },
 
@@ -295,29 +322,33 @@ export const lecturerAnnualService = {
     if(!(await lecturerService.getById(lecturerId)))throw new AnnualNotFoundError("Lecturer not found");
     if(!(await getReportingWindow(year.id)))throw new AnnualValidationError("Coordinator must configure the reporting window first");
     await prisma.$executeRaw`
-      INSERT INTO lecturer_annual."AnnualSubmission" ("academicYearId","lecturerId","note","revision")
-      VALUES (${year.id},${lecturerId},${note},${randomUUID()})
+      INSERT INTO lecturer_annual."AnnualSubmission" ("academicYearId","lecturerId","note","revision","submittedAt")
+      VALUES (${year.id},${lecturerId},${note},${randomUUID()},clock_timestamp())
       ON CONFLICT ("academicYearId","lecturerId")
-      DO UPDATE SET "note"=EXCLUDED."note","revision"=EXCLUDED."revision","submittedAt"=CURRENT_TIMESTAMP`;
+      DO UPDATE SET "note"=EXCLUDED."note","revision"=EXCLUDED."revision","submittedAt"=clock_timestamp()`;
   },
 
   async reviewSubmission(yearId:string,actorId:string,input:ReviewAnnualSubmissionInput):Promise<void>{
     if(actorId===input.lecturerId)throw new AnnualValidationError("Cannot review your own annual submission");
-    const report=await this.summary(yearId);
+    return consistentAnnualWrite(yearId,async tx=>{
+      const report=await this.summary(yearId,tx);
     const person=report.staff.find(p=>p.lecturerId===input.lecturerId);
     if(!person?.submissionFingerprint)throw new AnnualNotFoundError("No annual submission to review");
     if(person.submissionFingerprint!==input.fingerprint)
       throw new AnnualValidationError("Submission or source evidence changed. Reload and review the current record.");
+    if(input.decision==="verified"&&person.submissionStatus==="needs_changes")
+      throw new AnnualValidationError("Lecturer must explicitly resubmit the returned annual record before approval");
     if(input.decision==="verified"&&(
       !report.reportingWindow ||
       person.classification!=="unconfirmed"&&person.staffSnapshotStatus!=="verified" ||
       person.evidence.some(e=>e.verificationStatus==="self_declared"||e.attribution!=="in_period") ||
       person.teaching.some(t=>t.discrepancy||!t.confirmed&&t.verdict===null)))
       throw new AnnualValidationError("Resolve staffing, teaching and evidence review items before verifying the annual submission");
-    await prisma.$executeRaw`
+    await tx.$executeRaw`
       INSERT INTO lecturer_annual."AnnualSubmissionReviewEvent"
-        ("id","academicYearId","lecturerId","fingerprint","decision","reason","actorId")
-      VALUES (${randomUUID()},${yearId},${input.lecturerId},${input.fingerprint},${input.decision},${input.reason},${actorId})`;
+        ("id","academicYearId","lecturerId","fingerprint","decision","reason","actorId","reviewedAt")
+      VALUES (${randomUUID()},${yearId},${input.lecturerId},${input.fingerprint},${input.decision},${input.reason},${actorId},clock_timestamp())`;
+    });
   },
 
   async reviewTeaching(yearId:string,actorId:string,input:ReviewAnnualTeachingInput):Promise<void>{
@@ -362,7 +393,8 @@ export const lecturerAnnualService = {
   },
 
   async release(yearId:string,actorId:string):Promise<AnnualSummary>{
-    const summary=await this.summary(yearId);
+    return consistentAnnualWrite(yearId,async tx=>{
+      const summary=await this.summary(yearId,tx);
     if(!summary.reportingWindow)
       throw new AnnualValidationError("Set and verify the academic-year reporting window before release");
     if(summary.statistics.staffSnapshotsMissing>0)
@@ -371,8 +403,6 @@ export const lecturerAnnualService = {
       throw new AnnualValidationError("Remove or correct undated/out-of-period evidence before release");
     if(summary.staff.some(p=>p.submissionStatus==="submitted"||p.submissionStatus==="needs_changes"))
       throw new AnnualValidationError("Complete coordinator review of submitted annual records before release");
-    return prisma.$transaction(async tx=>{
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${yearId}))::text AS "locked"`;
       const rows=await tx.$queryRaw<{version:number}[]>`
         SELECT (COALESCE(MAX("version"),0)+1)::integer AS "version"
         FROM lecturer_annual."AnnualReportRelease" WHERE "academicYearId"=${yearId}`;
@@ -383,7 +413,7 @@ export const lecturerAnnualService = {
         VALUES (${randomUUID()},${yearId},${released.releaseVersion},
           ${JSON.stringify(released)}::jsonb,${actorId})`;
       return released;
-    });
+    },true);
   },
 
   async latestRelease(yearId:string):Promise<AnnualSummary>{

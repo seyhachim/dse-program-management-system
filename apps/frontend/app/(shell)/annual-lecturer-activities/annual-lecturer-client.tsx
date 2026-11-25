@@ -230,9 +230,9 @@ export function AnnualLecturerClient(){
                   <div className="rounded-lg border border-border p-2 space-y-2">
                     <p className="font-medium">Annual submission: {person.submissionStatus.replace(/_/g," ")}</p>
                     {person.submissionNote&&<p className="whitespace-pre-wrap text-xs">{person.submissionNote}</p>}
-                    {person.submissionReview&&<p className="text-xs">{person.submissionReview.stale?"Previous review is no longer current. ":""}{person.submissionReview.reason}</p>}
+                    {person.submissionReview&&<p className="text-xs">{person.submissionStatus==="needs_changes"?"Awaiting lecturer resubmission. ":person.submissionReview.stale?"Previous review is no longer current. ":""}{person.submissionReview.reason}</p>}
                     {person.submissionFingerprint&&person.lecturerId!==me?.id&&<div className="flex flex-wrap gap-2">
-                      <button disabled={saving} className="text-xs text-primary underline" onClick={()=>void reviewSubmission(person,"verified")}>Verify annual submission</button>
+                      <button disabled={saving||person.submissionStatus==="needs_changes"} className="text-xs text-primary underline disabled:opacity-50" onClick={()=>void reviewSubmission(person,"verified")}>Verify annual submission</button>
                       <button disabled={saving} className="text-xs text-primary underline" onClick={()=>void reviewSubmission(person,"needs_changes")}>Return for changes</button>
                     </div>}
                   </div>
@@ -278,7 +278,7 @@ export function AnnualLecturerClient(){
       <p className="text-sm text-muted-foreground">Your assignments come from PMS. Link dated portfolio activities that overlap the official reporting window.</p>
       <p className="text-xs text-muted-foreground">Reporting window: {ownWindow?ownWindow.startDate+" to "+ownWindow.endDate:"Not configured by the coordinator"}</p>
       <p className="text-sm">Annual status: <strong>{own?.classification.replace(/_/g," ")??"Not recorded"}</strong> · Submission: <strong>{own?.submissionStatus??"unreported"}</strong></p>
-      {own?.submissionReview&&<p className="rounded-md border p-3 text-sm">{own.submissionReview.stale?"Previous review (record changed): ":"Coordinator feedback: "}{own.submissionReview.reason}</p>}
+      {own?.submissionReview&&<p className="rounded-md border p-3 text-sm">{own.submissionStatus==="needs_changes"?"Coordinator feedback — resubmission required: ":own.submissionReview.stale?"Previous review (record changed): ":"Coordinator feedback: "}{own.submissionReview.reason}</p>}
       <div className="space-y-2">
         {(own?.teaching??[]).map(t=><p key={t.offeringId} className="rounded-lg bg-muted/50 p-3 text-sm">
           {t.courseCode} — {t.courseTitle} · {t.term} · {t.confirmed?"Confirmed":"Pending delivery verification"}
