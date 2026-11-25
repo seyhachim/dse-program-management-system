@@ -1,5 +1,6 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
+import { deliverRegistrationDecision } from "./student-registration-notification.ts";
 import { UniversityEmailSchema } from "@dse-pms/shared-types";
 import { sendRegistrationEmail, verifyRegistrationEmail, RegistrationEmailError } from "./student-registration-email.ts";
 import { TelegramInitDataVerifyRequestSchema, TelegramRegistrationReviewSchema, TelegramRegistrationStatusSchema, type TelegramRegistrationBootstrap, type TelegramRegistrationPlacement, type TelegramRegistrationStatus } from "@dse-pms/shared-types";
@@ -98,7 +99,11 @@ export function createStudentRegistrationRouter(): Router {
     if (process.env.TELEGRAM_STUDENT_REGISTRATION_ENABLED !== "true") return void res.status(503).json({ error: "Registration review is disabled" });
     const parsed = TelegramRegistrationReviewSchema.safeParse(req.body);
     if (!parsed.success) return void res.status(400).json({ error: "Invalid review. Record the verification reason." });
-    try { res.json(await reviewRegistration(req.user!, req.params.id!, parsed.data)); }
+    try {
+      const result = await reviewRegistration(req.user!, req.params.id!, parsed.data);
+      const notification = await deliverRegistrationDecision(result.reviewId);
+      res.json({status:result.status, notification});
+    }
     catch (error) { reviewError(res, error); }
   });
   return router;
