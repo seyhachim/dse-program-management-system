@@ -7,7 +7,8 @@ export default function StudentsPage() {
     <>
       <Topbar title="Students" subtitle="Student records — CRUD, list, profile" />
       <main className="flex-1 overflow-y-auto p-6">
-        <div className="mb-4 flex justify-end">
+        <div className="mb-4 flex flex-wrap justify-end gap-2">
+          <Link href="/students/registration-requests" className="inline-flex h-10 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground">Registration requests</Link>
           <Link
             href="/students/cohorts"
             className="inline-flex h-10 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
