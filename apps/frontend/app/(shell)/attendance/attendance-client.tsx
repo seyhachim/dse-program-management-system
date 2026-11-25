@@ -80,6 +80,8 @@ export function AttendanceClient() {
   const [rollCallOpen, setRollCallOpen] = useState(false);
   const [rollCallSnapshot, setRollCallSnapshot] = useState<AttendanceRecordView[] | null>(null);
   const [recheckStudentId, setRecheckStudentId] = useState<string | null>(null);
+  // Keep the version the lecturer actually reviewed, not a later query refresh.
+  const [recheckReviewedVersion, setRecheckReviewedVersion] = useState<string | null>(null);
   const [draftRecovered, setDraftRecovered] = useState(false);
   const [draftWriteError, setDraftWriteError] = useState(false);
   const [editingSemesterNote, setEditingSemesterNote] = useState<{ studentId: string; studentName: string; readOnly: boolean } | null>(null);
@@ -157,6 +159,7 @@ export function AttendanceClient() {
     setRollCallOpen(false);
     setRollCallSnapshot(null);
     setRecheckStudentId(null);
+    setRecheckReviewedVersion(null);
   }, [attendanceContext]);
 
   useEffect(() => {
@@ -379,6 +382,7 @@ export function AttendanceClient() {
     }
     setMutationError(null);
     setRecheckMode("standard");
+    setRecheckReviewedVersion(baselineVersionRef.current);
     setRecheckStudentId(studentId);
   }
 
@@ -391,6 +395,7 @@ export function AttendanceClient() {
     }
     setMutationError(null);
     setRecheckMode("late-arrival");
+    setRecheckReviewedVersion(baselineVersionRef.current);
     setRecheckStudentId(studentId);
   }
 
@@ -399,6 +404,7 @@ export function AttendanceClient() {
     const next = records[recheckIndex + offset];
     if (next) {
       setRecheckMode("standard");
+      setRecheckReviewedVersion(baselineVersionRef.current);
       setRecheckStudentId(next.studentId);
     }
   }
@@ -682,7 +688,7 @@ export function AttendanceClient() {
         />
       ) : null}
       <RollCallDialog open={rollCallOpen} offering={selectedOffering} date={date} week={teachingWeek} records={records} semesterNotes={semesterNotesQuery.isSuccess ? semesterNotes : []} semesterNotesState={semesterNotesQuery.isError ? "error" : semesterNotesQuery.isSuccess ? "ready" : "loading"} saving={saving} saveError={mutationError} onUpdateRecord={updateRecord} onRequestClose={requestRollCallClose} onSaveAndClose={saveRollCallAndClose} />
-      <StudentRecheckDialog open={Boolean(recheckRecord)} initialMode={recheckMode} offeringId={offeringId} date={date} expectedUpdatedAt={session?.updatedAt ?? null} record={recheckRecord} hasPrevious={recheckMode === "standard" && recheckIndex > 0} hasNext={recheckMode === "standard" && recheckIndex >= 0 && recheckIndex < records.length - 1} onPrevious={() => moveRecheck(-1)} onNext={() => moveRecheck(1)} onClose={() => { setRecheckStudentId(null); setRecheckMode("standard"); }} onSaved={handleRecheckSaved} />
+      <StudentRecheckDialog open={Boolean(recheckRecord)} initialMode={recheckMode} offeringId={offeringId} date={date} expectedUpdatedAt={recheckReviewedVersion === session?.updatedAt ? recheckReviewedVersion : null} record={recheckRecord} hasPrevious={recheckMode === "standard" && recheckIndex > 0} hasNext={recheckMode === "standard" && recheckIndex >= 0 && recheckIndex < records.length - 1} onPrevious={() => moveRecheck(-1)} onNext={() => moveRecheck(1)} onClose={() => { setRecheckStudentId(null); setRecheckMode("standard"); }} onSaved={handleRecheckSaved} />
     </>
   );
 }
