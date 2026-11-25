@@ -305,7 +305,7 @@ jobs:
         run: OPPORTUNITIES_DB_TESTS=1 bun test apps/backend/src/plugins/opportunities/service-interest-db.test.ts
 
       - name: Verify exam variant persistence and immutable assignment history
-        run: EXAM_VARIANT_DB_TESTS=1 bun test apps/backend/src/core/academic/exam-variant-db.test.ts
+        run: EXAM_VARIANT_DB_TESTS=1 bun test apps/backend/src/core/academic/exam-variant-db.test.ts apps/backend/src/core/academic/exam-variant-management-db.test.ts
 
       - name: Verify database security
         run: bun run --cwd apps/backend db:security:verify
