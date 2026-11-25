@@ -126,6 +126,30 @@ export function createAssessmentEvidenceRouter(): Router {
     next();
   });
 
+  router.get("/assessment-evidence/offerings/:offeringId/context", async (req, res) => {
+    try {
+      const id = z.string().uuid().safeParse(req.params.offeringId);
+      if (!id.success) throw new EvidenceError(400, "Invalid offering");
+      const offering = await prisma.offering.findUnique({ where: { id: id.data }, select: {
+        courseId: true, lecturerId: true, coLecturers: { select: { lecturerId: true } },
+        course: { select: { programmeId: true } },
+        courseSpec: { select: { id: true, courseId: true, reviewStatus: true, assessmentItems: {
+          where: { status: "Active" }, orderBy: { order: "asc" }, select: { id: true, name: true, mode: true },
+        } } },
+      } });
+      if (!offering) throw new EvidenceError(404, "Assessment context not found");
+      const user = req.user!;
+      const scope = evidenceAccess(user, offering.course.programmeId, [...offering.coLecturers.map(x => x.lecturerId), ...(offering.lecturerId ? [offering.lecturerId] : [])]);
+      if (!(scope.contribute && await roleHasPermission(user.roles, "courses:write")) &&
+          !(scope.review && await roleHasPermission(user.roles, "qa:manage")))
+        throw new EvidenceError(404, "Assessment context not found");
+      const spec = offering.courseSpec;
+      if (!spec || spec.courseId !== offering.courseId || spec.reviewStatus !== "Approved")
+        throw new EvidenceError(409, "Offering must use the exact approved course specification");
+      res.json({ courseSpecId: spec.id, assessments: spec.assessmentItems });
+    } catch (error) { sendError(res, error); }
+  });
+
   router.get(base, async (req, res) => {
     try {
       const context = parseContext(req);
