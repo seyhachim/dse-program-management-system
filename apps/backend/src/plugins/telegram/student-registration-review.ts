@@ -17,27 +17,27 @@ function assertReviewer(user: AuthUser) {
 function eligibleRosterEmail(email: string | null): email is string {
   return UniversityEmailSchema.safeParse(email).success;
 }
-type Row = Omit<TelegramRegistrationStaffRow, "createdAt" | "updatedAt"> & { createdAt: Date; updatedAt: Date };
+type Row = Omit<TelegramRegistrationStaffRow, "createdAt" | "updatedAt" | "emailVerifiedAt"> & { createdAt: Date; updatedAt: Date; emailVerifiedAt: Date | null };
 
 export async function listRegistrationRequests(user: AuthUser, status: TelegramRegistrationStatus, offset: number) {
   assertReviewer(user);
   const rows = await prisma.$queryRaw<Row[]>`
     SELECT r."id", r."status", r."khmerFamilyName", r."khmerGivenName", r."latinFamilyName", r."latinGivenName",
       r."cohortId", c."code" AS "cohortCode", s."code" AS "sectionCode", r."officialStudentId",
-      r."email", r."telegramPhone", r."createdAt", r."updatedAt"
+      r."email", r."telegramPhone", r."emailVerifiedAt", r."createdAt", r."updatedAt"
     FROM "telegram_security"."StudentRegistrationRequest" r
     JOIN "StudentCohort" c ON c."id"=r."cohortId"
     JOIN "StudentCohortSection" s ON s."id"=r."sectionId"
     WHERE r."programmeId"=${DEFAULT_PROGRAMME_ID} AND r."status"=${status}
     ORDER BY r."createdAt" DESC, r."id" DESC LIMIT 51 OFFSET ${offset}
   `;
-  return { items: rows.slice(0, 50).map(r => ({ ...r, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString() })), hasMore: rows.length > 50 };
+  return { items: rows.slice(0, 50).map(r => ({ ...r, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(), emailVerifiedAt: r.emailVerifiedAt?.toISOString() ?? null })), hasMore: rows.length > 50 };
 }
 
 export async function registrationRosterCandidates(user: AuthUser, requestId: string, search: string): Promise<TelegramRegistrationRosterCandidate[]> {
   assertReviewer(user);
-  const rows = await prisma.$queryRaw<Array<{ id: string; name: string; studentId: string | null; email: string | null; userId: string | null; applicantEmail: string }>>`
-    SELECT st."id", st."name", st."studentId", st."email", st."userId", r."email" AS "applicantEmail"
+  const rows = await prisma.$queryRaw<Array<{ id: string; name: string; studentId: string | null; email: string | null; userId: string | null; applicantEmail: string | null; emailVerifiedAt: Date | null }>>`
+    SELECT st."id", st."name", st."studentId", st."email", st."userId", r."email" AS "applicantEmail", r."emailVerifiedAt"
     FROM "telegram_security"."StudentRegistrationRequest" r
     JOIN "StudentCohortMembership" cm ON cm."cohortId"=r."cohortId" AND cm."exitedAt" IS NULL
     JOIN "StudentCohortSectionMembership" sm ON sm."studentId"=cm."studentId"
@@ -51,7 +51,7 @@ export async function registrationRosterCandidates(user: AuthUser, requestId: st
     )
     ORDER BY st."name", st."id" LIMIT 50
   `;
-  return rows.map(({ userId, applicantEmail, ...row }) => ({ ...row, hasAccount: Boolean(userId), canActivate: !userId && Boolean(row.studentId) && eligibleRosterEmail(row.email) && row.email.toLowerCase() === applicantEmail.toLowerCase() }));
+  return rows.map(({ userId, applicantEmail, emailVerifiedAt, ...row }) => ({ ...row, hasAccount: Boolean(userId), canActivate: !userId && Boolean(row.studentId) && eligibleRosterEmail(row.email) && Boolean(emailVerifiedAt && applicantEmail && row.email.toLowerCase() === applicantEmail.toLowerCase()) }));
 }
 
 /** Approve only a staff-verified, already imported roster record without an existing account.
@@ -60,8 +60,8 @@ export async function registrationRosterCandidates(user: AuthUser, requestId: st
 export async function reviewRegistration(user: AuthUser, requestId: string, input: TelegramRegistrationReviewInput) {
   assertReviewer(user);
   return prisma.$transaction(async tx => {
-    const requests = await tx.$queryRaw<Array<{ telegramUserId: string; status: string; cohortId: string; sectionId: string; email: string; careerProfile: unknown }>>`
-      SELECT "telegramUserId", "status", "cohortId", "sectionId", "email", "careerProfile"
+    const requests = await tx.$queryRaw<Array<{ telegramUserId: string; status: string; cohortId: string; sectionId: string; email: string | null; emailVerifiedAt: Date | null; careerProfile: unknown }>>`
+      SELECT "telegramUserId", "status", "cohortId", "sectionId", "email", "emailVerifiedAt", "careerProfile"
       FROM "telegram_security"."StudentRegistrationRequest"
       WHERE "id"=${requestId} AND "programmeId"=${DEFAULT_PROGRAMME_ID} FOR UPDATE
     `;
@@ -70,6 +70,7 @@ export async function reviewRegistration(user: AuthUser, requestId: string, inpu
     if (request.status !== "PENDING") throw new RegistrationReviewError(409, "Registration is not pending");
     let approvedStudentId: string | null = null;
     if (input.decision === "APPROVE") {
+      if (!request.email || !request.emailVerifiedAt) throw new RegistrationReviewError(409, "University email ownership must be verified before approval");
       const candidates = await tx.$queryRaw<Array<{ id: string; name: string; studentId: string | null; email: string | null; userId: string | null }>>`
         SELECT st."id", st."name", st."studentId", st."email", st."userId"
         FROM "Student" st
