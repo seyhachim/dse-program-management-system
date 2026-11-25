@@ -95,3 +95,5 @@ export * from "./student-handbook.ts";
 export * from "./offering-activities.ts";
 
 export * from "./activity-publications.ts";
+
+export * from "./telegram-student-registration.ts";
