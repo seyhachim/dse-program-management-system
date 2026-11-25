@@ -113,6 +113,7 @@ function toCurriculumCourse(placement: {
     placementId: placement.id,
     courseId: placement.courseId,
     code: officialCodes.get(placement.id) ?? placement.course.code,
+    ...(officialCodes.get(placement.id) && officialCodes.get(placement.id) !== placement.course.code ? { catalogueCode: placement.course.code } : {}),
     title: placement.course.title,
     yearLevel: placement.yearLevel,
     semester: placement.semester,

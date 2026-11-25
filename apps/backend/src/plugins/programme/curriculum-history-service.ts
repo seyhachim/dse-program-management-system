@@ -12,6 +12,7 @@ import { CurriculumNotFoundError, curriculumService } from "./curriculum-service
 function snapshot(course: ProgrammeCurriculumRead["years"][number]["semesters"][number]["courses"][number]): CurriculumPlacementSnapshot {
   return {
     courseId: course.courseId,
+    code: course.code,
     yearLevel: course.yearLevel,
     semester: course.semester,
     credits: course.credits,
@@ -21,16 +22,17 @@ function snapshot(course: ProgrammeCurriculumRead["years"][number]["semesters"][
 }
 
 function flatten(read: ProgrammeCurriculumRead) {
-  return read.years.flatMap((year) =>
-    year.semesters.flatMap((semester) =>
-      semester.courses.map((course) => ({
-        courseId: course.courseId,
-        code: course.code,
-        title: course.title,
-        placement: snapshot(course),
-      })),
-    ),
-  );
+  const courses = [
+    ...read.years.flatMap((year) => year.semesters.flatMap((semester) => semester.courses)),
+    ...read.pathways.flatMap((pathway) => pathway.courses),
+  ];
+  // The default pathway occurs in both views; identity, not display code, deduplicates it.
+  return [...new Map(courses.map((course) => [course.courseId, {
+    courseId: course.courseId,
+    code: course.code,
+    title: course.title,
+    placement: snapshot(course),
+  }])).values()];
 }
 
 export function compareCurriculumReads(
@@ -56,6 +58,7 @@ export function compareCurriculumReads(
     } else if (oldItem && !newItem) {
       kinds.push("Removed");
     } else if (oldItem && newItem) {
+      if (oldItem.code !== newItem.code) kinds.push("CodeChanged");
       if (oldItem.placement.yearLevel !== newItem.placement.yearLevel) kinds.push("YearChanged");
       if (oldItem.placement.semester !== newItem.placement.semester) kinds.push("SemesterChanged");
       if (oldItem.placement.credits !== newItem.placement.credits) kinds.push("CreditsChanged");

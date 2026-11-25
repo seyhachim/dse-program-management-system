@@ -10,12 +10,14 @@ export const CURRICULUM_DIFF_KINDS = [
   "CreditsChanged",
   "TypeChanged",
   "OrderChanged",
+  "CodeChanged",
 ] as const;
 export const CurriculumDiffKindSchema = z.enum(CURRICULUM_DIFF_KINDS);
 export type CurriculumDiffKind = z.infer<typeof CurriculumDiffKindSchema>;
 
 export const CurriculumPlacementSnapshotSchema = z.object({
   courseId: z.string().uuid(),
+  code: z.string().optional(),
   yearLevel: z.number().int().min(1).max(4),
   semester: CurriculumSemesterSchema,
   credits: z.number().int().min(0),

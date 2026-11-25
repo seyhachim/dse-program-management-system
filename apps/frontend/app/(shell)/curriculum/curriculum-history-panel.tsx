@@ -13,11 +13,12 @@ export const CURRICULUM_DIFF_LABEL: Record<CurriculumDiffKind, string> = {
   CreditsChanged: "Credits changed",
   TypeChanged: "Type/category changed",
   OrderChanged: "Order changed",
+  CodeChanged: "Official code changed",
 };
 
 function valueLabel(value: CurriculumComparison["changes"][number]["before"]): string {
   if (!value) return "—";
-  return `Year ${value.yearLevel}, Sem ${value.semester === "First" ? "1" : "2"}, ${value.credits} cr, ${value.courseType}, order ${value.sortOrder + 1}`;
+  return `${value.code ? `${value.code} · ` : ""}Year ${value.yearLevel}, Sem ${value.semester === "First" ? "1" : "2"}, ${value.credits} cr, ${value.courseType}, order ${value.sortOrder + 1}`;
 }
 
 export function CurriculumHistoryPanel() {

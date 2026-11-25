@@ -97,6 +97,14 @@ describe("curriculum comparison", () => {
     expect(compareCurriculumReads(before, read(crypto.randomUUID(), [course(id)])).changes).toEqual([]);
   });
 
+  test("detects a code-only change on the same canonical identity", () => {
+    const id = crypto.randomUUID();
+    const before = read(crypto.randomUUID(), [course(id, { code: "OLD" })]);
+    const after = read(crypto.randomUUID(), [course(id, { code: "NEW" })]);
+    const diff = compareCurriculumReads(before, after);
+    expect(diff.changes[0]).toMatchObject({ courseId: id, changes: ["CodeChanged"], before: { code: "OLD" }, after: { code: "NEW" } });
+  });
+
   test("rejects comparison across different curricula", () => {
     expect(() => compareCurriculumReads(
       read(crypto.randomUUID(), [], crypto.randomUUID()),

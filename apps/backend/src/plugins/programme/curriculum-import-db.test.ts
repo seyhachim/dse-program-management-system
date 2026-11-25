@@ -2,6 +2,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { CourseType, PrismaClient } from "@prisma/client";
 import { curriculumImportService } from "./curriculum-import-service.ts";
 import { curriculumService } from "./curriculum-service.ts";
+import { curriculumDraftService, CurriculumDraftConflictError } from "./curriculum-draft-service.ts";
+import { curriculumHistoryService } from "./curriculum-history-service.ts";
 import { curriculumCourseSpecService } from "./curriculum-course-spec-service.ts";
 import { offeringCurriculumService } from "./offering-curriculum-service.ts";
 
@@ -322,14 +324,65 @@ describeDb("curriculum JSON import and artifact persistence", () => {
     await expect(curriculumImportService.apply(f.version.id, f.user.id, applyInput(scopedUpload))).rejects.toThrow("blocking issues");
 
     // Direct database writes cannot create a duplicate official code even across pathways.
-    await expect(prisma.$executeRaw`
+    await expect(Promise.resolve(prisma.$executeRaw`
       UPDATE curriculum_artifact."CourseSnapshot"
       SET "courseCodeSnapshot" = ${f.common.code}
       WHERE "curriculumVersionId" = ${g6.id}
         AND "courseId" = ${f.research.id}
-    `).rejects.toThrow();
+    `)).rejects.toThrow("CourseSnapshot_version_official_code_key");
     const after = await curriculumImportService.artifact(g6.id);
     expect(after.courses.find((course) => course.courseId === f.research.id)?.code).toBe(f.research.code);
+  });
+
+  test("draft official-code edits are audited, clone correctly and compare all pathways", async () => {
+    const f = await fixture();
+    await curriculumImportService.apply(f.version.id, f.user.id, applyInput(uploadFor(f)));
+    const first = await prisma.programmeCurriculumCourse.findFirstOrThrow({
+      where: { curriculumVersionId: f.version.id, courseId: f.common.id },
+    });
+    const location = { yearLevel: first.yearLevel, semester: first.semester, sortOrder: first.sortOrder };
+    const official = `OFF-${f.token}`;
+    await expect(curriculumDraftService.updateCourse(first.id, f.user.id, {
+      ...location, officialCode: official,
+    })).rejects.toThrow("reason is required");
+    await expect(curriculumDraftService.updateCourse(first.id, f.user.id, {
+      ...location, officialCode: f.research.code, officialCodeReason: "Collision test",
+    })).rejects.toBeInstanceOf(CurriculumDraftConflictError);
+    await curriculumDraftService.updateCourse(first.id, f.user.id, {
+      ...location, officialCode: official, officialCodeReason: "Committee correction",
+    });
+    expect((await prisma.course.findUniqueOrThrow({ where: { id: f.common.id } })).code).toBe(f.common.code);
+    const history = await curriculumHistoryService.history(f.curriculum.id);
+    expect(history.versions[0]?.auditActions.find((event) => event.action === "CourseUpdated")?.details)
+      .toMatchObject({ officialCodeReason: "Committee correction", before: { code: f.common.code }, after: { code: official } });
+    await prisma.programmeCurriculumVersion.update({
+      where: { id: f.version.id }, data: { status: "Approved", approvedAt: new Date() },
+    });
+    await expect(curriculumDraftService.updateCourse(first.id, f.user.id, {
+      ...location, officialCode: "FORBIDDEN", officialCodeReason: "Approved history",
+    })).rejects.toThrow("Only Draft");
+    const revision = await curriculumService.createRevision(f.curriculum.id, f.version.id, f.user.id, {
+      revisionType: "Minor", revisionTriggers: ["ProgrammeCoordinator"],
+      revisionReason: "Test clone", changeSummary: "Preserve official codes",
+    });
+    const revisionId = revision.selectedVersion.id;
+    expect((await curriculumImportService.artifact(revisionId)).courses.find((course) => course.courseId === f.common.id)?.code).toBe(official);
+    expect((await curriculumHistoryService.compare(f.curriculum.id, f.version.id, revisionId)).changes).toEqual([]);
+    const alternate = await prisma.programmeCurriculumCourse.findFirstOrThrow({
+      where: { curriculumVersionId: revisionId, courseId: f.research.id },
+    });
+    const revisedCode = `RES-${f.token}`;
+    await curriculumDraftService.updateCourse(alternate.id, f.user.id, {
+      yearLevel: alternate.yearLevel, semester: alternate.semester, sortOrder: alternate.sortOrder,
+      officialCode: revisedCode, officialCodeReason: "Research pathway code correction",
+    });
+    const comparison = await curriculumHistoryService.compare(f.curriculum.id, f.version.id, revisionId);
+    expect(comparison.changes).toHaveLength(1);
+    expect(comparison.changes[0]).toMatchObject({
+      courseId: f.research.id, changes: ["CodeChanged"],
+      before: { code: f.research.code }, after: { code: revisedCode },
+    });
+    expect((await curriculumImportService.artifactForExport(f.version.id)).courses.find((course) => course.courseId === f.research.id)?.code).toBe(f.research.code);
   });
 
   test("title conflicts require an explicit keep-existing decision", async () => {

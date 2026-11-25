@@ -63,9 +63,11 @@ function PlacementEditor({
   onCancel,
   onSave,
   onRemove,
+  codeOnly = false,
 }: {
   course: CurriculumCourse;
   busy: boolean;
+  codeOnly?: boolean;
   onCancel: () => void;
   onSave: (input: {
     yearLevel: number;
@@ -73,6 +75,8 @@ function PlacementEditor({
     sortOrder: number;
     credits: number;
     courseType: CurriculumCourse["courseType"];
+    officialCode: string;
+    officialCodeReason?: string;
   }) => void;
   onRemove: (reason: string) => void;
 }) {
@@ -81,10 +85,24 @@ function PlacementEditor({
   const [credits, setCredits] = useState(course.credits);
   const [courseType, setCourseType] = useState(course.courseType);
   const [reason, setReason] = useState("");
+  const [officialCode, setOfficialCode] = useState(course.code);
+  const [codeReason, setCodeReason] = useState("");
+  const codeChanged = officialCode.trim() !== course.code;
 
   return (
     <div className="mt-3 space-y-3 rounded-lg border border-border bg-muted/20 p-3">
-      <div className="grid gap-2 sm:grid-cols-4">
+      <label className="block text-xs">
+        Official curriculum code
+        <input value={officialCode} maxLength={40} onChange={(event) => setOfficialCode(event.target.value)}
+          className="mt-1 h-9 w-full rounded-md border bg-background px-2" />
+      </label>
+      {course.catalogueCode && <p className="text-xs text-muted-foreground">Catalogue: {course.catalogueCode} (identity unchanged)</p>}
+      {codeChanged && <label className="block text-xs">
+        Reason for official code change
+        <input value={codeReason} maxLength={1000} onChange={(event) => setCodeReason(event.target.value)}
+          className="mt-1 h-9 w-full rounded-md border bg-background px-2" />
+      </label>}
+      {!codeOnly && <div className="grid gap-2 sm:grid-cols-4">
         <label className="text-xs">
           Year
           <select
@@ -138,10 +156,10 @@ function PlacementEditor({
             )}
           </select>
         </label>
-      </div>
+      </div>}
       <div className="flex flex-wrap gap-2">
         <button
-          disabled={busy}
+          disabled={busy || !officialCode.trim() || (codeChanged && !codeReason.trim())}
           onClick={() =>
             onSave({
               yearLevel,
@@ -149,6 +167,8 @@ function PlacementEditor({
               sortOrder: course.sortOrder,
               credits,
               courseType,
+              officialCode: officialCode.trim(),
+              ...(codeChanged ? { officialCodeReason: codeReason.trim() } : {}),
             })
           }
           className="h-9 rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
@@ -163,7 +183,7 @@ function PlacementEditor({
           Cancel
         </button>
       </div>
-      <div className="border-t pt-3">
+      {!codeOnly && <div className="border-t pt-3">
         <label className="text-xs text-muted-foreground">
           Reason required to remove
           <input
@@ -180,7 +200,7 @@ function PlacementEditor({
         >
           Remove course
         </button>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -205,6 +225,7 @@ export function CurriculumPageClient() {
   const [editingPlacementId, setEditingPlacementId] = useState<string | null>(null);
   const [courses, setCourses] = useState<CourseView[]>([]);
   const [addCourseId, setAddCourseId] = useState("");
+  const [addOfficialCode, setAddOfficialCode] = useState("");
   const [addYear, setAddYear] = useState(1);
   const [addSemester, setAddSemester] = useState<"First" | "Second">("First");
   const [mutating, setMutating] = useState(false);
@@ -287,11 +308,10 @@ export function CurriculumPageClient() {
   const placedIds = useMemo(
     () =>
       new Set(
-        data?.years.flatMap((year) =>
-          year.semesters.flatMap((semester) =>
-            semester.courses.map((course) => course.courseId),
-          ),
-        ) ?? [],
+        data ? [
+          ...data.years.flatMap((year) => year.semesters.flatMap((semester) => semester.courses.map((course) => course.courseId))),
+          ...data.pathways.flatMap((pathway) => pathway.courses.map((course) => course.courseId)),
+        ] : [],
       ),
     [data],
   );
@@ -522,7 +542,7 @@ export function CurriculumPageClient() {
               <p className="font-medium">Add programme course</p>
               <select
                 value={addCourseId}
-                onChange={(event) => setAddCourseId(event.target.value)}
+                onChange={(event) => { setAddCourseId(event.target.value); setAddOfficialCode(""); }}
                 className="mt-2 h-10 w-full rounded-md border bg-background px-3"
               >
                 <option value="">Select a course…</option>
@@ -533,6 +553,11 @@ export function CurriculumPageClient() {
                 ))}
               </select>
             </div>
+            <label className="text-sm">
+              Official code (optional)
+              <input value={addOfficialCode} maxLength={40} onChange={(event) => setAddOfficialCode(event.target.value)}
+                placeholder="Use catalogue code by default" className="mt-1 block h-10 rounded-md border bg-background px-3" />
+            </label>
             <label className="text-sm">
               Year
               <select
@@ -564,6 +589,7 @@ export function CurriculumPageClient() {
                 void mutate(async () => {
                   const result = await curriculumApi.addCourse(current.id, {
                     courseId: addCourseId,
+                    ...(addOfficialCode.trim() ? { officialCode: addOfficialCode.trim() } : {}),
                     yearLevel: addYear,
                     semester: addSemester,
                     sortOrder:
@@ -572,6 +598,7 @@ export function CurriculumPageClient() {
                       ]?.courses.length ?? 0,
                   });
                   setAddCourseId("");
+                  setAddOfficialCode("");
                   return result;
                 })
               }
@@ -656,7 +683,8 @@ export function CurriculumPageClient() {
                   </span>
                 </div>
                 {editMode ? (
-                  !semester.courses.length ? (
+                  <>
+                  {!semester.courses.length ? (
                     <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">
                       No courses assigned
                     </p>
@@ -743,7 +771,26 @@ export function CurriculumPageClient() {
                         </div>
                       ))}
                     </div>
-                  )
+                  )}
+                  {data.pathways.filter((pathway) => !pathway.isDefault && pathway.yearLevel === year.yearLevel && pathway.semester === semester.semester).map((pathway) => (
+                    <section key={pathway.id} className="mt-4 space-y-2 rounded-lg border p-3">
+                      <h5 className="text-sm font-medium">{pathway.name} — official codes</h5>
+                      {pathway.courses.map((course) => (
+                        <div key={course.placementId}>
+                          <button type="button" className="text-sm underline" onClick={() => setEditingPlacementId(editingPlacementId === course.placementId ? null : course.placementId)}>
+                            {course.code} — {course.title}
+                          </button>
+                          {editingPlacementId === course.placementId && (
+                            <PlacementEditor course={course} busy={mutating} codeOnly
+                              onCancel={() => setEditingPlacementId(null)}
+                              onRemove={() => undefined}
+                              onSave={(input) => void mutate(() => curriculumApi.updateCourse(current.id, course.placementId, input))} />
+                          )}
+                        </div>
+                      ))}
+                    </section>
+                  ))}
+                  </>
                 ) : (
                   <CurriculumPathwayView
                     yearLevel={year.yearLevel}

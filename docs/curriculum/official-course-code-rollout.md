@@ -18,11 +18,18 @@ Draft implementation; no release or production import is authorized.
 - Before staging migration, run the duplicate preflight from the migration on the target DB. If there are duplicates, review them without rewriting approved history. Never bypass the invariant.
 - DB regression covers approved old course, ambiguous legacy import rejection, distinct G6 Draft identity, artifact lookup, direct duplicate rejection and immutable old curriculum. Actual CI results pending.
 
+## Phase 3: Draft editor and history
+
+- Optional official code on add, explicit reason for a changed official code on edit. Exact placement/version/course scope; lock Draft version and recheck review marker, audit old/new codes transactionally, enforce duplicate protection and preserve canonical identity.
+- Alternate pathway rows expose code-only editing; default route retains existing editing. Existing canonical revision trigger copies official code by course identity; regression verifies clone and approved history rather than replacing the trigger.
+- Comparison covers all pathways, deduplicates the default route by course identity, and displays code-only changes with old/new codes.
+- Phase 2 CI: 16/17 workflows passed; import suite failed because Bun expected a native Promise rather than PrismaPromise for the duplicate assertion. Fixed to execute the real rejection and check the constraint name. Fresh CI required.
+
 ## Remaining merge blockers
 
 1. Validate the new version-wide constraint and duplicate preflight on isolated staging, including detached legacy snapshots. No production migration or data correction authorized.
 2. Verify import/export round trip and error UI, additional conflict/concurrency cases and browser smoke; official document export must not display internal aliases.
-3. Draft editor mutation and audit, revision cloning, comparison (including alternate pathways and code-only change), integrity diagnostics, and contextual offering/CourseSpec/student/report displays still require audit and tests. The current read projection is not the complete feature.
+3. Verify Phase 3 editor, clone, comparison and audit regressions, including authorization and browser checks. Integrity diagnostics and contextual offering/CourseSpec/student/report displays remain Phase 4.
 4. Add G5 approved/G6 draft and approved delivery regressions, duplicate/rollback/security cases and browser verification. Validate staging before any release.
 5. Keep G6 v3.0 Draft until academic review resolves 132-credit research/industry routes against 130-credit limit. No import or approval in this PR until the full feature is verified.
 6. Coordinate additive migration ordering and rebase with #1354, #1362, #1299, #1364 and #1352. This initial slice intentionally avoids their changed files. No Vercel configuration changes; retain existing preview/deployment policy.
