@@ -18,9 +18,10 @@ export const TelegramStudentRegistrationInputSchema = z.object({
   cohortId: z.string().trim().min(1).max(100),
   sectionId: z.string().trim().min(1).max(100),
   officialStudentId: z.string().trim().min(1).max(100).optional(),
-  email: UniversityEmailSchema,
+  email: UniversityEmailSchema.optional(),
+  emailNotIssued: z.literal(true).optional(),
   careerProfile: StudentCareerProfileSchema.optional(),
-}).strict();
+}).strict().refine(v => Boolean(v.email) !== Boolean(v.emailNotIssued), {path:["email"],message:"Enter a university email or explicitly mark it not issued yet"});
 
 export type TelegramStudentRegistrationInput = z.infer<
   typeof TelegramStudentRegistrationInputSchema
@@ -43,11 +44,13 @@ export type TelegramRegistrationBootstrap = {
   verificationId: string; expiresAt: string;
   state: "FORM" | "BOT_REQUIRED" | "EXISTING_ACCOUNT" | TelegramRegistrationStatus;
   placements: TelegramRegistrationPlacement[];
+  email?: string | null;
+  emailVerified?: boolean;
 };
 export type TelegramRegistrationStaffRow = {
   id: string; status: TelegramRegistrationStatus; khmerFamilyName: string; khmerGivenName: string;
   latinFamilyName: string; latinGivenName: string; cohortId: string; cohortCode: string; sectionCode: string;
-  officialStudentId: string | null; email: string | null; telegramPhone: string | null;
+  officialStudentId: string | null; email: string | null; telegramPhone: string | null; emailVerifiedAt: string | null;
   createdAt: string; updatedAt: string;
 };
 export type TelegramRegistrationRosterCandidate = {
