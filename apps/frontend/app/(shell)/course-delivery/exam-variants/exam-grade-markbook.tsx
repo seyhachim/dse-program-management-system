@@ -76,7 +76,7 @@ function GradeEditor({offeringId,assessmentItemId,enrollmentId,onDirty,onSaved}:
       <p className="break-all text-xs text-muted-foreground">{data.snapshot.variantHash}</p></div>
     {!data.canEdit&&<p>Read-only: you are not eligible to edit this draft.</p>}
     {rows.map((r,i)=><div key={r.questionId} className="grid grid-cols-2 items-center gap-2 rounded border p-2 sm:grid-cols-4">
-      <label htmlFor={"exam-q-"+i} className="break-all text-sm">Q{i+1} · {r.questionId}</label>
+      <label htmlFor={"exam-q-"+i} className="break-all text-sm">Q{i+1} · {data.questionLabels[r.questionId]??r.questionId}</label>
       <span className="text-sm">{r.cloCode} · {r.evidence}</span>
       <input id={"exam-q-"+i} className={field} type="number" min={0} max={r.maxPoints} step="any" value={r.value} aria-invalid={!r.valid} disabled={!data.canEdit||busy} onChange={e=>setValues(v=>({...v,[r.questionId]:e.target.value}))}/>
       <span className="text-sm">/ {r.maxPoints}{!r.valid?" · Invalid":""}</span>
