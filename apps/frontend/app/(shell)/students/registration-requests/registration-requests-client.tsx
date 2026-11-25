@@ -64,8 +64,8 @@ export function RegistrationRequestsClient() {
       : { decision, reason: reason.trim() };
     savingRef.current = true; setSaving(true); setError(""); setNotice("");
     try {
-      await api.post(`${root}/${encodeURIComponent(selected.id)}/review`,input);
-      setNotice("Review recorded successfully."); resetSelection(); setOffset(0); setRevision(n => n+1);
+      const result = await api.post<{status:string;notification:string}>(`${root}/${encodeURIComponent(selected.id)}/review`,input);
+      setNotice(result.notification === "SENT" ? "Review recorded and Telegram notification sent." : "Review recorded. Telegram notification was not confirmed; contact the student directly."); resetSelection(); setOffset(0); setRevision(n => n+1);
     } catch (e) { setError(e instanceof Error ? e.message : "Review failed"); }
     finally { savingRef.current = false; setSaving(false); }
   }
