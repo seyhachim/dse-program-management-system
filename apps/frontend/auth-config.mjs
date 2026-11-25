@@ -1,5 +1,5 @@
-const STAGING_API = "https://dse-pms-staging-isolated-free.onrender.com";
-const STAGING_NEON_AUTH = "https://ep-purple-scene-a1py5uzt.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth";
+const STAGING_API = "https://dse-pms-telegram1364-uat.onrender.com";
+const STAGING_NEON_AUTH = "https://ep-solitary-block-a1hm2c16.neonauth.ap-southeast-1.aws.neon.tech/neondb/auth";
 
 /**
  * Staging preview is a distinct, exact-host allowlisted deployment. This never
@@ -11,7 +11,8 @@ export function validateProductionAuthConfig(env = process.env) {
     throw new Error("NEXT_PUBLIC_DEV_TOKEN must not be configured in production builds");
   }
   if (env.NEXT_PUBLIC_AUTH_MODE === "neon-staging") {
-    if (env.VERCEL_ENV === "production" ||
+    if (env.VERCEL_ENV !== "preview" ||
+        env.DSE_REGISTRATION_UAT !== "true" ||
         env.NEXT_PUBLIC_STAGING_MODE !== "true" ||
         env.NEXT_PUBLIC_API_URL !== STAGING_API ||
         env.NEXT_PUBLIC_NEON_AUTH_BASE_URL !== STAGING_NEON_AUTH ||
