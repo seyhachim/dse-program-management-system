@@ -1,0 +1,17 @@
+# Phase 3A — secure grading interlock (#1371)
+
+Stacked on #1375 at 8a4c07f. #1372–#1375 remain draft. No deployment, activation, or production migration.
+
+## Design and acceptance
+
+- Mode ownership is per exact CourseSpec version and assessment item, across every section. First committed legacy result/group or variant configuration claims the mode. An immutable private unique fence row serializes incompatible first writers even under stale MVCC snapshots. Existing matching modes are read without a write; unique upsert handles a missing row and concurrent creation. No user-set session flag, administrator exception or fallback.
+- Additive migration locks the affected roots during preflight, rejects historical overlap and seeds only mode metadata from existing results/groups/configuration; never rewrites existing marks. Existing rows with historical scope identifiers remain supported (no new FK on legacy identifiers). Mode persists after draft removal; conversion requires a separate reviewed historical-reconciliation procedure, not a reset.
+- Triggers guard canonical AssessmentResult and AssessmentGroup insert/update/delete, old and new scope for moves. Child scores/corrections have parent FKs; configured scopes cannot contain legacy roots. The existing group service also rejects Individual assessment mode. PostgreSQL owner/superuser operational powers are outside the application authorization boundary. No legacy grading is allowed for configured assessments, even if a student has a confirmed variant, until Phase 3B/3C provide a dedicated validated write and release path.
+- Authorized result lifecycle preflight returns conflict for manual marks, criterion scores, publication, finalization and correction; database remains authority for alternate writers and races. No frontend or shared-contract changes. Existing markbook should display the backend conflict; UI affordances and question-grade entry belong to 3B.
+- Tests: configured assigned/unassigned rejection, old-scope move rejection, fence immutability, history unchanged, ordinary legacy edit/publish/finalize, first-writer competition in both orders, stale Serializable snapshot and authorized legacy service conflicts. CI security inventory includes new private RLS-protected table; no Data API grants.
+
+## Coordination and remaining gates
+
+P0: prevent mixed legacy and variant grading, including races. P1: preserve old result lifecycle and explicit staff error. P2: variant score storage, grading workspace, CLO calculation and controlled release/correction remain separate. No new grading functionality or real grades in 3A. Confirm populated-upgrade behavior, migration lock duration and ordinary workload performance before rollout. Reconcile overlapping migration/security inventory with other active PRs; #1277 touches adjacent student-portal release paths, not the new grading lifecycle file in its inspected diff. Coordinate #1367 #1362 #1352 #1280 #1354 #1364 #1339 #1365. Independent security review and authenticated pilot remain pending.
+
+Run from repository root: bun install --frozen-lockfile; bunx prisma validate --schema apps/backend/prisma/schema.prisma; bun run typecheck; bun run lint; bun run test; bun run test:backend; bun run build. Disposable CI PostgreSQL runs the existing exam variant DB suites and security verifier. No local Bun/Postgres execution through connector; exact-head CI pending. Keep draft; no production database changes, merge, deploy or real student marks.
