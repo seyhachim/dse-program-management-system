@@ -98,6 +98,7 @@ function EvidenceRows({ base, userId, students, population }: { base: string; us
       </select>
     </label>
     {!data.eligibleResults.length && <p className="text-sm text-muted-foreground">No eligible finalized results yet. Publish and finalize marks using the existing Results workflow.</p>}
+    {current && population === "group" && <div className="rounded-lg border border-border p-3 text-sm"><p className="font-medium">Locked group membership</p><p className="mt-1 text-muted-foreground">{current.memberEnrollmentIds.map(studentLabel).join(" · ")}</p></div>}
     {current && <EvidenceEditor key={current.resultId + ":" + (revision?.revision ?? 0)} path={base + "/results/" + encodeURIComponent(current.resultId)} revision={revision} current={current} population={population} access={data.access} changed={async () => { await query.refetch(); }} />}
     {data.evidence.length > 0 && <div className="space-y-2"><h3 className="text-sm font-semibold">Collected evidence</h3>
       {data.evidence.map(e => { const result = data.eligibleResults.find(s => s.resultId === e.resultId); return <button key={e.resultId} type="button" disabled={!result} onClick={() => setChosen(e.resultId)} className="flex w-full justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-60"><span>{result ? sourceLabel(result) : "Historical source unavailable"} · revision {e.revision}</span><span>{(e.effectiveStatus ?? e.status).replaceAll("_"," ")}</span></button>; })}
