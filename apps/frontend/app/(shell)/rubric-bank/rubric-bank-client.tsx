@@ -110,7 +110,6 @@ export function RubricBankClient() {
   const openCreate = (kind: AssessmentInstrumentKind) => {
     setEditing(null);
     const next = blankDraft(kind);
-    if (kind === "rubric" && reference) next.levels = [{label:"Exceeds Expectation",points:3},{label:"Meets Expectation",points:2},{label:"Developing Expectation",points:1},{label:"Below Expectation",points:0}];
     setDraft(next);
     setMutationError(null);
     setDialogOpen(true);
@@ -289,7 +288,7 @@ export function RubricBankClient() {
             </div>
             <div className="space-y-2"><Label htmlFor="rubric-description">Description</Label><textarea id="rubric-description" value={draft.description} onChange={(e) => setDraft((current) => ({ ...current, description: e.target.value }))} className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" /></div>
 
-            {me && reference && draft.instrumentKind !== "marking_scheme" ? <aside className="rounded-md border border-border p-3 text-sm"><strong>Institutional reference — internal use only</strong><p>{reference.title} · {reference.version} · {reference.locator}</p><p className="text-xs text-muted-foreground">For new drafts, use the verified institutional scale. Existing instruments retain their original scale.</p>{!editing ? <Button variant="outline" size="sm" onClick={() => setDraft(current => ({...current, levels: [{label:"Exceeds Expectation",points:3},{label:"Meets Expectation",points:2},{label:"Developing Expectation",points:1},{label:"Below Expectation",points:0}], criteria:current.criteria.map(c=>({...c,descriptors:["","","",""]}))}))}>Use four-level OBE scale (resets descriptors)</Button> : null}</aside> : null}
+            {me && reference && draft.instrumentKind !== "marking_scheme" ? <aside className="rounded-md border border-border p-3 text-sm"><strong>Institutional reference — internal use only</strong><p>{reference.title} · {reference.version} · {reference.locator}</p><p className="text-xs text-muted-foreground">A verified reference does not approve a scoring scale. Confirm the applicable scale before publication. Existing instruments retain their original scale.</p></aside> : null}
 
             {draft.instrumentKind === "marking_scheme" ? (
               <div className="space-y-3">
