@@ -1,3 +1,4 @@
+import { loadOfferingOfficialCodes } from "../../core/academic/offering-official-code.ts";
 import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { CourseType, Semester } from "@prisma/client";
@@ -92,6 +93,12 @@ dbDescribe("curriculum-bound Offerings", () => {
         courseTypeSnapshot: CourseType.Core,
       },
     });
+    const officialCode = `OFF-${suffix.slice(0, 8)}`;
+    await prisma.$executeRaw`
+      UPDATE curriculum_artifact."CourseSnapshot" SET "courseCodeSnapshot" = ${officialCode}
+      WHERE "placementId" = ${olderPlacement.id} AND "curriculumVersionId" = ${olderVersion.id}
+        AND "courseId" = ${olderCourse.id}
+    `;
     await curriculumWorkflowService.submit(
       olderVersion.id,
       actor.id,
@@ -208,6 +215,12 @@ dbDescribe("curriculum-bound Offerings", () => {
     expect(binding?.curriculumVersionId).toBe(olderVersion.id);
     expect(binding?.version.version).toBe("1.0");
     expect(binding?.placement.yearLevel).toBe(3);
+    expect(binding?.placement.courseCode).toBe(officialCode);
+    expect((await offeringService.getById(created.id))?.course?.code).toBe(officialCode);
+    expect((await prisma.course.findUniqueOrThrow({ where: { id: olderCourse.id } })).code).toBe(olderCourse.code);
+    const codes = await loadOfferingOfficialCodes([created.id, randomUUID()]);
+    expect(codes.get(created.id)).toBe(officialCode);
+    expect(codes.size).toBe(1);
   });
 
   test("does not allow a Draft curriculum placement to authorize delivery", async () => {

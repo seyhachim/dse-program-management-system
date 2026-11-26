@@ -4,6 +4,7 @@ import type {
   LecturerTeachingEvidenceRef,
 } from "@dse-pms/shared-types";
 import { prisma } from "../../core/db/prisma.ts";
+import { loadOfferingOfficialCodes } from "../../core/academic/offering-official-code.ts";
 import { registry } from "../../core/plugins/registry.ts";
 
 const courses = () => registry.get<CoursesServiceContract>("courses").service;
@@ -43,13 +44,14 @@ export const portfolioTeachingEvidenceService = {
         .map((course) => [course.id, course]),
     );
 
+    const officialCodes = await loadOfferingOfficialCodes(rows.map((row) => row.id));
     return rows.flatMap((row) => {
       const course = courseById.get(row.courseId);
       if (!course) return [];
       return [{
         offeringId: row.id,
         courseId: row.courseId,
-        courseCode: course.code,
+        courseCode: officialCodes.get(row.id) ?? course.code,
         courseTitle: course.title,
         term: row.term,
         sectionCode: row.sectionCode,

@@ -6,6 +6,8 @@ import type { CourseSpecExactVersionView, Method, ProgrammeAcademicConfig, Rubri
 import { Button } from "@dse-pms/ui";
 import { api } from "@/lib/api";
 import { courseSpecHistoryApi, comparisonHref } from "@/lib/course-spec-history";
+import { curriculumApi } from "@/lib/curriculum";
+import { resolveBoundDocumentCode } from "../../curriculum-document-context";
 import { methodsApi } from "@/lib/methods";
 import { rubricsApi } from "@/lib/rubrics";
 import { buildCourseDocument } from "../../course-document-model";
@@ -21,35 +23,48 @@ import { EMPTY_POLICY } from "../../policy-section";
 import { EMPTY_DATE } from "../../date-section";
 import { EMPTY_STUDENT_RESPONSIBILITY } from "../../student-responsibility-section";
 
-export function HistoricalVersionClient({ courseId, versionId }: { courseId: string; versionId: string }) {
+export function HistoricalVersionClient({ courseId, versionId, curriculumContext }: { courseId: string; versionId: string; curriculumContext?: { curriculumVersionId: string; placementId: string } }) {
   const [version, setVersion] = useState<CourseSpecExactVersionView | null>(null);
   const [methods, setMethods] = useState<{ teaching: Method[]; assessment: Method[] }>({ teaching: [], assessment: [] });
   const [programme, setProgramme] = useState<ProgrammeAcademicConfig | null>(null);
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [previousId, setPreviousId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [officialCode, setOfficialCode] = useState<string | null>(null);
+  const curriculumVersionId = curriculumContext?.curriculumVersionId;
+  const placementId = curriculumContext?.placementId;
+  const contextRequested = curriculumContext !== undefined;
 
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
       courseSpecHistoryApi.get(courseId, versionId),
       courseSpecHistoryApi.list(courseId),
       methodsApi.list(),
       api.get<ProgrammeAcademicConfig>("/api/programme"),
       rubricsApi.list().catch(() => [] as Rubric[]),
-    ]).then(([exact, history, methodList, programmeConfig, rubricList]) => {
+      contextRequested ? (curriculumVersionId && placementId ? curriculumApi.courseSpecBindings(curriculumVersionId) : Promise.reject(new Error("Incomplete curriculum context"))) : Promise.resolve(null),
+    ]).then(([exact, history, methodList, programmeConfig, rubricList, bindings]) => {
+      if (cancelled) return;
+      if (contextRequested) {
+        if (!bindings || !curriculumVersionId || !placementId || exact.version.reviewStatus !== "Approved") throw new Error("Missing or unapproved curriculum context");
+        setOfficialCode(resolveBoundDocumentCode(bindings, { courseId, versionId, curriculumVersionId, placementId }));
+      }
       setVersion(exact);
       setMethods(methodList);
       setProgramme(programmeConfig);
       setRubrics(rubricList);
       const index = history.versions.findIndex((item) => item.id === versionId);
       setPreviousId(index >= 0 ? history.versions[index + 1]?.id ?? null : null);
-    }).catch(() => setError("Could not load this historical course specification version."));
-  }, [courseId, versionId]);
+    }).catch(() => { if (!cancelled) setError(contextRequested ? "Could not verify the approved curriculum binding. Contextual document export is unavailable." : "Could not load this historical course specification version."); });
+    return () => { cancelled = true; };
+  }, [courseId, versionId, contextRequested, curriculumVersionId, placementId]);
 
   const document = useMemo(() => {
-    if (!version) return null;
+    if (!version || (contextRequested && !officialCode)) return null;
     const data = version.data;
-    const courseInfo = toCourseInfoForm(data.courseInfo as Record<string, unknown> | undefined);
+    const storedCourseInfo = toCourseInfoForm(data.courseInfo as Record<string, unknown> | undefined);
+    const courseInfo = officialCode ? { ...storedCourseInfo, courseCode: officialCode } : storedCourseInfo;
     const clos = toClosForm(data.clos, data.cloMapping);
     const weeklyPlan = toWeeklyPlanForm(data.slt);
     const assessments = toAssessmentForm(data.assessmentPlan);
@@ -72,7 +87,7 @@ export function HistoricalVersionClient({ courseId, versionId }: { courseId: str
       specDate: (data.date as typeof EMPTY_DATE | undefined) ?? EMPTY_DATE,
       courseTotalSlt: courseInfo.totalSltHours ?? null,
     });
-  }, [courseId, methods, programme, rubrics, version]);
+  }, [courseId, methods, programme, rubrics, version, contextRequested, officialCode]);
 
   if (error) return <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>;
   if (!version || !document) return <p className="text-sm text-muted-foreground">Loading historical version…</p>;
@@ -93,6 +108,7 @@ export function HistoricalVersionClient({ courseId, versionId }: { courseId: str
           </div>
         </div>
       </section>
+      {officialCode && <p className="rounded-lg border p-3 text-sm">Official curriculum code: <strong>{officialCode}</strong>. Verified against the selected approved curriculum placement; stored CourseSpec unchanged.</p>}
       <DocumentPreview document={document} courseSpecId={versionId} />
     </div>
   );

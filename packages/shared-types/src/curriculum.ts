@@ -90,12 +90,15 @@ const CurriculumPlacementLocationSchema = z.object({
 
 export const AddCurriculumCourseSchema = CurriculumPlacementLocationSchema.extend({
   courseId: z.string().uuid(),
+  officialCode: z.string().trim().min(1).max(40).optional(),
   credits: z.number().int().min(0).optional(),
   courseType: CourseTypeSchema.optional(),
 });
 export type AddCurriculumCourseInput = z.infer<typeof AddCurriculumCourseSchema>;
 
 export const UpdateCurriculumCourseSchema = CurriculumPlacementLocationSchema.extend({
+  officialCode: z.string().trim().min(1).max(40).optional(),
+  officialCodeReason: z.string().trim().min(1).max(1000).optional(),
   credits: z.number().int().min(0).optional(),
   courseType: CourseTypeSchema.optional(),
 });
@@ -123,6 +126,7 @@ export const CurriculumCourseSchema = z.object({
   placementId: z.string().uuid(),
   courseId: z.string().uuid(),
   code: z.string(),
+  catalogueCode: z.string().optional(),
   title: z.string(),
   yearLevel: z.number().int().min(1).max(4),
   semester: CurriculumSemesterSchema,

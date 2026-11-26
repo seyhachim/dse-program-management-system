@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { CurriculumCourseSpecBindings } from "@dse-pms/shared-types";
 import { ApiError } from "@/lib/api";
 import { useMe } from "@/lib/auth";
@@ -144,7 +145,14 @@ export function CurriculumCourseSpecBindingsPanel() {
                     <td className="px-4 py-3"><p className="font-medium">{binding.courseCode}</p><p className="text-xs text-muted-foreground">{binding.courseTitle}</p></td>
                     <td className="px-4 py-3">
                       {binding.linkedVersion ? (
-                        <span className="font-medium">{courseSpecVersionLabel(binding.linkedVersion)}</span>
+                        <div>
+                          <span className="font-medium">{courseSpecVersionLabel(binding.linkedVersion)}</span>
+                          {data.versionStatus !== "Draft" && (
+                            <Link className="block text-xs text-primary underline" href={`/courses/${encodeURIComponent(binding.courseId)}/spec/versions/${encodeURIComponent(binding.linkedVersion.id)}?curriculumVersionId=${encodeURIComponent(data.versionId)}&placementId=${encodeURIComponent(binding.placementId)}`}>
+                              Curriculum-bound PDF / Word
+                            </Link>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-amber-700">Not bound</span>
                       )}

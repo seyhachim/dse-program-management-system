@@ -7,6 +7,7 @@ import type {
 import { prisma } from "../../core/db/prisma.ts";
 import { formatProgrammeCurriculumVersion } from "./curriculum-domain.ts";
 import { competencyFrameworkService } from "./competency-framework-service.ts";
+import { loadCurriculumOfficialCodes } from "./curriculum-official-code.ts";
 
 const versionSelect = {
   id: true,
@@ -107,11 +108,12 @@ function toCurriculumCourse(placement: {
   courseTypeSnapshot: "Basic" | "Core" | "Elective" | "Specialization" | "MoeysHeip";
   sortOrder: number;
   course: { code: string; title: string };
-}) {
+}, officialCodes: ReadonlyMap<string, string>) {
   return {
     placementId: placement.id,
     courseId: placement.courseId,
-    code: placement.course.code,
+    code: officialCodes.get(placement.id) ?? placement.course.code,
+    ...(officialCodes.get(placement.id) && officialCodes.get(placement.id) !== placement.course.code ? { catalogueCode: placement.course.code } : {}),
     title: placement.course.title,
     yearLevel: placement.yearLevel,
     semester: placement.semester,
@@ -454,7 +456,7 @@ export const curriculumService = {
     }
 
     const visiblePlacementIds = await defaultRoutePlacementIds(selectedSummary.id);
-    const [placements, pathwayRows, competencyFramework] = await Promise.all([
+    const [placements, pathwayRows, competencyFramework, officialCodes] = await Promise.all([
       prisma.programmeCurriculumCourse.findMany({
         where: {
           curriculumVersionId: selectedSummary.id,
@@ -492,10 +494,11 @@ export const curriculumService = {
         },
       }),
       competencyFrameworkService.getBindingForCurriculumVersion(selectedSummary.id),
+      loadCurriculumOfficialCodes(selectedSummary.id),
     ]);
 
     const pathways = pathwayRows.map((pathway) => {
-      const courses = pathway.courses.map(toCurriculumCourse);
+      const courses = pathway.courses.map((placement) => toCurriculumCourse(placement, officialCodes));
       return {
         id: pathway.id,
         code: pathway.code,
@@ -517,7 +520,7 @@ export const curriculumService = {
             (placement) =>
               placement.yearLevel === yearLevel && placement.semester === semester,
           )
-          .map(toCurriculumCourse);
+          .map((placement) => toCurriculumCourse(placement, officialCodes));
 
         return {
           semester,

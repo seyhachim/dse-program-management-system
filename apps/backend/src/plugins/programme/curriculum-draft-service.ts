@@ -38,6 +38,58 @@ async function getDraftVersion(versionId: string) {
   return version;
 }
 
+// Serialize draft placement edits against the version and check the actual review marker.
+async function lockEditableDraft(tx: Prisma.TransactionClient, versionId: string) {
+  const rows = await tx.$queryRaw<Array<{ status: string }>>`
+    SELECT "status"::text AS status FROM public."ProgrammeCurriculumVersion"
+    WHERE "id" = ${versionId} FOR UPDATE
+  `;
+  if (rows[0]?.status !== "Draft") {
+    throw new CurriculumDraftMutationError("Only Draft curriculum versions can be edited");
+  }
+  const review = await tx.$queryRaw<Array<{ marker: string }>>`
+    SELECT "details"->>'workflowAction' AS marker
+    FROM public."ProgrammeCurriculumAuditAction"
+    WHERE "curriculumVersionId" = ${versionId}
+      AND "action" = 'MetadataUpdated'
+      AND "details"->>'workflowAction' IN ('SubmittedForReview', 'ChangesRequested')
+    ORDER BY "createdAt" DESC, "id" DESC LIMIT 1
+  `;
+  if (review[0]?.marker === "SubmittedForReview") {
+    throw new CurriculumDraftMutationError("Only Draft curriculum versions can be edited");
+  }
+}
+
+async function readOfficialCode(tx: Prisma.TransactionClient, versionId: string, placementId: string, courseId: string) {
+  const rows = await tx.$queryRaw<Array<{ code: string }>>`
+    SELECT "courseCodeSnapshot" AS code FROM curriculum_artifact."CourseSnapshot"
+    WHERE "curriculumVersionId" = ${versionId} AND "placementId" = ${placementId} AND "courseId" = ${courseId}
+    FOR UPDATE
+  `;
+  if (!rows[0]) throw new CurriculumDraftConflictError("Official course snapshot is missing; review curriculum integrity");
+  return rows[0].code;
+}
+
+async function writeOfficialCode(tx: Prisma.TransactionClient, versionId: string, placementId: string, courseId: string, code: string) {
+  if (!code.trim() || code !== code.trim() || code.length > 40) {
+    throw new CurriculumDraftMutationError("Official course code must contain 1–40 characters");
+  }
+  const duplicate = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM curriculum_artifact."CourseSnapshot"
+    WHERE "curriculumVersionId" = ${versionId}
+      AND "courseCodeSnapshot" = ${code}
+      AND "placementId" IS DISTINCT FROM ${placementId}
+    LIMIT 1
+  `;
+  if (duplicate.length) throw new CurriculumDraftConflictError("This official course code is already used in the selected curriculum version");
+  const updated = await tx.$executeRaw`
+    UPDATE curriculum_artifact."CourseSnapshot"
+    SET "courseCodeSnapshot" = ${code}, "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "curriculumVersionId" = ${versionId} AND "placementId" = ${placementId} AND "courseId" = ${courseId}
+  `;
+  if (updated !== 1) throw new CurriculumDraftConflictError("Official course snapshot is missing; review curriculum integrity");
+}
+
 export const curriculumDraftService = {
   async getDraftContext(versionId: string) {
     return getDraftVersion(versionId);
@@ -82,6 +134,9 @@ export const curriculumDraftService = {
 
     try {
       await prisma.$transaction(async (tx) => {
+        await lockEditableDraft(tx, version.id);
+        // The INSERT trigger may inherit a predecessor code before the requested code is written.
+        await tx.$executeRaw`SET CONSTRAINTS curriculum_artifact."CourseSnapshot_version_official_code_key" DEFERRED`;
         const placement = await tx.programmeCurriculumCourse.create({
           data: {
             curriculumVersionId: version.id,
@@ -94,16 +149,20 @@ export const curriculumDraftService = {
           },
           select: { id: true },
         });
+        const inheritedCode = await readOfficialCode(tx, version.id, placement.id, course.id);
+        const officialCode = input.officialCode ?? inheritedCode;
+        await writeOfficialCode(tx, version.id, placement.id, course.id, officialCode);
         await tx.programmeCurriculumAuditAction.create({
           data: {
             curriculumVersionId: version.id,
             actorId,
             action: "CourseAdded",
-            note: `Added ${course.code} to draft curriculum`,
+            note: `Added ${officialCode} to draft curriculum`,
             details: {
               placementId: placement.id,
               courseId: course.id,
-              courseCode: course.code,
+              courseCode: officialCode,
+              catalogueCode: course.code,
               yearLevel: input.yearLevel,
               semester: input.semester,
               credits: creditsSnapshot,
@@ -154,6 +213,15 @@ export const curriculumDraftService = {
     await assertEditableWorkflow(placement.curriculumVersion.id);
 
     await prisma.$transaction(async (tx) => {
+      await lockEditableDraft(tx, placement.curriculumVersion.id);
+      const beforeCode = await readOfficialCode(tx, placement.curriculumVersion.id, placement.id, placement.courseId);
+      const afterCode = input.officialCode ?? beforeCode;
+      if (afterCode !== beforeCode) {
+        if (!input.officialCodeReason?.trim()) {
+          throw new CurriculumDraftMutationError("A reason is required to change the official course code");
+        }
+        await writeOfficialCode(tx, placement.curriculumVersion.id, placement.id, placement.courseId, afterCode);
+      }
       await tx.programmeCurriculumCourse.update({
         where: { id: placement.id },
         data: {
@@ -173,7 +241,9 @@ export const curriculumDraftService = {
           details: {
             placementId: placement.id,
             courseId: placement.courseId,
+            officialCodeReason: afterCode !== beforeCode ? input.officialCodeReason!.trim() : null,
             before: {
+              code: beforeCode,
               yearLevel: placement.yearLevel,
               semester: placement.semester,
               credits: placement.creditsSnapshot,
@@ -181,6 +251,7 @@ export const curriculumDraftService = {
               sortOrder: placement.sortOrder,
             },
             after: {
+              code: afterCode,
               yearLevel: input.yearLevel,
               semester: input.semester,
               credits: input.credits ?? placement.creditsSnapshot,
@@ -226,6 +297,8 @@ export const curriculumDraftService = {
     await assertEditableWorkflow(placement.curriculumVersion.id);
 
     await prisma.$transaction(async (tx) => {
+      await lockEditableDraft(tx, placement.curriculumVersion.id);
+      const officialCode = await readOfficialCode(tx, placement.curriculumVersion.id, placement.id, placement.courseId);
       await tx.programmeCurriculumAuditAction.create({
         data: {
           curriculumVersionId: placement.curriculumVersion.id,
@@ -235,7 +308,8 @@ export const curriculumDraftService = {
           details: {
             placementId: placement.id,
             courseId: placement.courseId,
-            courseCode: placement.course.code,
+            courseCode: officialCode,
+            catalogueCode: placement.course.code,
             yearLevel: placement.yearLevel,
             semester: placement.semester,
             credits: placement.creditsSnapshot,
@@ -289,6 +363,7 @@ export const curriculumDraftService = {
     }
 
     await prisma.$transaction(async (tx) => {
+      await lockEditableDraft(tx, version.id);
       for (const [sortOrder, placementId] of input.placementIds.entries()) {
         await tx.programmeCurriculumCourse.update({
           where: { id: placementId },

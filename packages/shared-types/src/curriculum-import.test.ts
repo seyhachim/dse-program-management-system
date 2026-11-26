@@ -156,6 +156,41 @@ describe("dse curriculum JSON import contract", () => {
     expect(DseCurriculumImportSchema.safeParse(input).success).toBe(false);
   });
 
+  test("supports explicit catalogue identity without changing the official code", () => {
+    const input = baseImport();
+    const parsed = DseCurriculumImportSchema.parse({
+      ...input,
+      courses: [{ ...input.courses[0], code: "AAI302", catalogueCode: "AAI302-G6" }, ...input.courses.slice(1)],
+    });
+    expect(parsed.courses[0]?.code).toBe("AAI302");
+    expect(parsed.courses[0]?.catalogueCode).toBe("AAI302-G6");
+    expect(parsed.courses[1]?.catalogueCode).toBeUndefined();
+  });
+
+  test("rejects duplicate official codes across pathways even with distinct catalogue identities", () => {
+    const input = baseImport();
+    const parsed = DseCurriculumImportSchema.safeParse({
+      ...input,
+      courses: [
+        { ...input.courses[1], code: "AAI302", catalogueCode: "AAI302-G5" },
+        { ...input.courses[2], code: "AAI302", catalogueCode: "AAI302-G6" },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  test("rejects duplicate canonical catalogue identity under different official codes", () => {
+    const input = baseImport();
+    const parsed = DseCurriculumImportSchema.safeParse({
+      ...input,
+      courses: [
+        { ...input.courses[1], code: "AAI301", catalogueCode: "AAI302-G6" },
+        { ...input.courses[2], code: "AAI302", catalogueCode: "AAI302-G6" },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
   test("rejects duplicate and unknown declared totals", () => {
     const input = {
       ...structuredClone(baseImport()),

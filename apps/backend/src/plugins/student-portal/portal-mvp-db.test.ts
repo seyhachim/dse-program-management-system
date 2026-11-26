@@ -27,6 +27,25 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
       orderBy: [{ versionMajor: "desc" }, { versionMinor: "desc" }],
       select: { id: true, courseId: true },
     });
+    const canonical = await prisma.course.findUniqueOrThrow({ where: { id: spec.courseId } });
+    const officialCode = `OFF-${suffix.slice(0, 8)}`;
+    const curriculum = await prisma.programmeCurriculum.create({
+      data: { programmeId: canonical.programmeId, code: `PORTAL-${suffix.slice(0, 8)}`, name: "Synthetic official code test" },
+    });
+    const version = await prisma.programmeCurriculumVersion.create({
+      data: { curriculumId: curriculum.id, versionMajor: 1, versionMinor: 0, createdById: lecturer.id },
+    });
+    const placement = await prisma.programmeCurriculumCourse.create({
+      data: { curriculumVersionId: version.id, courseId: canonical.id, yearLevel: 1, semester: "First",
+        creditsSnapshot: canonical.credits ?? 3, courseTypeSnapshot: canonical.courseType ?? "Core", courseSpecVersionId: spec.id },
+    });
+    await prisma.$executeRaw`
+      UPDATE curriculum_artifact."CourseSnapshot" SET "courseCodeSnapshot" = ${officialCode}
+      WHERE "placementId" = ${placement.id} AND "curriculumVersionId" = ${version.id} AND "courseId" = ${canonical.id}
+    `;
+    await prisma.programmeCurriculumVersion.update({
+      where: { id: version.id }, data: { status: "Approved", approvedAt: new Date() },
+    });
     const offering = await prisma.offering.create({
       data: {
         courseId: spec.courseId,
@@ -38,6 +57,10 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
         status: "Active",
       },
     });
+    await prisma.$executeRaw`
+      INSERT INTO offering_governance."OfferingCurriculumBinding" ("offeringId", "curriculumCourseId", "boundByUserId", "updatedByUserId")
+      VALUES (${offering.id}, ${placement.id}, ${lecturer.id}, ${lecturer.id})
+    `;
     const historicalOffering = await prisma.offering.create({
       data: {
         courseId: spec.courseId,
@@ -100,14 +123,19 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
       const detail = await studentPortalService.course(studentUser.id, offering.id);
       expect(detail.specAvailable).toBe(true);
       expect(detail.lifecycle).toBe("current");
+      expect(detail.code).toBe(officialCode);
+      expect(detail.courseId).toBe(canonical.id);
+      expect(home.courses.find((course) => course.offeringId === offering.id)?.code).toBe(officialCode);
+      expect(courses.find((course) => course.offeringId === historicalOffering.id)?.code).toBe(canonical.code);
 
       const document = await studentPortalService.courseDocument(studentUser.id, offering.id);
-      expect(document.fileName).toContain("approved-course-specification.html");
+      expect(document.fileName).toBe(`${officialCode}-approved-course-specification.html`);
       expect(document.contentType).toBe("text/html; charset=utf-8");
 
       const historicalDetail = await studentPortalService.course(studentUser.id, historicalOffering.id);
       expect(historicalDetail.specAvailable).toBe(true);
       expect(historicalDetail.lifecycle).toBe("historical");
+      expect(historicalDetail.code).toBe(canonical.code);
 
       const historicalDocument = await studentPortalService.courseDocument(studentUser.id, historicalOffering.id);
       expect(historicalDocument.fileName).toContain("approved-course-specification.html");
@@ -118,6 +146,7 @@ dbDescribe("Student Portal MVP authorization and publication boundaries", () => 
 
       const announcements = await studentPortalService.announcements(studentUser.id);
       expect(announcements.map((announcement) => announcement.title)).toEqual(["Visible"]);
+      expect(announcements[0]?.courseCode).toBe(officialCode);
 
       await prisma.student.update({ where: { id: student.id }, data: { status: "Inactive" } });
       await expect(studentPortalService.courses(studentUser.id)).rejects.toBeInstanceOf(PortalAccessError);

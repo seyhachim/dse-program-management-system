@@ -19,6 +19,7 @@ import {
 } from "@dse-pms/shared-types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
+import { loadOfferingOfficialCodes } from "../../core/academic/offering-official-code.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { summarizeLecturerWorkload } from "./workload.ts";
 
@@ -325,12 +326,14 @@ async function toView(
     }[];
   },
   lecturerById: Map<string, LecturerRef>,
+  officialCodes?: ReadonlyMap<string, string>,
 ): Promise<OfferingView> {
   const [course, courseSpec, enrolledStudents] = await Promise.all([
     courses().getById(offering.courseId),
     offering.courseSpecId ? courses().getCourseSpecVersion(offering.courseSpecId) : Promise.resolve(null),
     students().findByIds(offering.enrollments.map((e) => e.studentId)),
   ]);
+  const officialCode = (officialCodes ?? await loadOfferingOfficialCodes([offering.id])).get(offering.id);
   const lecturer = offering.lecturerId ? (lecturerById.get(offering.lecturerId) ?? null) : null;
   const coLecturers = offering.coLecturers
     .map((c) => lecturerById.get(c.lecturerId))
@@ -382,7 +385,7 @@ async function toView(
     enrolledCount: offering.enrollments.length,
     createdAt: offering.createdAt.toISOString(),
     course: course
-      ? { id: course.id, code: course.code, title: course.title, programmeId: course.programmeId }
+      ? { id: course.id, code: officialCode ?? course.code, title: course.title, programmeId: course.programmeId }
       : null,
     courseSpec,
     // Full instructor block for the syllabus Course Details (§6–9).
@@ -439,7 +442,8 @@ export const offeringService = {
       orderBy: [{ term: "desc" }, { createdAt: "desc" }],
     });
     const lecturerById = await lecturerLookup();
-    const views = await Promise.all(offerings.map((o) => toView(o, lecturerById)));
+    const officialCodes = await loadOfferingOfficialCodes(offerings.map((o) => o.id));
+    const views = await Promise.all(offerings.map((o) => toView(o, lecturerById, officialCodes)));
     return views.map((offering) => scopeOfferingMeetingsForLecturer(offering, lecturerScope));
   },
 

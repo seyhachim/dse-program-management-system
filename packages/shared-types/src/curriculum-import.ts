@@ -42,7 +42,10 @@ export const CurriculumImportPathwaySchema = z.object({
 });
 
 export const CurriculumImportCourseSchema = z.object({
+  // Official code within the selected curriculum version. Legacy JSON uses it for both roles.
   code: z.string().trim().min(1).max(40),
+  // Explicit canonical Course.code lookup when it differs from the official code.
+  catalogueCode: z.string().trim().min(1).max(40).optional(),
   title: z.string().trim().min(1).max(320),
   yearLevel: z.number().int().min(1).max(4),
   semester: CurriculumSemesterSchema,
@@ -136,6 +139,7 @@ export const DseCurriculumImportSchema = z
     }
 
     const placementKeys = new Set<string>();
+    const officialCourseCodes = new Set<string>();
     const canonicalCourseCodes = new Set<string>();
     for (const [index, course] of value.courses.entries()) {
       if (course.pathwayCode && !pathwayCodes.has(course.pathwayCode)) {
@@ -155,14 +159,23 @@ export const DseCurriculumImportSchema = z
       }
       placementKeys.add(key);
 
-      if (canonicalCourseCodes.has(course.code)) {
+      if (officialCourseCodes.has(course.code)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["courses", index, "code"],
-          message: `Course code ${course.code} may appear only once in a curriculum version, even across pathways`,
+          message: `Official course code ${course.code} may appear only once in a curriculum version, even across pathways`,
         });
       }
-      canonicalCourseCodes.add(course.code);
+      officialCourseCodes.add(course.code);
+      const catalogueCode = course.catalogueCode ?? course.code;
+      if (canonicalCourseCodes.has(catalogueCode)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["courses", index, "catalogueCode"],
+          message: `Canonical catalogue code ${catalogueCode} may appear only once in a curriculum version`,
+        });
+      }
+      canonicalCourseCodes.add(catalogueCode);
     }
 
     const semesterTotalKeys = new Set<string>();

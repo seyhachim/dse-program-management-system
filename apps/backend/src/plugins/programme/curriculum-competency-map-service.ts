@@ -6,6 +6,7 @@ import type {
 import { prisma } from "../../core/db/prisma.ts";
 import { formatProgrammeCurriculumVersion } from "./curriculum-domain.ts";
 import { competencyFrameworkService } from "./competency-framework-service.ts";
+import { loadCurriculumOfficialCodes } from "./curriculum-official-code.ts";
 
 export class CurriculumCompetencyMapNotFoundError extends Error {}
 export class CurriculumCompetencyMapConflictError extends Error {}
@@ -121,8 +122,10 @@ export const curriculumCompetencyMapService = {
 
   async getMap(versionId: string): Promise<CurriculumCompetencyMap> {
     const context = await this.getVersionContext(versionId);
-    const [framework, rows, pathways] = await Promise.all([
+    const [framework, rows, pathways, officialCodes] = await Promise.all([
       competencyFrameworkService.getBindingForCurriculumVersion(versionId),
+      // The map covers all placements in this exact version.
+
       prisma.programmeCurriculumCourse.findMany({
         where: { curriculumVersionId: versionId },
         orderBy: [
@@ -150,6 +153,7 @@ export const curriculumCompetencyMapService = {
           isDefault: true,
         },
       }),
+      loadCurriculumOfficialCodes(versionId),
     ]);
 
     const competencyOrder = new Map(
@@ -162,7 +166,7 @@ export const curriculumCompetencyMapService = {
     const courses = rows.map((row) => ({
       placementId: row.id,
       courseId: row.courseId,
-      code: row.course.code,
+      code: officialCodes.get(row.id) ?? row.course.code,
       title: row.course.title,
       yearLevel: row.yearLevel,
       semester: row.semester,
@@ -288,6 +292,11 @@ export const curriculumCompetencyMapService = {
     }
 
     await prisma.$transaction(async (tx) => {
+      const official = await tx.$queryRaw<Array<{ code: string }>>`
+        SELECT "courseCodeSnapshot" AS code FROM curriculum_artifact."CourseSnapshot"
+        WHERE "curriculumVersionId" = ${versionId} AND "placementId" = ${placementId} AND "courseId" = ${placement.courseId}
+      `;
+      const courseCode = official[0]?.code ?? placement.course.code;
       if (clear) {
         await tx.programmeCurriculumCourseCompetencyMapping.delete({
           where: { id: current!.id },
@@ -301,7 +310,8 @@ export const curriculumCompetencyMapService = {
             details: {
               placementId,
               courseId: placement.courseId,
-              courseCode: placement.course.code,
+              courseCode,
+              catalogueCode: placement.course.code,
               competencyId,
               competencyCode: competency.code,
               before: stateOf(current!),
@@ -351,7 +361,8 @@ export const curriculumCompetencyMapService = {
           details: {
             placementId,
             courseId: placement.courseId,
-            courseCode: placement.course.code,
+            courseCode,
+              catalogueCode: placement.course.code,
             competencyId,
             competencyCode: competency.code,
             before: current ? stateOf(current) : null,
