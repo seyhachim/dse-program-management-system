@@ -135,7 +135,7 @@ export function calculateWeightedDirectPreview(input: WeightedDirectInput) {
       }
       if (instrument.kind === "whole-assessment" && (components.size !== 1 || [...components.values()][0]!.role !== "direct"))
         fail("Invalid whole-assessment evidence");
-      const direct = [...components.values()].filter(c => c.role === "direct");
+      const direct = [...components.values()].filter(c => c.role === "direct").sort((a,b) => compare(a.id,b.id));
       if (direct.length && weight === null) fail("Explicit CLO weight required for direct assessment");
       const scores = unique(result?.scores ?? [], s => s.componentId);
       if (result) {
@@ -183,7 +183,7 @@ export function calculateWeightedDirectPreview(input: WeightedDirectInput) {
     const unresolved = assessments.some(a => a.state === "unresolved");
     // No partial classification, no silent reweighting of missing assessments.
     const complete = !unresolved && expected.length > 0 && completed.length === expected.length;
-    const percentage = complete ? completed.reduce((n,a) => n+a.fraction!*(a.weight!/expectedWeight),0)*100 : null;
+    const percentage = complete ? completed.reduce((n,a) => n+a.fraction!*a.weight!,0)/expectedWeight*100 : null;
     // Clamp only a floating point overshoot at the mathematical upper bound.
     const score = percentage === null ? null : Math.min(100, percentage);
     return { enrollmentId: student.enrollmentId, assessments, expectedWeight, completedWeight,
@@ -196,11 +196,16 @@ export function calculateWeightedDirectPreview(input: WeightedDirectInput) {
   const population = candidatePopulation({ populationSize: roster.size,
     studentCount: students.filter(s => s.percentage !== null).length,
     achievedCount: students.filter(s => s.attained === true).length });
+  // Different direct assessment coverage across resolved papers is a comparability
+  // blocker, not permission to silently publish a section-level classification.
+  const signatures = new Set(students.filter(s => s.status !== "unresolved").map(s =>
+    JSON.stringify(s.assessments.filter(a => a.state === "complete" || a.state === "missing").map(a => a.assessmentItemId))));
+  const comparableAssessmentCoverage = signatures.size <= 1 && students.every(s => s.status !== "unresolved");
   const sourceEvidence = { calculationVersion: WEIGHTED_DIRECT_PREVIEW_VERSION, scope, policyRef,
     assessments: [...inventory.values()].sort((a,b) => compare(a.assessmentItemId,b.assessmentItemId))
       .map(a => ({ assessmentItemId: a.assessmentItemId, cloWeight: a.cloWeight })),
-    students, population,
-    directLevel: candidateDirectLevel(population.completePopulationRate, policy.band),
+    students, population, comparableAssessmentCoverage,
+    directLevel: candidateDirectLevel(comparableAssessmentCoverage ? population.completePopulationRate : null, policy.band),
     official: false as const };
   return { ...sourceEvidence, calculationHash: createHash("sha256").update(JSON.stringify(sourceEvidence)).digest("hex") };
 }
