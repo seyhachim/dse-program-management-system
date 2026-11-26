@@ -246,7 +246,7 @@ async function gradeResponse(tx:Tx,g: Awaited<ReturnType<typeof gradeContext>>, 
   }
   return { assignment: g.current, snapshot: g.snapshot, canEdit: g.canEdit,
     gradeRevision: row?.revision ?? 0, complete: summary.complete, questionLabels: g.questionLabels,
-    academicDossierId:g.dossier?.id??null, blueprint:g.dossier?.blueprint??null, feedback:row?.feedback??[],
+    academicDossierId:g.dossier?.id??null, savedDossierId:row?.dossierId??null, blueprint:g.dossier?.blueprint??null, feedback:row?.feedback??[],
     canModerate:Boolean(row?.complete&&row.dossierId&&g.ctx.reviewer&&row.actorId!==g.ctx.user.id&&g.ctx.offering.status!=="Completed"),
     sampleModeration:row?await sampleReview(tx,g.current.id,row.revision):null,
     earnedPoints: summary.earnedPoints, maximumPoints: summary.maximumPoints,
