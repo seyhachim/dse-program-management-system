@@ -9,7 +9,7 @@ import type {
 import { Button } from "@dse-pms/ui";
 import type { CloForm } from "../clos-section";
 import { weekSltForm, type WeekForm } from "../weekly-plan-model";
-import type { Method } from "@dse-pms/shared-types";
+import { CourseSpecSessionType, COURSE_SPEC_SESSION_TYPE_LABELS, courseSpecSessionType, courseSpecWeeklyPlanWeekAttention, type Method } from "@dse-pms/shared-types";
 
 const TOPIC_MAX = 200;
 
@@ -53,6 +53,9 @@ export function WeekFormFields({
   visibleSections?: number[];
 }) {
   const errors = weekFormErrors(draft, lloRequired);
+  const sessionType = courseSpecSessionType(draft);
+  const requiresTeaching = sessionType !== "assessment";
+  const requiresAssessment = sessionType !== "teaching";
   const show = (section: number) => !visibleSections || visibleSections.includes(section);
 
   const updateLessonLearningOutcomes = (
@@ -125,6 +128,12 @@ export function WeekFormFields({
       {/* 1. Week Information */}
       {show(1) ? (
       <Section n={1} title="Week Information">
+        <Field label="Session type" required>
+          <select aria-label="Session type" className={inputCls} value={sessionType} onChange={(e) => set({ sessionType: CourseSpecSessionType.parse(e.target.value) })}>
+            {CourseSpecSessionType.options.map((type) => <option key={type} value={type}>{COURSE_SPEC_SESSION_TYPE_LABELS[type]}</option>)}
+          </select>
+          <Hint>{sessionType === "teaching" ? "Assessment is optional this week." : sessionType === "assessment" ? "Assessment-only sessions do not require teaching methods, LLOs or learning activities." : "Both teaching and assessment evidence are expected."}</Hint>
+        </Field>
         <Field label="Week No." required>
           <input
             type="number"
@@ -211,13 +220,11 @@ export function WeekFormFields({
       <Section
         n={3}
         title="Lesson Learning Outcomes (LLOs)"
-        required={lloRequired}
+        required={requiresTeaching && lloRequired}
       >
         <p className="text-xs text-muted-foreground">
           Outcomes students should achieve by the end of this lesson.
-          {lloRequired
-            ? null
-            : " Optional for this legacy week — leave it empty, or fill in any you add."}
+          {requiresTeaching && lloRequired ? null : " Optional for this session — leave empty, or fill in any you add."}
         </p>
 
         <LloEditor
@@ -227,7 +234,7 @@ export function WeekFormFields({
 
         {touched && errors.llos ? (
           <p className="text-xs text-status-live">
-            {lloRequired
+            {requiresTeaching && lloRequired
               ? "Add at least one LLO (none left blank)."
               : "Remove blank LLOs, or leave the list empty."}
           </p>
@@ -293,7 +300,7 @@ export function WeekFormFields({
 
       {/* 5. Student Learning Activities */}
       {show(5) ? (
-      <Section n={5} title="Student Activities (What students do)" required>
+      <Section n={5} title="Student Activities (What students do)" required={requiresTeaching}>
         <p className="text-xs text-muted-foreground">
           Describe the activities students will perform to achieve this week's
           LLOs.
@@ -388,7 +395,7 @@ export function WeekFormFields({
 
       {/* 7. Assessment / Deliverables */}
       {show(7) ? (
-      <Section n={7} title="Assessment">
+      <Section n={7} title="Assessment" required={requiresAssessment}>
         <div className="space-y-3">
           <div>
             <p className="text-sm font-medium text-foreground">
@@ -396,11 +403,14 @@ export function WeekFormFields({
             </p>
 
             <p className="mt-1 text-xs text-muted-foreground">
-              Select the assessment methods used this week. Available methods
-              are based on the CLOs linked to this week.
+              {requiresAssessment ? "Record an assessment method or describe the scheduled assessment." : "Optional: leave empty when no assessment is scheduled."} Available methods are based on the linked CLOs.
             </p>
           </div>
 
+          <Field label="Scheduled assessment / description">
+            <textarea value={draft.assessment} onChange={(e) => set({ assessment: e.target.value })} className={inputCls} placeholder="e.g. Midterm Exam or Lab 3" />
+          </Field>
+          {touched && errors.assessment ? <p className="text-xs text-status-live">Add the scheduled assessment or a method.</p> : null}
           {draft.cloCodes.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
               Link at least one CLO to see available assessment methods.
@@ -516,22 +526,16 @@ export function WeekFormFields({
  * Legacy activities remain accepted until old CourseSpec data is migrated.
  */
 export function weekFormErrors(draft: WeekForm, lloRequired = true) {
-  const hasBlankLlo = draft.lessonLearningOutcomes.some(
-    (llo) => !llo.description.trim(),
-  );
-
+  const issues = courseSpecWeeklyPlanWeekAttention(draft);
+  const hasBlankLlo = draft.lessonLearningOutcomes.some((llo) => !llo.description.trim());
   return {
-    topic: draft.topic.trim().length === 0,
-
-    clos: draft.cloCodes.length === 0,
-
-    llos: lloRequired
-      ? draft.lessonLearningOutcomes.length === 0 || hasBlankLlo
-      : hasBlankLlo,
-
-    activities:
-      draft.studentLearningActivities.length === 0 &&
-      draft.activities.length === 0,
+    topic: issues.includes("Topic"),
+    clos: issues.includes("CLO"),
+    llos: hasBlankLlo || (lloRequired && issues.includes("LLO")),
+    activities: issues.includes("Learning activity"),
+    teaching: issues.includes("Teaching method"),
+    time: issues.includes("Learning time"),
+    assessment: issues.includes("Assessment"),
   };
 }
 

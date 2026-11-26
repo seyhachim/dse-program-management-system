@@ -27,6 +27,7 @@ const READINESS_SPEC_SELECT = {
     orderBy: { order: "asc" as const },
     select: {
       topic: true,
+      sessionType: true,
       cloCodes: true,
       lloItems: true,
       lessonLearningOutcomes: true,
@@ -81,6 +82,7 @@ export function applyCurrentCourseSpecReadiness(
 
   const weeks: CourseSpecReadinessWeek[] = (spec?.weeks ?? []).map((week) => ({
     topic: week.topic,
+    sessionType: week.sessionType,
     cloCodes: week.cloCodes,
     lloItems: week.lloItems,
     lessonLearningOutcomes: week.lessonLearningOutcomes,
