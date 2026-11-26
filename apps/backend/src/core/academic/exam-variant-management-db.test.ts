@@ -142,6 +142,34 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       expect(await service.assignBulk(teacher, { ...scope, entries: [entry] })).toHaveLength(1);
       expect((await service.history(teacher, { ...scope, enrollmentId: probe.id }))[0]?.variantId).toBe("C");
       await expect(service.history(otherTeacher, { ...scope, enrollmentId: probe.id })).rejects.toBeInstanceOf(ExamVariantAccessError);
+      // Phase 3B.1: academic dossier gates new grades and binds exact paper metadata.
+      const academicA={...scope,variantId:a.snapshot.variantId,variantHash:a.snapshot.variantHash};
+      const academicB={...scope,variantId:b.snapshot.variantId,variantHash:b.snapshot.variantHash};
+      const blueprint={durationMinutes:90,conditions:"Synthetic closed book",restrictedSchemeRef:"synthetic-scheme",
+        components:[{questionId:"Q1",parentLabel:"Q1",componentLabel:"a",topic:"Synthetic analysis",bloom:"Analyze",expectedAnswerRef:"synthetic-answer-1",partialCredit:"Synthetic partial credit rule"},
+          {questionId:"Q2",parentLabel:"Q1",componentLabel:"b",topic:"Synthetic interpretation",bloom:"Apply",expectedAnswerRef:"synthetic-answer-2",partialCredit:"Synthetic partial credit rule"}]};
+      const approvalChecks={coverage:true,cognitiveDemand:true,difficulty:true,workload:true,scoringRules:true,fairness:true,rationale:"Synthetic independent comparison reviewed"};
+      const lockedGrade=await service.gradeWorkspace(teacher,resolve);
+      expect(lockedGrade.canEdit).toBe(false);
+      await expect(service.saveGradeDraft(teacher,{...resolve,assignmentId:lockedGrade.assignment.id,assignmentRevision:lockedGrade.assignment.revision,
+        variantHash:lockedGrade.assignment.variantHash,expectedGradeRevision:0,marks:[{questionId:"Q1",score:0},{questionId:"Q2",score:null}]})).rejects.toThrow("Approved academic marking dossier required");
+      await expect(service.academicWorkspace(outsider,academicA)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.submitAcademic(otherTeacher,{...academicA,baselineId:null,blueprint})).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.submitAcademic(teacher,{...academicA,baselineId:null,blueprint:{...blueprint,components:[blueprint.components[0],blueprint.components[0]]}})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      const baseDossier=await service.submitAcademic(teacher,{...academicA,baselineId:null,blueprint});
+      await expect(service.decideAcademic(teacher,{...academicA,dossierId:baseDossier.id,decision:"Approved",review:approvalChecks})).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.decideAcademic(reviewer,{...academicA,dossierId:baseDossier.id,decision:"Approved",review:{...approvalChecks,difficulty:false}})).rejects.toThrow();
+      expect((await service.academicWorkspace(reviewer,academicA)).dossiers[0]?.blueprint.components.map(q=>[q.questionId,q.maxPoints,q.cloCode,q.evidence])).toEqual([["Q1",70,"CLO1","direct"],["Q2",30,"CLO2","supporting"]]);
+      await service.decideAcademic(reviewer,{...academicA,dossierId:baseDossier.id,decision:"Approved",review:approvalChecks});
+      expect((await service.academicWorkspace(teacher,academicA)).baseline?.id).toBe(baseDossier.id);
+      await expect(service.submitAcademic(teacher,{...academicB,baselineId:null,blueprint})).rejects.toThrow("Academic baseline changed");
+      const draftDossier=await service.submitAcademic(teacher,{...academicB,baselineId:baseDossier.id,blueprint});
+      await service.decideAcademic(reviewer,{...academicB,dossierId:draftDossier.id,decision:"Returned",review:{rationale:"Synthetic revision requested"}});
+      const revisedDossier=await service.submitAcademic(teacher,{...academicB,baselineId:baseDossier.id,blueprint});
+      await service.decideAcademic(reviewer,{...academicB,dossierId:revisedDossier.id,decision:"Approved",review:approvalChecks});
+      expect((await service.academicWorkspace(teacher,academicB)).dossiers.find(d=>d.id===draftDossier.id)?.status).toBe("Returned");
+      await expect((async()=>await db.$executeRaw`UPDATE exam_variant."ExamAcademicDossier" SET blueprint='{}'::jsonb WHERE id=${revisedDossier.id}`)()).rejects.toThrow("immutable");
+      await expect((async()=>await db.$executeRaw`DELETE FROM exam_variant."ExamAcademicDossier" WHERE id=${revisedDossier.id}`)()).rejects.toThrow("immutable");
       // Phase 3B: exact paper, explicit null versus zero, immutable grading revisions.
       const grade = await service.gradeWorkspace(teacher, resolve);
       expect(grade.gradeRevision).toBe(0);
@@ -149,6 +177,7 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       expect(grade.marks.map(m=>m.score)).toEqual([null,null]);
       expect(grade.earnedPoints).toBeNull();
       expect(grade.canEdit).toBe(true);
+      expect(grade.academicDossierId).toBe(revisedDossier.id);
       expect((await service.gradeWorkspace(reviewer,resolve)).canEdit).toBe(false);
       await expect(service.gradeWorkspace(outsider,resolve)).rejects.toBeInstanceOf(ExamVariantAccessError);
       await expect(service.gradeWorkspace(otherTeacher,resolve)).rejects.toBeInstanceOf(ExamVariantAccessError);
@@ -163,7 +192,10 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       await expect(service.saveGradeDraft(teacher,{...gradeInput,marks:[gradeInput.marks[0],gradeInput.marks[0]]})).rejects.toBeInstanceOf(ExamVariantConflictError);
       await expect(service.saveGradeDraft(teacher,{...gradeInput,marks:[gradeInput.marks[0],{questionId:"UNKNOWN",score:0}]})).rejects.toBeInstanceOf(ExamVariantConflictError);
       await expect(service.saveGradeDraft(teacher,{...gradeInput,marks:[{questionId:"Q1",score:71},gradeInput.marks[1]]})).rejects.toBeInstanceOf(ExamVariantConflictError);
-      const partial = await service.saveGradeDraft(teacher,gradeInput);
+      const partial = await service.saveGradeDraft(teacher,{...gradeInput,feedback:[{questionId:"Q1",comment:"Synthetic feedback"}]});
+      expect(partial.feedback).toEqual([{questionId:"Q1",comment:"Synthetic feedback"}]);
+      expect(partial.savedDossierId).toBe(revisedDossier.id);
+      await expect(service.moderateSample(reviewer,{...resolve,assignmentId:grade.assignment.id,gradeRevision:1,outcome:"Accepted",reason:"Synthetic review rationale",sampleRef:"synthetic-script"})).rejects.toBeInstanceOf(ExamVariantConflictError);
       expect(partial.gradeRevision).toBe(1);
       expect(partial.complete).toBe(false);
       expect(partial.earnedPoints).toBeNull();
@@ -182,6 +214,13 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       expect(completed.earnedPoints).toBe(30);
       expect(completed.maximumPoints).toBe(100);
       expect((await service.saveGradeDraft(teacher,{...completedInput,expectedGradeRevision:2})).gradeRevision).toBe(2);
+      expect(completed.feedback).toEqual(partial.feedback);
+      const sample={...resolve,assignmentId:grade.assignment.id,gradeRevision:2,outcome:"Accepted",reason:"Synthetic review rationale",sampleRef:"synthetic-script"};
+      await expect(service.moderateSample(teacher,sample)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.moderateSample(outsider,sample)).rejects.toBeInstanceOf(ExamVariantAccessError);
+      expect((await service.moderateSample(reviewer,sample)).sampleModeration?.outcome).toBe("Accepted");
+      await expect(service.moderateSample(reviewer,sample)).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect((async()=>await db.$executeRaw`UPDATE exam_variant."ExamSampleModeration" SET outcome='ChangesRequired' WHERE "assignmentId"=${grade.assignment.id}`)()).rejects.toThrow("immutable");
       const revisions = await db.$queryRaw<Array<{revision:number;complete:boolean;earnedPoints:number|null}>>`SELECT revision,complete,"earnedPoints" FROM exam_variant."ExamGradeRevision" WHERE "assignmentId"=${grade.assignment.id} ORDER BY revision`;
       expect(revisions).toEqual([{revision:1,complete:false,earnedPoints:null},{revision:2,complete:true,earnedPoints:30}]);
       await expect((async()=>await db.$executeRaw`UPDATE exam_variant."ExamGradeRevision" SET "earnedPoints"=99 WHERE "assignmentId"=${grade.assignment.id}`)()).rejects.toThrow("immutable");
@@ -190,6 +229,15 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
         VALUES (${grade.assignment.id},${grade.assignment.revision},${grade.assignment.variantId},${grade.assignment.variantHash},3,${JSON.stringify(completed.marks)}::jsonb,true,99,100,${f.teacher.id})`)()).rejects.toThrow("Grade total or completeness mismatch");
       expect((await service.workspace(teacher,scope)).roster.find(r=>r.enrollmentId===f.enrolled.id)?.grade).toEqual({revision:2,complete:true});
       expect(await db.assessmentResult.count({where:{courseSpecId:f.spec.id,assessmentItemId:"exam"}})).toBe(0);
+      await expect((async()=>await db.$executeRaw`INSERT INTO exam_variant."ExamGradeRevision" ("assignmentId","assignmentRevision","variantId","variantHash",revision,marks,complete,"earnedPoints","maximumPoints","actorId") VALUES (${grade.assignment.id},${grade.assignment.revision},${grade.assignment.variantId},${grade.assignment.variantHash},3,${JSON.stringify(completed.marks)}::jsonb,true,30,100,${f.teacher.id})`)()).rejects.toThrow("Approved academic marking dossier required");
+      await expect(service.saveGradeDraft(teacher,{...completedInput,expectedGradeRevision:2,feedback:[{questionId:"UNKNOWN",comment:"Synthetic comment"}]})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect(service.saveGradeDraft(teacher,{...completedInput,expectedGradeRevision:2,feedback:[{questionId:"Q1",comment:"First"},{questionId:"Q1",comment:"Second"}]})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      const editedFeedback=await service.saveGradeDraft(teacher,{...completedInput,expectedGradeRevision:2,feedback:[{questionId:"Q1",comment:"Revised synthetic feedback"}]});
+      expect(editedFeedback.gradeRevision).toBe(3);
+      expect(editedFeedback.earnedPoints).toBe(30);
+      expect(editedFeedback.sampleModeration).toBeNull();
+      expect((await db.$queryRaw<Array<{outcome:string}>>`SELECT outcome FROM exam_variant."ExamSampleModeration" WHERE "assignmentId"=${grade.assignment.id} AND "gradeRevision"=2`)[0]?.outcome).toBe("Accepted");
+      await expect(service.moderateSample(reviewer,sample)).rejects.toBeInstanceOf(ExamVariantConflictError);
       // Phase 3A: legacy marks cannot coexist with a configured assessment.
       const rawMark = (tx: Pick<typeof db,"$executeRaw">, itemId: string, enrollmentId: string = f.enrolled.id) => tx.$executeRaw`
         INSERT INTO public."AssessmentResult" (id,"enrollmentId","courseSpecId","assessmentItemId",score,"maxScore","updatedAt")

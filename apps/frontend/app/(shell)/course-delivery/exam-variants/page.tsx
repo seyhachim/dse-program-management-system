@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { courseDeliveryApi } from "@/lib/course-delivery";
 import { ExamGradeMarkbook } from "./exam-grade-markbook";
+import { ExamAcademicModeration } from "./exam-academic-moderation";
 
 const base="/api/offerings/exam-variants/";
 const field="w-full min-h-10 rounded border border-border bg-background p-2 text-sm";
@@ -99,6 +100,7 @@ function Workspace({offeringId,assessmentItemId}:{offeringId:string;assessmentIt
       {data.canAssign&&<button className={btn} disabled={busy||!paper||!selected.length||selected.length>50||reason.trim().length<5||!evidenceRef.trim()} onClick={assign}>Confirm {selected.length} actual paper(s)</button>}
       {history&&<div className="space-y-2"><h3>Assignment history</h3>{history.map(e=><p key={e.revision}>r{e.revision}: {e.previousVariantId??"Unassigned"} → {e.variantId} · {e.reason} · {e.evidenceRef}</p>)}</div>}
     </section>
+    <ExamAcademicModeration workspace={data} onChanged={()=>setNotice("Academic dossier updated. Reload any open grade editor to check eligibility.")}/>
     <ExamGradeMarkbook workspace={data} onSaved={(enrollmentId,grade)=>setData(current=>current?{...current,roster:current.roster.map(r=>r.enrollmentId===enrollmentId?{...r,grade:{revision:grade.gradeRevision,complete:grade.complete}}:r)}:current)}/>
   </div>;
 }
