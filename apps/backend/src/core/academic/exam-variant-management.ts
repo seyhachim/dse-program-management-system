@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AuthUser } from "../auth/token.ts";
 import { createExamVariantSnapshot, resolveExamVariant, summarizeExamVariantScores, verifyExamVariantSnapshot } from "./exam-variant.ts";
 import { rubricContentHash } from "./rubric-context.ts";
+import { academicBlueprintSchema, buildAcademicBlueprint, blueprintDistribution, equivalenceSchema, type AcademicBlueprint } from "./exam-academic-blueprint.ts";
 
 const id = z.string().min(1).max(256).refine((s) => s.trim() === s);
 const ref = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/);
@@ -23,13 +24,19 @@ const assignmentEntrySchema = z.object({
 }).strict();
 const assignSchema = scopeSchema.merge(assignmentEntrySchema);
 const resolveSchema = scopeSchema.extend({ enrollmentId: id });
+const feedbackSchema = z.array(z.object({ questionId: id, comment: z.string().trim().min(1).max(1000) }).strict()).max(1000);
+const academicDecisionSchema = z.discriminatedUnion("decision", [
+  versionSchema.extend({ dossierId:id, decision:z.literal("Approved"), review:equivalenceSchema }),
+  versionSchema.extend({ dossierId:id, decision:z.literal("Returned"), review:z.object({rationale:z.string().trim().min(10).max(2000)}).strict() }),
+]);
 const gradeSchema = resolveSchema.extend({
   assignmentId: id, assignmentRevision: z.number().int().min(1).max(2147483647),
   variantHash: hash, expectedGradeRevision: z.number().int().min(0).max(2147483646),
   marks: z.array(z.object({ questionId: id, score: z.number().finite().nonnegative().nullable() }).strict()).max(1000),
+  feedback: feedbackSchema.optional(),
 });
 type GradeMark = { questionId: string; maxPoints: number; score: number | null };
-type GradeRevision = { revision: number; marks: GradeMark[]; complete: boolean; earnedPoints: number | null; maximumPoints: number; actorId: string; savedAt: Date };
+type GradeRevision = { dossierId:string|null; feedback:z.infer<typeof feedbackSchema>; revision: number; marks: GradeMark[]; complete: boolean; earnedPoints: number | null; maximumPoints: number; actorId: string; savedAt: Date };
 
 const proposalSchema = z.object({
   purpose: z.literal("exam-variant-proposal-v1"), offeringId: id,
@@ -166,8 +173,43 @@ async function assignment(tx: Tx, ctx: Context, enrollmentId: string): Promise<A
   return rows[0];
 }
 
+type Dossier = { id:string; offeringId:string; variantId:string; variantHash:string; blueprint:AcademicBlueprint;
+  baselineId:string|null; submittedById:string; submittedAt:Date; status:"Pending"|"Approved"|"Returned";
+  decidedById:string|null; decidedAt:Date|null; review:unknown };
+type SampleReview = { gradeRevision:number; reviewerId:string; outcome:"Accepted"|"ChangesRequired"; reason:string; sampleRef:string; reviewedAt:Date };
+async function academicRows(tx:Tx,ctx:Context,v:Pick<Version,"variantId"|"variantHash">):Promise<Dossier[]> {
+  return tx.$queryRaw<Dossier[]>`SELECT id,"offeringId","variantId","variantHash",blueprint,"baselineId","submittedById","submittedAt",status,"decidedById","decidedAt",review
+    FROM exam_variant."ExamAcademicDossier" WHERE "courseSpecId"=${ctx.scope.courseSpecId} AND "assessmentItemId"=${ctx.scope.assessmentItemId}
+    AND "variantId"=${v.variantId} AND "variantHash"=${v.variantHash} ORDER BY "submittedAt" DESC,id LIMIT 101`;
+}
+async function approvedDossier(tx:Tx,ctx:Context,v:Pick<Version,"variantId"|"variantHash">):Promise<Dossier|undefined> {
+  const rows=await academicRows(tx,ctx,v);
+  if(rows.length>100) conflict("Academic dossier history exceeds pilot limits");
+  return rows.find(r=>r.status==="Approved");
+}
+async function baselineDossier(tx:Tx,ctx:Context):Promise<Dossier|undefined> {
+  const rows=await tx.$queryRaw<Dossier[]>`SELECT id,"offeringId","variantId","variantHash",blueprint,"baselineId","submittedById","submittedAt",status,"decidedById","decidedAt",review
+    FROM exam_variant."ExamAcademicDossier" WHERE "courseSpecId"=${ctx.scope.courseSpecId} AND "assessmentItemId"=${ctx.scope.assessmentItemId}
+    AND status='Approved' AND "baselineId" IS NULL`;
+  return rows[0];
+}
+function dossierResponse(row:Dossier) {
+  return {...row,submittedAt:row.submittedAt.toISOString(),decidedAt:row.decidedAt?.toISOString()??null,distribution:blueprintDistribution(row.blueprint)};
+}
+async function paperAuthor(tx:Tx,ctx:Context,v:Pick<Version,"variantId"|"variantHash">) {
+  const rows=await tx.$queryRaw<Array<{preparedById:string}>>`SELECT "preparedById" FROM exam_variant."ExamPaperVersion"
+    WHERE "courseSpecId"=${ctx.scope.courseSpecId} AND "assessmentItemId"=${ctx.scope.assessmentItemId} AND "variantId"=${v.variantId} AND "variantHash"=${v.variantHash}`;
+  return rows[0]?.preparedById;
+}
+async function sampleReview(tx:Tx,assignmentId:string,revision:number) {
+  const rows=await tx.$queryRaw<SampleReview[]>`SELECT "gradeRevision","reviewerId",outcome,reason,"sampleRef","reviewedAt"
+    FROM exam_variant."ExamSampleModeration" WHERE "assignmentId"=${assignmentId} AND "gradeRevision"=${revision}`;
+  const row=rows[0];
+  return row?{...row,reviewedAt:row.reviewedAt.toISOString()}:null;
+}
+
 async function gradeRevision(tx: Tx, assignmentId: string): Promise<GradeRevision | undefined> {
-  const rows = await tx.$queryRaw<GradeRevision[]>`SELECT revision,marks,complete,"earnedPoints","maximumPoints","actorId","savedAt"
+  const rows = await tx.$queryRaw<GradeRevision[]>`SELECT revision,marks,complete,"earnedPoints","maximumPoints","actorId","savedAt","dossierId",feedback
     FROM exam_variant."ExamGradeRevision" WHERE "assignmentId"=${assignmentId} ORDER BY revision DESC LIMIT 1`;
   return rows[0];
 }
@@ -190,10 +232,12 @@ async function gradeContext(tx: Tx, actorId: string, request: z.infer<typeof res
   };
   const labels = await tx.rubricCriterion.findMany({ where: { rubricId: snapshot.instrumentId }, select: { id: true, name: true } });
   const questionLabels = Object.fromEntries(labels.map(q=>[q.id,q.name]));
-  return { ctx, current, snapshot: resolveExamVariant(resolution), scope, v, resolution, questionLabels,
-    canEdit: ctx.teacher && ctx.offering.status === "Active" && student.student.status === "Active" && Boolean(student.student.studentId) };
+  const dossier = await approvedDossier(tx,ctx,current);
+  if(write&&!dossier) conflict("Approved academic marking dossier required");
+  return { ctx, current, snapshot: resolveExamVariant(resolution), scope, v, resolution, questionLabels,dossier,
+    canEdit: Boolean(dossier) && ctx.teacher && ctx.offering.status === "Active" && student.student.status === "Active" && Boolean(student.student.studentId) };
 }
-function gradeResponse(g: Awaited<ReturnType<typeof gradeContext>>, row: GradeRevision | undefined) {
+async function gradeResponse(tx:Tx,g: Awaited<ReturnType<typeof gradeContext>>, row: GradeRevision | undefined) {
   const summary = summarizeExamVariantScores(g.resolution, { ...g.scope, ...g.v, marks: row?.marks ?? [] });
   if (row && (row.complete !== summary.complete || row.maximumPoints !== summary.maximumPoints ||
       (row.earnedPoints === null ? summary.earnedPoints !== null :
@@ -202,6 +246,9 @@ function gradeResponse(g: Awaited<ReturnType<typeof gradeContext>>, row: GradeRe
   }
   return { assignment: g.current, snapshot: g.snapshot, canEdit: g.canEdit,
     gradeRevision: row?.revision ?? 0, complete: summary.complete, questionLabels: g.questionLabels,
+    academicDossierId:g.dossier?.id??null, blueprint:g.dossier?.blueprint??null, feedback:row?.feedback??[],
+    canModerate:Boolean(row?.complete&&row.dossierId&&g.ctx.reviewer&&row.actorId!==g.ctx.user.id&&g.ctx.offering.status!=="Completed"),
+    sampleModeration:row?await sampleReview(tx,g.current.id,row.revision):null,
     earnedPoints: summary.earnedPoints, maximumPoints: summary.maximumPoints,
     marks: summary.rows.map(q=>({ questionId:q.questionId,maxPoints:q.maxPoints,score:q.score })),
     savedAt: row?.savedAt.toISOString() ?? null };
@@ -315,11 +362,79 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         return { id: assignmentId, revision: 1, variantId: snapshot.variantId, variantHash: snapshot.variantHash };
   }
   return {
+    async academicWorkspace(actor:AuthUser,input:unknown) {
+      const request=versionSchema.parse(input);
+      return transact(async tx=>{
+        const ctx=await context(tx,actor.id,request,"read");
+        if(!ctx.reviewer&&!(await permission(tx,ctx,request))) deny();
+        const snapshot=await paper(tx,ctx,request,false);
+        const rows=await academicRows(tx,ctx,request);
+        if(rows.length>100) conflict("Academic dossier history exceeds pilot limits");
+        const baseline=await baselineDossier(tx,ctx);
+        return {snapshot,dossiers:rows.map(dossierResponse),
+          baseline:baseline?{id:baseline.id,variantId:baseline.variantId,variantHash:baseline.variantHash,
+            durationMinutes:baseline.blueprint.durationMinutes,conditions:baseline.blueprint.conditions,distribution:blueprintDistribution(baseline.blueprint)}:null,
+          canSubmit:ctx.teacher&&ctx.offering.status!=="Completed"&&await permission(tx,ctx,request)&&!rows.some(r=>r.status==="Pending"||r.status==="Approved"),
+          canReview:ctx.reviewer&&ctx.offering.status!=="Completed"&&await paperAuthor(tx,ctx,request)!==ctx.user.id,
+          questionLabels:Object.fromEntries((await scheme(tx,snapshot.instrumentId,false)).criterionRows.map(q=>[q.id,q.name]))};
+      });
+    },
+    async submitAcademic(actor:AuthUser,input:unknown) {
+      const request=versionSchema.extend({baselineId:id.nullable(),blueprint:academicBlueprintSchema}).parse(input);
+      return transact(async tx=>{
+        const ctx=await context(tx,actor.id,request,"teacher");
+        writable(ctx);
+        if(!(await permission(tx,ctx,request))) deny();
+        const snapshot=await paper(tx,ctx,request,false);
+        const baseline=await baselineDossier(tx,ctx);
+        if(request.baselineId!==(baseline?.id??null)) conflict("Academic baseline changed; reload before submitting");
+        const rows=await academicRows(tx,ctx,request);
+        if(rows.length>=100||rows.some(r=>r.status==="Pending"||r.status==="Approved")) conflict("Paper already has an open academic dossier");
+        let blueprint:AcademicBlueprint;
+        try {blueprint=buildAcademicBlueprint(snapshot,request.blueprint);} catch {conflict("Invalid scored component mapping");}
+        const dossierId=randomUUID();
+        await tx.$executeRaw`INSERT INTO exam_variant."ExamAcademicDossier"
+          (id,"offeringId","courseSpecId","assessmentItemId","variantId","variantHash",blueprint,"baselineId","submittedById")
+          VALUES (${dossierId},${ctx.offering.id},${ctx.scope.courseSpecId},${ctx.scope.assessmentItemId},${snapshot.variantId},${snapshot.variantHash},
+            ${JSON.stringify(blueprint)}::jsonb,${request.baselineId},${ctx.user.id})`;
+        return {id:dossierId,status:"Pending" as const};
+      });
+    },
+    async decideAcademic(actor:AuthUser,input:unknown) {
+      const request=academicDecisionSchema.parse(input);
+      return transact(async tx=>{
+        const ctx=await context(tx,actor.id,request,"reviewer");writable(ctx);
+        await paper(tx,ctx,request,false);
+        const row=(await academicRows(tx,ctx,request)).find(d=>d.id===request.dossierId);
+        if(!row||row.submittedById===ctx.user.id||await paperAuthor(tx,ctx,request)===ctx.user.id) deny();
+        if(row.status!=="Pending") conflict("Academic dossier has already been decided");
+        if(request.decision==="Approved"&&row.baselineId!==((await baselineDossier(tx,ctx))?.id??null)) conflict("Academic baseline changed; return and resubmit");
+        const changed=await tx.$executeRaw`UPDATE exam_variant."ExamAcademicDossier" SET status=${request.decision},"decidedById"=${ctx.user.id},"decidedAt"=clock_timestamp(),review=${JSON.stringify(request.review)}::jsonb WHERE id=${row.id} AND status='Pending'`;
+        if(changed!==1) conflict("Academic dossier changed; reload");
+        return {id:row.id,status:request.decision};
+      });
+    },
+    async moderateSample(actor:AuthUser,input:unknown) {
+      const request=resolveSchema.extend({assignmentId:id,gradeRevision:z.number().int().positive(),outcome:z.enum(["Accepted","ChangesRequired"]),
+        reason:z.string().trim().min(10).max(2000),sampleRef:ref}).parse(input);
+      return transact(async tx=>{
+        const g=await gradeContext(tx,actor.id,request,false);
+        if(!g.ctx.reviewer) deny();
+        writable(g.ctx);
+        const row=await gradeRevision(tx,g.current.id);
+        if(!row||!row.complete||!row.dossierId||row.revision!==request.gradeRevision||g.current.id!==request.assignmentId) conflict("Current complete academically moderated draft required");
+        if(row.actorId===g.ctx.user.id) deny();
+        if(await sampleReview(tx,g.current.id,row.revision)) conflict("This grade revision has already been sampled");
+        await tx.$executeRaw`INSERT INTO exam_variant."ExamSampleModeration" ("assignmentId","gradeRevision","reviewerId",outcome,reason,"sampleRef")
+          VALUES (${g.current.id},${row.revision},${g.ctx.user.id},${request.outcome},${request.reason},${request.sampleRef})`;
+        return gradeResponse(tx,g,row);
+      });
+    },
     async gradeWorkspace(actor: AuthUser, input: unknown) {
       const request = resolveSchema.parse(input);
       return transact(async tx => {
         const g = await gradeContext(tx, actor.id, request, false);
-        return gradeResponse(g, await gradeRevision(tx, g.current.id));
+        return gradeResponse(tx,g, await gradeRevision(tx, g.current.id));
       });
     },
     async saveGradeDraft(actor: AuthUser, input: unknown) {
@@ -341,15 +456,22 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         if (submitted.some(m=>m.score!==null && m.score>m.maxPoints)) conflict("Question score exceeds maximum");
         const summary = summarizeExamVariantScores(g.resolution,{ ...g.scope,...g.v,marks:submitted });
         const marks = summary.rows.map(q=>({questionId:q.questionId,maxPoints:q.maxPoints,score:q.score}));
-        if (previous && JSON.stringify(previous.marks.map(q=>[q.questionId,q.maxPoints,q.score]))===JSON.stringify(marks.map(q=>[q.questionId,q.maxPoints,q.score]))) return gradeResponse(g,previous);
+        const suppliedFeedback=request.feedback??previous?.feedback??[];
+        const comments=new Map(suppliedFeedback.map(f=>[f.questionId,f.comment]));
+        if(comments.size!==suppliedFeedback.length||[...comments.keys()].some(q=>!maxima.has(q))) conflict("Invalid question feedback");
+        const feedback=marks.flatMap(q=>comments.has(q.questionId)?[{questionId:q.questionId,comment:comments.get(q.questionId)!}]:[]);
+        if(!g.dossier) conflict("Approved academic marking dossier required");
+        if (previous && previous.dossierId===g.dossier.id &&
+          JSON.stringify(previous.marks.map(q=>[q.questionId,q.maxPoints,q.score]))===JSON.stringify(marks.map(q=>[q.questionId,q.maxPoints,q.score])) &&
+          JSON.stringify(previous.feedback.map(q=>[q.questionId,q.comment]))===JSON.stringify(feedback.map(q=>[q.questionId,q.comment]))) return gradeResponse(tx,g,previous);
         const revision = request.expectedGradeRevision+1;
         await tx.$executeRaw`INSERT INTO exam_variant."ExamGradeRevision"
-          ("assignmentId","assignmentRevision","variantId","variantHash",revision,marks,complete,"earnedPoints","maximumPoints","actorId")
+          ("assignmentId","assignmentRevision","variantId","variantHash",revision,marks,complete,"earnedPoints","maximumPoints","actorId","dossierId",feedback)
           VALUES (${g.current.id},${g.current.revision},${g.current.variantId},${g.current.variantHash},${revision},
-            ${JSON.stringify(marks)}::jsonb,${summary.complete},${summary.earnedPoints},${summary.maximumPoints},${g.ctx.user.id})`;
+            ${JSON.stringify(marks)}::jsonb,${summary.complete},${summary.earnedPoints},${summary.maximumPoints},${g.ctx.user.id},${g.dossier.id},${JSON.stringify(feedback)}::jsonb)`;
         const saved = await gradeRevision(tx,g.current.id);
         if (!saved || saved.revision!==revision) conflict("Grade save could not be confirmed");
-        return gradeResponse(g,saved);
+        return gradeResponse(tx,g,saved);
       });
     },
     async submit(actor: AuthUser, input: unknown) {
