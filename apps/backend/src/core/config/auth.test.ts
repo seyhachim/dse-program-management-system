@@ -127,3 +127,24 @@ describe("staging-only Neon auth — production Supabase is unaffected", () => {
     }
   });
 });
+
+const evidenceStaging = {
+  ...neonStaging,
+  DSE_STAGING_DB_HOST: "ep-young-voice-bif6nm9u.c-5.ap-southeast-1.aws.neon.tech",
+  DSE_STAGING_DB_NAME: "evidence1367",
+  DSE_STAGING_DB_MARKER: "DSE-PMS-STAGING:evidence1367-20261125-uat-v01",
+  DATABASE_URL: "postgresql://test:synthetic@ep-young-voice-bif6nm9u.c-5.ap-southeast-1.aws.neon.tech/evidence1367?sslmode=require",
+  NEON_AUTH_BASE_URL: "https://ep-young-voice-bif6nm9u.neonauth.c-5.ap-southeast-1.aws.neon.tech/evidence1367/auth",
+  CORS_ORIGIN: "https://dse-pms-evidence1367-uat.onrender.com",
+};
+describe("PR #1367 exact isolated evidence UAT target", () => {
+  test("accepts only the new complete pinned database and issuer tuple", () => {
+    expect(resolveAuthConfig(env(evidenceStaging))).toEqual({ mode: "neon-staging", neonAuthBaseUrl: evidenceStaging.NEON_AUTH_BASE_URL });
+    for (const key of ["DSE_STAGING_DB_HOST", "DSE_STAGING_DB_NAME", "DSE_STAGING_DB_MARKER", "DATABASE_URL", "NEON_AUTH_BASE_URL"] as const) {
+      expect(() => resolveAuthConfig(env({ ...evidenceStaging, [key]: neonStaging[key] }))).toThrow();
+    }
+    expect(() => resolveAuthConfig(env({ ...evidenceStaging, AUTH_MODE: "dev" }))).toThrow();
+    expect(() => resolveAuthConfig(env({ ...evidenceStaging, SUPABASE_SERVICE_ROLE_KEY: "synthetic" }))).toThrow();
+    expect(() => resolveAuthConfig(env({ ...evidenceStaging, CORS_ORIGIN: "*" }))).toThrow();
+  });
+});

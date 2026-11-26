@@ -1,0 +1,73 @@
+name: Assessment Evidence — Isolated Storage and Malware Scan
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/assessment-evidence-real-storage-ci.yml"
+      - "apps/backend/src/integration/assessment-evidence.integration.test.ts"
+      - "apps/backend/src/plugins/qa/evidence/assessment-evidence-*.ts"
+      - "apps/backend/prisma/migrations/**"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: evidence-real-storage-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  isolated-storage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      AUTH_MODE: dev
+      JWT_SECRET: assessment-evidence-isolated-ci-secret-at-least-32-characters
+      BACKEND_INTEGRATION_TESTS: "1"
+      ASSESSMENT_EVIDENCE_REAL_STORAGE_TEST: "1"
+      TELEGRAM_PMS_ENABLED: "false"
+      TELEGRAM_PUBLIC_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+      - run: bun install --frozen-lockfile
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+      - name: Install and verify ClamAV using current official signatures
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clamav clamav-freshclam
+          sudo systemctl stop clamav-freshclam || true
+          sudo freshclam
+          printf '%s' 'Synthetic clean document' | clamscan --no-summary -
+          # Standard harmless EICAR antivirus test signature; must exit 1.
+          set +e
+          printf '%s' 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' | clamscan --no-summary -
+          status=$?
+          set -e
+          test "$status" = 1
+      - name: Start disposable local Storage and PostgreSQL
+        run: |
+          supabase init --yes
+          supabase start --exclude realtime,studio,edge-runtime,logflare,vector,supavisor,imgproxy,mailpit,postgres-meta
+      - name: Export local-only credentials
+        shell: bash
+        run: |
+          status_file="$(mktemp)"
+          supabase status -o env --override-name api.url=SUPABASE_URL --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY --override-name auth.anon_key=SUPABASE_ANON_KEY > "$status_file"
+          awk '/^(SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_ANON_KEY)=/ {
+            n=index($0,"="); name=substr($0,1,n-1); value=substr($0,n+1);
+            sub(/^"/,"",value); sub(/"$/,"",value);
+            print name "=" value;
+          }' "$status_file" >> "$GITHUB_ENV"
+          rm -f "$status_file"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres?schema=public" >> "$GITHUB_ENV"
+      - run: bun run db:generate
+      - run: bun run db:migrate:deploy
+      - run: bun run seed
+      - name: Verify DB security inventory
+        run: bun run --cwd apps/backend db:security:verify
+      - name: Exercise actual private Storage and assessment evidence authorization
+        run: bun test apps/backend/src/integration/assessment-evidence.integration.test.ts
+      - name: Discard synthetic records and files
+        if: always()
+        run: supabase stop --no-backup || true

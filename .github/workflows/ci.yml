@@ -438,11 +438,15 @@ jobs:
       - name: Seed isolated browser database
         run: bun run seed
 
+      - name: Seed synthetic TSA301 evidence pilot sections
+        run: bun apps/backend/scripts/seed-assessment-evidence-browser.ts
+
       - name: Mint role-scoped dev tokens
         run: |
           echo "BROWSER_SMOKE_ADMIN_TOKEN=$(bun run gen-token --role admin | tail -n 1)" >> "$GITHUB_ENV"
           echo "BROWSER_SMOKE_COORDINATOR_TOKEN=$(bun run gen-token --role program_coordinator | tail -n 1)" >> "$GITHUB_ENV"
           echo "BROWSER_SMOKE_LECTURER_TOKEN=$(bun run gen-token --role lecturer | tail -n 1)" >> "$GITHUB_ENV"
+          echo "BROWSER_SMOKE_EVIDENCE_LECTURER_TOKEN=$(bun run gen-token --role lecturer --email lecturer@dse.dev | tail -n 1)" >> "$GITHUB_ENV"
           echo "BROWSER_SMOKE_READONLY_TOKEN=$(bun run gen-token --role program_secretary | tail -n 1)" >> "$GITHUB_ENV"
           echo "BROWSER_SMOKE_STUDENT_TOKEN=$(bun run gen-token --role student | tail -n 1)" >> "$GITHUB_ENV"
 

@@ -26,12 +26,17 @@ import { useMe } from "@/lib/auth";
 import { courseDeliveryApi, toDateTimeLocal } from "@/lib/course-delivery";
 import { protectedQueryKey, QUERY_STALE_MS } from "@/lib/query-client";
 import { Topbar } from "../topbar";
+import { AssessmentEvidenceDashboard } from "./assessment-evidence-dashboard";
+import { AssessmentEvidencePanel, type EvidenceSelection } from "./assessment-evidence-panel";
 import { GroupAssessmentPanel } from "./group-assessment-panel";
 
 export function CourseDeliveryClient() {
   const { me, loading: meLoading } = useMe();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
+  const [deliveryTab, setDeliveryTab] = useState("announcements");
+  const [showEvidenceDashboard, setShowEvidenceDashboard] = useState(false);
+  const [evidenceSelection, setEvidenceSelection] = useState<EvidenceSelection>();
   const [notice, setNotice] = useState<string | null>(null);
   const queryScope = { userId: me?.id ?? "pending" };
   const deliveryKey = protectedQueryKey(queryScope, "course-delivery", "offerings");
@@ -80,11 +85,18 @@ export function CourseDeliveryClient() {
             isError={deliveryQuery.isError}
             label="Course delivery"
           />
+          {me && me.permissions.includes("qa:manage") && me.roles.some(role => role === "admin" || role === "program_coordinator") && <>
+            <Button variant="outline" onClick={() => setShowEvidenceDashboard(x => !x)}>{showEvidenceDashboard ? "Hide programme evidence dashboard" : "Programme evidence dashboard"}</Button>
+            {showEvidenceDashboard && <AssessmentEvidenceDashboard key={me.id} userId={me.id} onOpen={selection => {
+              if (!offerings.some(o => o.offeringId === selection.offeringId)) { setNotice("This offering is not available in Course Delivery. Refresh the offering list."); return; }
+              setSelectedId(selection.offeringId); setEvidenceSelection(selection); setDeliveryTab("assessment-evidence"); setShowEvidenceDashboard(false);
+            }} />}
+          </>}
           {loading ? <LoadingState /> : error ? <ErrorState message={error} retry={retry} /> : !offerings.length ? (
             <EmptyState />
           ) : selected ? (
             <>
-              <CourseHeader offerings={offerings} selected={selected} onSelect={setSelectedId} />
+              <CourseHeader offerings={offerings} selected={selected} onSelect={id => { setSelectedId(id); setEvidenceSelection(undefined); }} />
               <Link
                 href={"/course-delivery/activities/" + selected.offeringId}
                 className="inline-flex min-h-10 items-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted"
@@ -103,12 +115,13 @@ export function CourseDeliveryClient() {
                   Students will see assessment details only after approval.
                 </div>
               ) : null}
-              <Tabs defaultValue="announcements">
+              <Tabs value={deliveryTab} onValueChange={setDeliveryTab}>
                 <TabsList className="max-w-full overflow-x-auto">
                   <TabsTrigger value="announcements">Announcements</TabsTrigger>
                   <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
                   <TabsTrigger value="results">Results</TabsTrigger>
                   <TabsTrigger value="feedback">Feedback</TabsTrigger>
+                  <TabsTrigger value="assessment-evidence">Assessment Evidence</TabsTrigger>
                 </TabsList>
                 <TabsContent value="announcements" className="mt-4">
                   <AnnouncementsPanel offering={selected} onChanged={changed} />
@@ -118,6 +131,9 @@ export function CourseDeliveryClient() {
                 </TabsContent>
                 <TabsContent value="results" className="mt-4">
                   <ResultsPanel offering={selected} onChanged={changed} />
+                </TabsContent>
+                <TabsContent value="assessment-evidence" className="mt-4">
+                  <AssessmentEvidencePanel key={selected.offeringId + ":" + (evidenceSelection?.assessmentItemId ?? "") + ":" + (evidenceSelection?.population ?? "")} offeringId={selected.offeringId} initial={evidenceSelection?.offeringId === selected.offeringId ? evidenceSelection : undefined} />
                 </TabsContent>
                 <TabsContent value="feedback" className="mt-4">
                   <FeedbackPanel offering={selected} />
@@ -159,7 +175,8 @@ function CourseHeader({ offerings, selected, onSelect }: {
           <select
             value={selected.offeringId}
             onChange={(event) => onSelect(event.target.value)}
-            className="mt-1 block h-10 min-w-72 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            aria-label="Course section"
+            className="mt-1 block h-10 w-full min-w-0 max-w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
           >
             {offerings.map((offering) => (
               <option key={offering.offeringId} value={offering.offeringId}>
