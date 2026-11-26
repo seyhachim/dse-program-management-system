@@ -40,6 +40,7 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
   let student: AuthUser;
   let specId = "";
   let courseId = "";
+  const offeringIds: string[] = [];
 
   beforeAll(async () => {
     // Fixtures include intentional stale flags. They must NEVER touch a hosted
@@ -61,9 +62,12 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
         credits: 3, totalSltHours: 120, lecturerId: lecturer.id },
     });
     courseId = course.id;
-    await prisma.offering.create({ data: {
-      courseId, lecturerId: lecturer.id, term: code, sectionCode: "A", status: "Planned",
-    }});
+    for (const sectionCode of ["A", "B"]) {
+      const offering = await prisma.offering.create({ data: {
+        courseId, lecturerId: lecturer.id, term: code, sectionCode, status: "Planned",
+      }});
+      offeringIds.push(offering.id);
+    }
     const spec = await prisma.courseSpec.create({ data: {
       courseId, courseInfo: { create: {
         programmeTitle: "Synthetic test programme", courseTitle: course.title,
@@ -128,11 +132,38 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
     };
   }
 
+  async function bindOffering(offeringId: string, user: AuthUser | null, courseSpecId: string | null) {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    if (user) headers.set("Authorization", "Bearer " + signToken(user));
+    const response = await fetch(baseUrl + "/api/offerings/" + offeringId, {
+      method: "PATCH", headers, body: JSON.stringify({ courseSpecId }),
+    });
+    return { status: response.status, body: await response.json() as {
+      error?: string; status?: string; courseSpec?: { id: string } | null;
+    }};
+  }
+
+  async function readOffering(offeringId: string) {
+    const response = await fetch(baseUrl + "/api/offerings/" + offeringId, {
+      headers: { Authorization: "Bearer " + signToken(reviewer) },
+    });
+    return { status: response.status, body: await response.json() as {
+      status?: string; courseSpec?: { id: string } | null;
+    }};
+  }
+
   async function snapshot() {
     return prisma.courseSpec.findUniqueOrThrow({ where: { id: specId }, include: { reviewActions: true } });
   }
 
   test("denies unauthorized submit and review; validates real source data, date, transitions, lock and audit", async () => {
+    expect(offeringIds).toHaveLength(2);
+    for (const id of offeringIds) {
+      const premature = await bindOffering(id, reviewer, specId);
+      expect(premature.status).toBe(400);
+      expect(premature.body.error ?? "").toContain("Approved CourseSpec");
+      expect((await prisma.offering.findUniqueOrThrow({ where: { id } })).courseSpecId).toBeNull();
+    }
     expect((await request("/submit", null)).status).toBe(401);
     expect((await request("/submit", student)).status).toBe(403);
     expect((await request("/submit", unrelated)).status).toBe(403);
@@ -254,5 +285,41 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
     expect((await request("/review/approve", student)).status).toBe(403);
     expect((await request("/review/approve", lecturer)).status).toBe(403);
     expect((await snapshot()).reviewActions).toHaveLength(3);
+
+    // Simulate the authorized approval and exact binding of two synthetic
+    // sections. This is a technical regression, not a real academic approval.
+    const approved = await request("/review/approve", reviewer);
+    expect(approved.status).toBe(200);
+    expect(approved.body.review?.status).toBe("approved");
+    const afterApproval = await snapshot();
+    expect(afterApproval.id).toBe(specId);
+    expect(afterApproval.reviewStatus).toBe("Approved");
+    expect(afterApproval.submissionVersion).toBe(2);
+    expect(afterApproval.specDate?.toISOString()).toBe(first.specDate?.toISOString());
+    expect(afterApproval.reviewActions).toHaveLength(4);
+    expect(afterApproval.reviewActions.find(a => a.action === "Approved")?.actorId).toBe(reviewer.id);
+    expect(afterApproval.reviewActions.find(a => a.action === "Approved")?.submissionVersion).toBe(2);
+    expect((await request("/courseInfo", lecturer, "PUT", {})).status).toBe(409);
+
+    for (const id of offeringIds) {
+      expect((await bindOffering(id, null, specId)).status).toBe(401);
+      expect((await bindOffering(id, student, specId)).status).toBe(403);
+      expect((await bindOffering(id, unrelated, specId)).status).toBe(403);
+      expect((await prisma.offering.findUniqueOrThrow({ where: { id } })).courseSpecId).toBeNull();
+      const bound = await bindOffering(id, reviewer, specId);
+      expect(bound.status).toBe(200);
+      expect(bound.body.courseSpec?.id).toBe(specId);
+      const read = await readOffering(id);
+      expect(read.status).toBe(200);
+      expect(read.body.courseSpec?.id).toBe(specId);
+      expect(read.body.status).toBe("Planned");
+      const persisted = await prisma.offering.findUniqueOrThrow({ where: { id } });
+      expect(persisted.courseSpecId).toBe(specId);
+      expect(persisted.status).toBe("Planned");
+      expect((await bindOffering(id, reviewer, null)).status).toBe(400);
+      expect((await prisma.offering.findUniqueOrThrow({ where: { id } })).courseSpecId).toBe(specId);
+    }
+    expect((await snapshot()).reviewActions).toHaveLength(4);
+    expect(await prisma.assessmentResult.count({ where: { courseSpecId: specId } })).toBe(0);
   }, 30000);
 });
