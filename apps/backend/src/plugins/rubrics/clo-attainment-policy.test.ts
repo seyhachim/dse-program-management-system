@@ -45,12 +45,12 @@ describe("candidate CLO policy foundation (governance #1384)", () => {
       expect(() => candidateStudentAttained(value)).toThrow();
   });
   test("candidate A exact boundaries", () => {
-    for (const [rate, level] of [[0,0],[39.999,0],[40,1],[49.999,1],[50,2],[69.999,2],[70,3],[100,3]])
-      expect(candidateDirectLevel(rate!, "candidate-a")).toBe(level!);
+    for (const [rate, level] of [[0,0],[39.999,0],[40,1],[49.999,1],[50,2],[69.999,2],[70,3],[100,3]] as const)
+      expect(candidateDirectLevel(rate, "candidate-a")).toBe(level);
   });
   test("candidate B exact boundaries", () => {
-    for (const [rate, level] of [[0,0],[59.999,0],[60,1],[69.999,1],[70,2],[79.999,2],[80,3],[100,3]])
-      expect(candidateDirectLevel(rate!, "candidate-b")).toBe(level!);
+    for (const [rate, level] of [[0,0],[59.999,0],[60,1],[69.999,1],[70,2],[79.999,2],[80,3],[100,3]] as const)
+      expect(candidateDirectLevel(rate, "candidate-b")).toBe(level);
     expect(candidateDirectLevel(null, "candidate-b")).toBeNull();
     expect(() => candidateDirectLevel(101, "candidate-b")).toThrow();
     expect(() => candidateDirectLevel(75, "invalid" as "candidate-b")).toThrow();
