@@ -87,3 +87,21 @@ Avoid:
 After giving me the plan, implement the changes with complete function bodies and include the tests required to prove the feature works.
 
 At the end, tell me exactly what I should run in VS Code to verify the implementation.
+
+## Academic impact review
+
+<!-- Complete every field; use N/A with a specific reason when not applicable. See docs/governance/PR-REVIEW.md. Do not include confidential sources, student data, or exam contents. -->
+- Issue:
+- Impact:
+- Rationale:
+- AC principles:
+- OBE:
+- CDIO:
+- AUN-QA:
+- RUPP:
+- Sources and authority:
+- Scope and historical integrity:
+- Evidence and assessment:
+- Authorization and privacy:
+- Verification:
+- Policy blockers and review:

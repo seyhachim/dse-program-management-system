@@ -1,0 +1,19 @@
+name: Academic governance review
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  academic-impact:
+    name: Academic impact review format
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test validator
+        run: python -m unittest discover -s scripts -p 'test_academic_pr_review.py'
+      - name: Validate PR metadata
+        run: python scripts/academic_pr_review.py

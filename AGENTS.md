@@ -64,6 +64,8 @@ CI performs a fresh PostgreSQL migration/seed plus curriculum-integrity and fail
 
 ## Pull requests
 
+Complete the Academic impact review section in the root PR template for every PR. Follow [academic PR review](docs/governance/PR-REVIEW.md); the format check is not academic approval. Older PRs may use the documented transition but still require manual review. Keep unresolved policy changes blocked and never disclose restricted evidence.
+
 Before creating or updating a PR, read the root `pull_request_template.md` and preserve its required inspection, implementation, database, contract, authorization, edge-case, test, and reviewer evidence.
 
 Before merge, compare the finished PR with both the issue acceptance criteria and the root PR template. Any failing typecheck, lint, test, build, migration, security, permission, or API-contract gate is merge-blocking unless it is explicitly outside the issue and documented as a pre-existing repository limitation.
