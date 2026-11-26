@@ -230,6 +230,14 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       expect((await service.workspace(teacher,scope)).roster.find(r=>r.enrollmentId===f.enrolled.id)?.grade).toEqual({revision:2,complete:true});
       expect(await db.assessmentResult.count({where:{courseSpecId:f.spec.id,assessmentItemId:"exam"}})).toBe(0);
       await expect((async()=>await db.$executeRaw`INSERT INTO exam_variant."ExamGradeRevision" ("assignmentId","assignmentRevision","variantId","variantHash",revision,marks,complete,"earnedPoints","maximumPoints","actorId") VALUES (${grade.assignment.id},${grade.assignment.revision},${grade.assignment.variantId},${grade.assignment.variantHash},3,${JSON.stringify(completed.marks)}::jsonb,true,30,100,${f.teacher.id})`)()).rejects.toThrow("Approved academic marking dossier required");
+      await expect(service.saveGradeDraft(teacher,{...completedInput,expectedGradeRevision:2,feedback:[{questionId:"UNKNOWN",comment:"Synthetic comment"}]})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      await expect(service.saveGradeDraft(teacher,{...completedInput,expectedGradeRevision:2,feedback:[{questionId:"Q1",comment:"First"},{questionId:"Q1",comment:"Second"}]})).rejects.toBeInstanceOf(ExamVariantConflictError);
+      const editedFeedback=await service.saveGradeDraft(teacher,{...completedInput,expectedGradeRevision:2,feedback:[{questionId:"Q1",comment:"Revised synthetic feedback"}]});
+      expect(editedFeedback.gradeRevision).toBe(3);
+      expect(editedFeedback.earnedPoints).toBe(30);
+      expect(editedFeedback.sampleModeration).toBeNull();
+      expect((await db.$queryRaw<Array<{outcome:string}>>`SELECT outcome FROM exam_variant."ExamSampleModeration" WHERE "assignmentId"=${grade.assignment.id} AND "gradeRevision"=2`)[0]?.outcome).toBe("Accepted");
+      await expect(service.moderateSample(reviewer,sample)).rejects.toBeInstanceOf(ExamVariantConflictError);
       // Phase 3A: legacy marks cannot coexist with a configured assessment.
       const rawMark = (tx: Pick<typeof db,"$executeRaw">, itemId: string, enrollmentId: string = f.enrolled.id) => tx.$executeRaw`
         INSERT INTO public."AssessmentResult" (id,"enrollmentId","courseSpecId","assessmentItemId",score,"maxScore","updatedAt")
