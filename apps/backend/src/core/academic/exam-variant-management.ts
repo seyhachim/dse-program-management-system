@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AuthUser } from "../auth/token.ts";
 import { createExamVariantSnapshot, resolveExamVariant, summarizeExamVariantScores, verifyExamVariantSnapshot } from "./exam-variant.ts";
 import { rubricContentHash } from "./rubric-context.ts";
+import { buildExamCloPreview, examCloScenarioSchema, type ExamCloPreviewSource } from "./exam-clo-preview.ts";
 import { academicBlueprintSchema, buildAcademicBlueprint, blueprintDistribution, equivalenceSchema, type AcademicBlueprint } from "./exam-academic-blueprint.ts";
 
 const id = z.string().min(1).max(256).refine((s) => s.trim() === s);
@@ -362,6 +363,61 @@ export function createExamVariantManagementService(db: PrismaClient, proposalSec
         return { id: assignmentId, revision: 1, variantId: snapshot.variantId, variantHash: snapshot.variantHash };
   }
   return {
+    async cloPreview(actor:AuthUser,input:unknown) {
+      const request=scopeSchema.extend({scenarioThreshold:examCloScenarioSchema}).parse(input);
+      return transact(async tx=>{
+        const ctx=await context(tx,actor.id,request,"read");
+        const {courseSpecId,assessmentItemId,programmeId}=ctx.scope;
+        const offeringId=ctx.offering.id;
+        const roster=await tx.enrollment.findMany({where:{offeringId},orderBy:{id:"asc"},take:501,
+          select:{id:true,student:{select:{studentId:true,status:true}}}});
+        if(roster.length>500) conflict("Evidence preview exceeds pilot roster limit");
+        const assignments=await tx.$queryRaw<Array<Assignment&{enrollmentId:string}>>`
+          SELECT id,"enrollmentId",revision,"variantId","variantHash" FROM exam_variant."ExamPaperAssignment"
+          WHERE "offeringId"=${offeringId} AND "courseSpecId"=${courseSpecId} AND "assessmentItemId"=${assessmentItemId}`;
+        const grades=await tx.$queryRaw<Array<GradeRevision&{assignmentId:string;assignmentRevision:number;variantId:string;variantHash:string;sampleOutcome:"Accepted"|"ChangesRequired"|null}>>`
+          SELECT DISTINCT ON (g."assignmentId") g."assignmentId",g."assignmentRevision",g."variantId",g."variantHash",g.revision,g.marks,g.complete,
+          g."earnedPoints",g."maximumPoints",g."actorId",g."savedAt",g."dossierId",g.feedback,s.outcome AS "sampleOutcome"
+          FROM exam_variant."ExamGradeRevision" g JOIN exam_variant."ExamPaperAssignment" a ON a.id=g."assignmentId"
+          LEFT JOIN exam_variant."ExamSampleModeration" s ON s."assignmentId"=g."assignmentId" AND s."gradeRevision"=g.revision
+          WHERE a."offeringId"=${offeringId} AND a."courseSpecId"=${courseSpecId} AND a."assessmentItemId"=${assessmentItemId}
+          ORDER BY g."assignmentId",g.revision DESC`;
+        const byEnrollment=new Map(assignments.map(a=>[a.enrollmentId,a]));
+        const byGrade=new Map(grades.map(g=>[g.assignmentId,g]));
+        const cached=new Map<string,{snapshot:Snapshot;dossierId:string|null}>();
+        const sources:ExamCloPreviewSource[]=[];
+        for(const row of roster){
+          const eligible=row.student.status==="Active"&&Boolean(row.student.studentId);
+          const current=byEnrollment.get(row.id);
+          if(!current){sources.push({enrollmentId:row.id,eligible,assignmentId:null,assignmentRevision:null,snapshot:null,
+            gradeRevision:null,dossierId:null,approvedDossierId:null,sampleOutcome:null,summary:null});continue;}
+          let exact=cached.get(current.variantHash);
+          if(!exact){
+            const snapshot=await paper(tx,ctx,current,false);
+            if(!(await permission(tx,ctx,snapshot))) deny();
+            const dossier=await approvedDossier(tx,ctx,current);
+            exact={snapshot,dossierId:dossier?.id??null};cached.set(current.variantHash,exact);
+          }
+          if(exact.snapshot.variantId!==current.variantId) conflict("Assigned paper identity mismatch");
+          const saved=byGrade.get(current.id);
+          const scope={...ctx.scope,offeringId,enrollmentId:row.id};
+          const v={variantId:current.variantId,variantHash:current.variantHash};
+          const resolution={context:{...scope,examMaximum:exact.snapshot.examMaximum,activeCloCodes:ctx.activeCloCodes},
+            variants:[exact.snapshot],permissions:[{...ctx.scope,offeringId,...v}],assignment:{...scope,...v,confirmed:true}};
+          if(saved&&(saved.assignmentRevision!==current.revision||saved.variantId!==current.variantId||saved.variantHash!==current.variantHash))
+            conflict("Saved grade assignment mismatch");
+          const summary=saved?summarizeExamVariantScores(resolution,{...scope,...v,marks:saved.marks}):null;
+          if(saved&&summary&&(saved.complete!==summary.complete||saved.maximumPoints!==summary.maximumPoints||
+            (saved.earnedPoints===null?summary.earnedPoints!==null:summary.earnedPoints===null||
+            Math.abs(saved.earnedPoints-summary.earnedPoints)>Math.max(Math.abs(saved.earnedPoints),Math.abs(summary.earnedPoints))*1e-12)))
+            conflict("Stored grade integrity mismatch");
+          sources.push({enrollmentId:row.id,eligible,assignmentId:current.id,assignmentRevision:current.revision,snapshot:exact.snapshot,
+            gradeRevision:saved?.revision??null,dossierId:saved?.dossierId??null,approvedDossierId:exact.dossierId,
+            sampleOutcome:saved?.sampleOutcome??null,summary});
+        }
+        return buildExamCloPreview({programmeId,courseSpecId,assessmentItemId,offeringId,activeCloCodes:ctx.activeCloCodes},sources,request.scenarioThreshold);
+      });
+    },
     async academicWorkspace(actor:AuthUser,input:unknown) {
       const request=versionSchema.parse(input);
       return transact(async tx=>{

@@ -238,6 +238,26 @@ dbDescribe("exam variant management (#1371 Phase 2B)", () => {
       expect(editedFeedback.sampleModeration).toBeNull();
       expect((await db.$queryRaw<Array<{outcome:string}>>`SELECT outcome FROM exam_variant."ExamSampleModeration" WHERE "assignmentId"=${grade.assignment.id} AND "gradeRevision"=2`)[0]?.outcome).toBe("Accepted");
       await expect(service.moderateSample(reviewer,sample)).rejects.toBeInstanceOf(ExamVariantConflictError);
+      // Phase 3C.1: authorized diagnostic only, exact current draft provenance.
+      const preview=await service.cloPreview(teacher,{...scope,scenarioThreshold:50});
+      expect(preview.official).toBe(false);
+      expect(preview.population).toBe(2);
+      expect(preview.students.find(s=>s.enrollmentId===f.enrolled.id)).toMatchObject({variantHash:b.snapshot.variantHash,gradeRevision:3,dossierId:revisedDossier.id,status:"available",sampleOutcome:null});
+      expect(preview.students.find(s=>s.enrollmentId===probe.id)?.status).toBe("ungraded");
+      expect(preview.students.find(s=>s.enrollmentId===f.enrolled.id)?.evidence.find(e=>e.cloCode==="CLO1"&&e.role==="direct")).toMatchObject({earnedPoints:0,plannedMaximum:70,percentage:0,meetsScenario:false});
+      expect(preview.rows.find(r=>r.cloCode==="CLO2"&&r.role==="supporting")).toMatchObject({mapped:2,available:1,missing:1,meanPercentage:100,meetsScenarioRate:null});
+      expect((await service.cloPreview(reviewer,{...scope,scenarioThreshold:50})).calculationHash).toBe(preview.calculationHash);
+      expect((await service.cloPreview(teacher,{...scope,scenarioThreshold:null})).rows.every(r=>r.meetsScenarioCount===null)).toBe(true);
+      await expect(service.cloPreview(outsider,{...scope,scenarioThreshold:50})).rejects.toBeInstanceOf(ExamVariantAccessError);
+      await expect(service.cloPreview(otherTeacher,{...scope,scenarioThreshold:50})).rejects.toBeInstanceOf(ExamVariantAccessError);
+      expect((await service.cloPreview(otherTeacher,{...scope,offeringId:f.other.id,scenarioThreshold:50})).students.map(s=>s.enrollmentId)).toEqual([f.foreign.id]);
+      await service.moderateSample(reviewer,{...sample,gradeRevision:3,outcome:"ChangesRequired"});
+      const flagged=await service.cloPreview(teacher,{...scope,scenarioThreshold:50});
+      expect(flagged.students.find(s=>s.enrollmentId===f.enrolled.id)?.status).toBe("changes-required");
+      expect(flagged.rows.every(r=>r.available===0&&r.meanPercentage===null)).toBe(true);
+      expect(flagged.calculationHash).not.toBe(preview.calculationHash);
+      expect(await db.assessmentResult.count({where:{courseSpecId:f.spec.id,assessmentItemId:"exam"}})).toBe(0);
+      expect(await db.qaCloAttainmentSnapshot.count({where:{offeringId:f.offering.id}})).toBe(0);
       // Phase 3A: legacy marks cannot coexist with a configured assessment.
       const rawMark = (tx: Pick<typeof db,"$executeRaw">, itemId: string, enrollmentId: string = f.enrolled.id) => tx.$executeRaw`
         INSERT INTO public."AssessmentResult" (id,"enrollmentId","courseSpecId","assessmentItemId",score,"maxScore","updatedAt")

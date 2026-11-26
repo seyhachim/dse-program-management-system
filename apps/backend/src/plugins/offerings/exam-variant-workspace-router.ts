@@ -62,6 +62,7 @@ export function createExamVariantWorkspaceRouter(env: Env = process.env): Router
     router.post("/exam-variants/academic/submit", endpoint(service.submitAcademic));
     router.post("/exam-variants/academic/decide", endpoint(service.decideAcademic));
     router.post("/exam-variants/grade/moderate", endpoint(service.moderateSample));
+    router.post("/exam-variants/clo/preview", endpoint(service.cloPreview));
   }
   return router;
 }
