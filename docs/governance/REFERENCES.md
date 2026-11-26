@@ -6,7 +6,7 @@ Last public-source check: 2026-11-26. External framework verification is not ver
 |---|---|---|---|
 | CDIO-01 | [CDIO Standards 3.0](https://www.cdio.org/content/cdio-standards-30) | Worldwide CDIO Initiative; standards 1–12 | Public version and headings verified; DSE CDIO lead to review local mapping |
 | CDIO-02 | [CDIO Syllabus 3.0](https://www.cdio.org/content/cdio-syllabus-30) | Worldwide CDIO Initiative; syllabus competency framework | Public version verified; DSE curriculum lead to review adaptation |
-| AUN-01 | [AUN-QA Resources and Publications](https://www.aunsec.org/discover-aun/thematic-networks/aun-qa/aun-qa-resources-and-publications): Guide to AUN-QA Assessment at Programme Level v4.0 | ASEAN University Network; programme criteria 1–8, guide section 1.2.4 | Public version and criterion headings verified; QA lead to verify detailed locators |
+| AUN-01 | [Guide to AUN-QA Assessment at Programme Level v4.0 (October 2020)](https://www.aunsec.org/application/files/2816/7290/3752/Guide_to_AUN-QA_Assessment_at_Programme_Level_Version_4.0_4.pdf) | ASEAN University Network; programme criteria 1–8, guide section 1.2.4, printed p. 12 | Public version and criterion headings verified; QA lead to verify detailed locators |
 | RUPP-01 | RUPP OBE Handbook | Institutional; version and sections unverified | Pending authorized verification; institutional academic owner |
 | RUPP-02 | RUPP Course Specification Template | Institutional; approved version unverified | Pending authorized verification; institutional academic owner |
 | RUPP-03 | Applicable grading, credit/SLT, moderation, appeals and progression policies | Institutional; specific titles and versions unverified | Pending authorized verification; institutional academic owner |
