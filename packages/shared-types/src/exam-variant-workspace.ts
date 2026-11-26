@@ -17,5 +17,15 @@ export type ExamWorkspaceDecision = ExamWorkspaceScope & { submissionId: string;
 export type ExamWorkspaceAssignmentEntry = { enrollmentId: string; variantId: string; variantHash: string; expectedRevision: number; reason: string; evidenceRef: string };
 
 export type ExamGradeMark = { questionId: string; maxPoints: number; score: number | null };
-export type ExamGradeWorkspace = { assignment: ExamWorkspaceAssignment; snapshot: ExamWorkspaceSnapshot; canEdit: boolean; gradeRevision: number; complete: boolean; questionLabels: Record<string,string>; earnedPoints: number | null; maximumPoints: number; marks: ExamGradeMark[]; savedAt: string | null };
-export type SaveExamGradeDraft = ExamWorkspaceScope & { enrollmentId: string; assignmentId: string; assignmentRevision: number; variantHash: string; expectedGradeRevision: number; marks: { questionId: string; score: number | null }[] };
+export type ExamGradeWorkspace = { assignment: ExamWorkspaceAssignment; snapshot: ExamWorkspaceSnapshot; canEdit: boolean; academicDossierId: string|null; savedDossierId: string|null; blueprint: ExamAcademicBlueprint|null; feedback: ExamQuestionFeedback[]; canModerate: boolean; sampleModeration: ExamSampleModeration|null; gradeRevision: number; complete: boolean; questionLabels: Record<string,string>; earnedPoints: number | null; maximumPoints: number; marks: ExamGradeMark[]; savedAt: string | null };
+export type SaveExamGradeDraft = ExamWorkspaceScope & { enrollmentId: string; assignmentId: string; assignmentRevision: number; variantHash: string; expectedGradeRevision: number; marks: { questionId: string; score: number | null }[]; feedback?: ExamQuestionFeedback[] };
+
+export type ExamBloomLevel = "Remember"|"Understand"|"Apply"|"Analyze"|"Evaluate"|"Create";
+export type ExamAcademicComponentInput = {questionId:string;parentLabel:string;componentLabel:string;topic:string;bloom:ExamBloomLevel;expectedAnswerRef:string;partialCredit:string};
+export type ExamAcademicBlueprintInput = {durationMinutes:number;conditions:string;restrictedSchemeRef:string;components:ExamAcademicComponentInput[]};
+export type ExamAcademicBlueprint = Omit<ExamAcademicBlueprintInput,"components"> & {components:(ExamAcademicComponentInput & ExamWorkspaceQuestion)[]};
+export type ExamAcademicDistribution = {cloCode:string;evidence:"direct"|"supporting";bloom:ExamBloomLevel;points:number}[];
+export type ExamAcademicDossier = {id:string;offeringId:string;variantId:string;variantHash:string;blueprint:ExamAcademicBlueprint;baselineId:string|null;submittedById:string;submittedAt:string;status:"Pending"|"Approved"|"Returned";decidedById:string|null;decidedAt:string|null;review:unknown;distribution:ExamAcademicDistribution};
+export type ExamAcademicWorkspace = {snapshot:ExamWorkspaceSnapshot;dossiers:ExamAcademicDossier[];baseline:{id:string;variantId:string;variantHash:string;durationMinutes:number;conditions:string;distribution:ExamAcademicDistribution}|null;canSubmit:boolean;canReview:boolean;questionLabels:Record<string,string>};
+export type ExamQuestionFeedback = {questionId:string;comment:string};
+export type ExamSampleModeration = {gradeRevision:number;reviewerId:string;outcome:"Accepted"|"ChangesRequired";reason:string;sampleRef:string;reviewedAt:string};
