@@ -7,6 +7,7 @@ const field="w-full min-h-10 rounded border border-border bg-background p-2 text
 const btn="rounded border border-border px-3 py-2 text-sm font-medium disabled:opacity-50";
 const checks=["coverage","cognitiveDemand","difficulty","workload","scoringRules","fairness"] as const;
 const checkLabels={coverage:"CLO and topic coverage",cognitiveDemand:"Cognitive demand",difficulty:"Comparable difficulty",workload:"Time and workload",scoringRules:"Scoring and partial-credit consistency",fairness:"Fairness and assessment conditions"};
+type DraftComponent=Omit<ExamAcademicComponentInput,"bloom">&{bloom:ExamBloomLevel|""};
 const blooms:ExamBloomLevel[]=["Remember","Understand","Apply","Analyze","Evaluate","Create"];
 
 function Distribution({rows}:{rows:ExamAcademicDistribution}){
@@ -29,7 +30,7 @@ function DossierEditor({workspace,variantId,variantHash,onChanged}:{workspace:Ex
   const [duration,setDuration]=useState("");
   const [conditions,setConditions]=useState("");
   const [schemeRef,setSchemeRef]=useState("");
-  const [components,setComponents]=useState<ExamAcademicComponentInput[]>([]);
+  const [components,setComponents]=useState<DraftComponent[]>([]);
   const [accepted,setAccepted]=useState<string[]>([]);
   const [rationale,setRationale]=useState("");
   const [busy,setBusy]=useState(false);
@@ -46,13 +47,13 @@ function DossierEditor({workspace,variantId,variantHash,onChanged}:{workspace:Ex
       setComponents(d.snapshot.questions.map((q,i)=>{
         const old=previous?.components.find(x=>x.questionId===q.questionId);
         return old?{questionId:old.questionId,parentLabel:old.parentLabel,componentLabel:old.componentLabel,topic:old.topic,bloom:old.bloom,expectedAnswerRef:old.expectedAnswerRef,partialCredit:old.partialCredit}:
-          {questionId:q.questionId,parentLabel:"Q"+(i+1),componentLabel:"a",topic:"",bloom:"Remember",expectedAnswerRef:"",partialCredit:""};
+          {questionId:q.questionId,parentLabel:"Q"+(i+1),componentLabel:"a",topic:"",bloom:"",expectedAnswerRef:"",partialCredit:""};
       }));
     }).catch(()=>{if(live)setError("Academic dossier unavailable or access denied.");});
     return()=>{live=false;};
   },[offeringId,assessmentItemId,variantId,variantHash,reload]);
-  function update(i:number,key:keyof Omit<ExamAcademicComponentInput,"questionId">,value:string){
-    setComponents(old=>old.map((q,j)=>i===j?{...q,[key]:value}:q));
+  function update(i:number,key:keyof Omit<DraftComponent,"questionId">,value:string){
+    setComponents(old=>old.map((q,j)=>i===j?{...q,[key]:value} as DraftComponent:q));
   }
   async function run(action:string,body:unknown){
     setBusy(true);setError("");
@@ -60,8 +61,8 @@ function DossierEditor({workspace,variantId,variantHash,onChanged}:{workspace:Ex
     catch(e){setError(e instanceof Error?e.message:"Academic action failed");}finally{setBusy(false);}
   }
   if(!data)return <div>{error?<p role="alert">{error}</p>:<p>Loading academic dossier…</p>}<button className={btn} onClick={()=>setReload(x=>x+1)}>Reload</button></div>;
-  const blueprint:ExamAcademicBlueprintInput={durationMinutes:Number(duration),conditions,restrictedSchemeRef:schemeRef,components};
-  const ready=Number.isInteger(blueprint.durationMinutes)&&blueprint.durationMinutes>0&&blueprint.durationMinutes<=720&&conditions.trim().length>=3&&schemeRef.trim()&&components.every(q=>q.parentLabel.trim()&&q.componentLabel.trim()&&q.topic.trim()&&q.expectedAnswerRef.trim()&&q.partialCredit.trim().length>=3);
+  const blueprint:ExamAcademicBlueprintInput={durationMinutes:Number(duration),conditions,restrictedSchemeRef:schemeRef,components:components.map(c=>({...c,bloom:c.bloom as ExamBloomLevel}))};
+  const ready=Number.isInteger(blueprint.durationMinutes)&&blueprint.durationMinutes>0&&blueprint.durationMinutes<=720&&conditions.trim().length>=3&&schemeRef.trim()&&components.every(q=>q.parentLabel.trim()&&q.componentLabel.trim()&&q.topic.trim()&&q.bloom!==""&&q.expectedAnswerRef.trim()&&q.partialCredit.trim().length>=3);
   return <div className="space-y-4">
     {error&&<p role="alert">{error}</p>}
     <div className="rounded border p-3 space-y-2">
@@ -79,7 +80,7 @@ function DossierEditor({workspace,variantId,variantHash,onChanged}:{workspace:Ex
           <label>Parent question<input className={field} maxLength={80} value={c.parentLabel} onChange={e=>update(i,"parentLabel",e.target.value)}/></label>
           <label>Scored part<input className={field} maxLength={80} value={c.componentLabel} onChange={e=>update(i,"componentLabel",e.target.value)}/></label>
           <label>Topic<input className={field} maxLength={80} value={c.topic} onChange={e=>update(i,"topic",e.target.value)}/></label>
-          <label>Cognitive level<select className={field} value={c.bloom} onChange={e=>update(i,"bloom",e.target.value)}>{blooms.map(b=><option key={b}>{b}</option>)}</select></label>
+          <label>Cognitive level<select className={field} value={c.bloom} onChange={e=>update(i,"bloom",e.target.value)}><option value="">Choose level</option>{blooms.map(b=><option key={b}>{b}</option>)}</select></label>
           <label>Expected answer reference<input className={field} maxLength={256} value={c.expectedAnswerRef} onChange={e=>update(i,"expectedAnswerRef",e.target.value)}/></label>
           <label>Partial-credit instructions<textarea className={field} maxLength={2000} value={c.partialCredit} onChange={e=>update(i,"partialCredit",e.target.value)}/></label>
         </div></div>;})}
@@ -90,7 +91,7 @@ function DossierEditor({workspace,variantId,variantHash,onChanged}:{workspace:Ex
       <p>{d.blueprint.conditions} · Scheme reference: {d.blueprint.restrictedSchemeRef}</p>
       <Distribution rows={d.distribution}/>
       <details><summary className="cursor-pointer">Restricted component instructions</summary>{d.blueprint.components.map(q=><div key={q.questionId} className="border-t py-2 text-sm"><p>{q.parentLabel}({q.componentLabel}) · {q.topic} · {q.maxPoints} marks · {q.bloom} · {q.cloCode} · {q.evidence}</p><p>Answer reference: {q.expectedAnswerRef}</p><p>Partial credit: {q.partialCredit}</p></div>)}</details>
-      {d.review&&typeof d.review==="object"&&"rationale" in d.review&&<p>Review: {String(d.review.rationale)}</p>}
+      {d.review!==null&&typeof d.review==="object"&&"rationale" in d.review&&<p>Review: {String(d.review.rationale)}</p>}
       {data.canReview&&d.status==="Pending"&&d.submittedById!==actorId&&<div className="space-y-2 border-t pt-2">
         <p className="text-sm">Review the actual controlled scheme and paper. Confirm each criterion independently, including the baseline comparison where applicable.</p>
         {checks.map(k=><label key={k} className="flex gap-2 items-center"><input type="checkbox" checked={accepted.includes(k)} onChange={e=>setAccepted(a=>e.target.checked?[...a,k]:a.filter(x=>x!==k))}/>{checkLabels[k]}</label>)}
