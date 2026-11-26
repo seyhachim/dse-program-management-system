@@ -2,6 +2,10 @@
 
 Use this file as the repository-level execution checklist for automated coding agents and contributors.
 
+## Academic governance preflight
+
+For any academic feature, bug fix, migration, report, or calculation, read [the DSE PMS constitution](docs/governance/CONSTITUTION.md) and its applicable framework/policy guides before planning or coding. Record applicable AC IDs, sources and approval status, version/cohort scope, direct versus supporting evidence, historical integrity, authorization and regression tests. Do not invent institutional requirements, expose restricted documents, or turn a proposed convention into an approved policy. If an unresolved policy changes academic meaning, isolate that work pending authorized review. For non-academic changes, note why there is no academic impact. This supplements, never replaces, existing engineering and security gates.
+
 ## Environment
 
 - Bun: `1.2.23`
@@ -59,6 +63,8 @@ CI performs a fresh PostgreSQL migration/seed plus curriculum-integrity and fail
 - Keep secrets out of source and browser-exposed `NEXT_PUBLIC_*` variables.
 
 ## Pull requests
+
+Complete the Academic impact review section in the root PR template for every PR. Follow [academic PR review](docs/governance/PR-REVIEW.md); the format check is not academic approval. Older PRs may use the documented transition but still require manual review. Keep unresolved policy changes blocked and never disclose restricted evidence.
 
 Before creating or updating a PR, read the root `pull_request_template.md` and preserve its required inspection, implementation, database, contract, authorization, edge-case, test, and reviewer evidence.
 

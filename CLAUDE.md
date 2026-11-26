@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Mandatory repository guidance
+
+Read [AGENTS.md](AGENTS.md) first; it is the canonical engineering and verification checklist. For academic changes, follow the academic governance preflight and read [the constitution](docs/governance/CONSTITUTION.md). Existing architecture notes below are subordinate to current code and canonical verification instructions.
+
 ## What this is
 
 DSE Program Management System — a modular monolith with a plugin registry, currently
@@ -26,11 +30,7 @@ bun run lint                           # turbo: lint all workspaces (frontend on
 bun run typecheck                      # turbo: tsc --noEmit in every workspace
 ```
 
-Testing: only `packages/shared-types` currently has tests (`bun:test`, files named
-`*.test.ts`, colocated with the source they test — see `course-spec.test.ts`).
-Run all of them with `bun test` from the repo root, or scope to one file with
-`bun test src/course-spec.test.ts` from inside `packages/shared-types`.
-`apps/backend` has a `test` script (`bun test`) wired for when it gains tests, but has none yet.
+Testing: follow the canonical verification commands in [AGENTS.md](AGENTS.md). Run root `bun run test` and `bun run test:backend`; backend discovery must execute tests. Database/security changes also require the documented migration, seed and security checks against an appropriate non-production database.
 
 Deploy target/process (Supabase → Render → Vercel, and switching from dev-token to
 Supabase Auth via `AUTH_MODE`) is documented in `DEPLOY.md`.
