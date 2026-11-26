@@ -44,7 +44,7 @@ class AcademicReviewTests(unittest.TestCase):
         self.assertTrue(validate(1382, "<!-- " + body() + " -->"))
 
     def test_next_section_not_counted(self):
-        self.assertTrue(validate(1382, body(overrides={"RUPP": ""}) + "\n## Other\n- RUPP: verified")))
+        self.assertTrue(validate(1382, body(overrides={"RUPP": ""}) + "\n## Other\n- RUPP: verified"))
 
 
 if __name__ == "__main__":
