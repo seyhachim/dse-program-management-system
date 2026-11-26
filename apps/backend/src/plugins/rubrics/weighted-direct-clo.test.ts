@@ -150,6 +150,17 @@ describe("governance weighted direct CLO preview (#1384)", () => {
     const empty=calculateWeightedDirectPreview({...input,enrollmentIds:[],students:[]});
     expect(empty.population.completePopulationRate).toBeNull();
   });
+  test("different assessment coverage prevents a class level even when each score is complete", () => {
+    const a=plan("a",[component("a1",10)]), b=plan("b",[component("b1",10)]);
+    const unmapped:AssessmentPlan={assessmentItemId:"b",mapping:"not-mapped",instrument:null,components:[]};
+    const input=fixture([a,b],[result(a,{a1:6}),result(b,{b1:6})],[20,80]);
+    const out=calculateWeightedDirectPreview({...input,enrollmentIds:["student-a","student-b"],
+      students:[...input.students,{enrollmentId:"student-b",plans:[a,unmapped],results:[result(a,{a1:6},"student-b")]}]});
+    expect(out.students.map(s=>s.percentage)).toEqual([60,60]);
+    expect(out.population.completePopulationRate).toBe(100);
+    expect(out.comparableAssessmentCoverage).toBe(false);
+    expect(out.directLevel).toBeNull();
+  });
   test("versioned calculation hash stable across order and changes on revision/correction", () => {
     const a=plan("a",[component("a1",10),component("a2",10)]), b=plan("b",[component("b1",10)]);
     const r=result(a,{a1:6,a2:8}), s=result(b,{b1:5});
