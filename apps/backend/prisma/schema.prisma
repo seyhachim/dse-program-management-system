@@ -393,6 +393,7 @@ model User {
   dseNewsUpdated DseNewsArticle[] @relation("DseNewsEditor")
   dseNewsAudits DseNewsAuditEvent[] @relation("DseNewsAuditActor")
   dseNewsMediaUploaded DseNewsMedia[] @relation("DseNewsMediaUploader")
+  institutionalPolicyRevisions InstitutionalPolicyRevision[] @relation("InstitutionalPolicyRevisionActor")
   rubricsOwned                       Rubric[]                                  @relation("RubricOwner")
   coLecturerOf                       OfferingCoLecturer[]                      @relation("OfferingCoLecturer")
   offeringMeetingAssignments             OfferingMeetingLecturer[]                 @relation("OfferingMeetingLecturerUser")
@@ -507,6 +508,7 @@ model Programme {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  institutionalPolicyRevisions InstitutionalPolicyRevision[]
   opportunities            Opportunity[]
   roleAssignments          UserRoleAssignment[]
   headAppointments         ProgrammeHeadAppointment[]
@@ -3673,4 +3675,28 @@ model DseNewsMedia {
   createdAt     DateTime       @default(now())
 
   @@index([articleId, kind])
+}
+
+
+/// Append-only restricted bibliographic metadata. Never store source files or URLs here.
+model InstitutionalPolicyRevision {
+  id             String   @id @default(uuid())
+  programmeId    String
+  topic          String
+  revision       Int
+  title          String
+  institutionalOwner String
+  version        String?
+  effectiveDate  String?
+  locator        String?
+  modules        String
+  status         String
+  classification String   @default("internal_staff")
+  createdById    String
+  createdAt      DateTime @default(now())
+  verifiedAt     DateTime?
+  programme      Programme @relation(fields: [programmeId], references: [id], onDelete: Restrict)
+  createdBy      User @relation("InstitutionalPolicyRevisionActor", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([programmeId, topic, revision])
 }

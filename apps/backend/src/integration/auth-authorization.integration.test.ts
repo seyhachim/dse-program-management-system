@@ -242,6 +242,58 @@ integrationDescribe("backend integration authorization boundaries", () => {
     ).toBe(403);
   });
 
+  test("institutional policy register rejects unauthorized access and keeps restricted metadata out of public rubric responses", async () => {
+    const programmeId = "policy-test-" + crypto.randomUUID();
+    await prisma.programme.create({data: {id: programmeId, code: programmeId, name: "Synthetic QA test programme"}});
+    const root = "/api/rubrics/institutional-policies/" + programmeId;
+    const scope = (actor: AuthUser, role: Role, id: string): string => signToken({
+      ...actor, roles: [role], programmeRoles: [{role, programmeId: id}],
+    });
+    const admin = signToken(context.users.admin);
+    const coordinator = scope(context.users.coordinator, "program_coordinator", programmeId);
+    const lecturer = scope(context.users.lecturer, "lecturer", programmeId);
+    const outsider = scope(context.users.lecturer, "lecturer", "dse");
+    const otherCoordinator = scope(context.users.coordinator, "program_coordinator", "dse");
+    const student = scope(context.users.student, "student", programmeId);
+    const marker = "SYNTHETIC_INTERNAL_POLICY_" + crypto.randomUUID();
+    const data = {topic:"obe", expectedRevision:0, title:marker, institutionalOwner:"Synthetic office",
+      version:"1", effectiveDate:null, locator:"Section 1", modules:"Assessment", status:"pending"};
+    expect((await request(root)).status).toBe(401);
+    for (const token of [outsider, otherCoordinator, student]) {
+      expect((await request(root,{token})).status).toBe(403);
+      expect((await request(root,{method:"POST",token,body:data})).status).toBe(403);
+    }
+    expect((await request(root,{method:"POST",token:lecturer,body:data})).status).toBe(403);
+    expect((await request(root,{method:"POST",token:coordinator,body:{...data, sourceUrl:"https://example.invalid"}})).status).toBe(400);
+    const created = await request(root,{method:"POST",token:coordinator,body:data});
+    expect(created.status).toBe(201);
+    const id = (created.body as {id:string}).id;
+    const pending = await request(root,{token:lecturer});
+    expect(pending.status).toBe(200);
+    expect(JSON.stringify(pending.body)).not.toContain(marker);
+    expect((await request(root+"/history/obe",{token:lecturer})).status).toBe(403);
+    expect((await request(root+"/history/obe",{token:admin})).status).toBe(200);
+    expect((await request(root,{method:"POST",token:coordinator,body:{...data,expectedRevision:1,status:"verified"}})).status).toBe(201);
+    const verified = await fetch(baseUrl+root,{headers:{Authorization:"Bearer "+lecturer}});
+    expect(verified.status).toBe(200);
+    expect(verified.headers.get("cache-control")).toBe("private, no-store");
+    expect(await verified.text()).toContain(marker);
+    expect((await request(root,{method:"POST",token:coordinator,body:data})).status).toBe(409);
+    const publicResponse = await request("/api/rubrics/public/"+id);
+    expect(publicResponse.status).toBe(404);
+    expect(JSON.stringify(publicResponse.body)).not.toContain(marker);
+    const anonymous = await request(root);
+    expect(anonymous.status).toBe(401);
+    expect(JSON.stringify(anonymous.body)).not.toContain(marker);
+    expect((await request(root,{method:"POST",token:coordinator,body:{...data,expectedRevision:2,status:"archived"}})).status).toBe(201);
+    const archived = await request(root,{token:lecturer});
+    expect(archived.status).toBe(200);
+    expect(JSON.stringify(archived.body)).not.toContain(marker);
+    const history = await request(root+"/history/obe",{token:coordinator});
+    expect(history.status).toBe(200);
+    expect((history.body as Array<{revision:number}>).map(r=>r.revision)).toEqual([3,2,1]);
+  });
+
   test("missing, invalid, and expired bearer tokens return 401", async () => {
     const missing = await request("/api/courses");
     expect(missing.status).toBe(401);
