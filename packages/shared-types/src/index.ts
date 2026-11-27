@@ -96,3 +96,4 @@ export * from "./lecturer-annual.ts";
 export * from "./offering-activities.ts";
 
 export * from "./activity-publications.ts";
+export * from "./course-project-groups.ts";

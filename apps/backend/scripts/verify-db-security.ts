@@ -111,6 +111,8 @@ const EXPECTED_PUBLIC_TABLES = [
   "AssessmentGroupScoreCorrection",
   "AssessmentIndividualComponentCorrection",
   "AssessmentGroupAuditEvent",
+  "CourseProjectGroupRegistration",
+  "CourseProjectGroupRegistrationEvent",
   "CourseAnnouncement",
   "CourseFeedback",
   "TeachingMethod",

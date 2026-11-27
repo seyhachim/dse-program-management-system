@@ -33,6 +33,7 @@ import {
 import { PortalError, PortalLoading, usePortalData } from "../../portal-state";
 import { PortalCourseAttendance } from "./portal-course-attendance";
 import { PortalCourseWeeklyNotes } from "./portal-course-weekly-notes";
+import { StudentCourseProjectGroups } from "@/components/course-project-group-registration";
 
 const COURSE_TAB_CLASS =
   "h-9 flex-none px-3 text-sm sm:px-4 data-active:bg-primary/10 data-active:text-primary data-active:shadow-none";
@@ -51,6 +52,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
   }
 
   const publishedResults = data.assessments.filter((item) => item.result);
+  const groupAssessments = data.assessments.filter((item) => item.mode !== "individual");
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
@@ -134,6 +136,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
           >
             Assessments
           </TabsTrigger>
+          {groupAssessments.length ? <TabsTrigger value="project-groups" className={COURSE_TAB_CLASS}>Project Groups</TabsTrigger> : null}
           <TabsTrigger
             value="grades"
             className={COURSE_TAB_CLASS}
@@ -232,6 +235,7 @@ export function PortalCourse({ offeringId }: { offeringId: string }) {
           )}
         </TabsContent>
 
+        {groupAssessments.length ? <TabsContent value="project-groups" className="mt-3"><StudentCourseProjectGroups offeringId={offeringId} assessments={groupAssessments} /></TabsContent> : null}
         <TabsContent value="assessments" className="mt-3">
           {data.assessments.length ? (
             <Card title="Assessment plan" compact>
