@@ -151,6 +151,40 @@ integrationDescribe("lecturer portfolio authorization and audit boundaries", () 
       "reset",
     ]);
 
+    // Exercise the batched history query against real PostgreSQL with multiple
+    // items, including an unreviewed item. The reviewer and self views agree.
+    const unreviewed = await request("/api/lecturers/me/portfolio-items", {
+      method: "POST", token: lecturerToken,
+      body: { kind: "publication", title: "Synthetic unreviewed batch fixture" },
+    });
+    expect(unreviewed.status).toBe(201);
+    const unreviewedId = (unreviewed.body as PortfolioItemResponse).id;
+    try {
+      const selfList = await request("/api/lecturers/me/portfolio-items", { token: lecturerToken });
+      const reviewerList = await request(`/api/lecturers/${lecturer.id}/portfolio-items`, {
+        token: signToken(coordinator),
+      });
+      expect(selfList.status).toBe(200);
+      expect(reviewerList.status).toBe(200);
+      expect(reviewerList.body).toEqual(selfList.body);
+      const items = selfList.body as PortfolioItemResponse[];
+      expect(items.every(item => item.lecturerId === lecturer.id)).toBe(true);
+      expect(items.find(item => item.id === itemId)?.verificationEvents).toEqual(editedItem.verificationEvents);
+      expect(items.find(item => item.id === unreviewedId)?.verificationEvents).toEqual([]);
+      const denied = await request(`/api/lecturers/${lecturer.id}/portfolio-items`, {
+        token: signToken(crossProgrammeCoordinator),
+      });
+      expect(denied.status).toBe(403);
+      const ordinaryDenied = await request(`/api/lecturers/${lecturer.id}/portfolio-items`, {
+        token: signToken(student),
+      });
+      expect(ordinaryDenied.status).toBe(403);
+    } finally {
+      expect((await request(`/api/lecturers/me/portfolio-items/${unreviewedId}`, {
+        method: "DELETE", token: lecturerToken,
+      })).status).toBe(204);
+    }
+
     const exportResult = await request("/api/lecturers/me/aun-qa-evidence", {
       token: lecturerToken,
     });
