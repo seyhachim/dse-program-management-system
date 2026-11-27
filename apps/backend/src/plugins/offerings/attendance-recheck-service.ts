@@ -137,6 +137,12 @@ async function deliverRecheckNotifications(
 ) {
   if (!registry.has("telegram")) return;
   const telegram = registry.get<TelegramNotificationContract>("telegram").service;
+  // Evaluate first so a database error cannot leave a newly started notification
+  // promise rejected and unobserved before the Promise.allSettled boundary.
+  const evaluation = (await studentAttendanceHistoryService.warningHealthForStudents(
+    [studentId],
+    offeringId,
+  )).get(studentId);
   const work: Array<Promise<void>> = [];
   if (newlyPendingId) {
     work.push(
@@ -148,7 +154,6 @@ async function deliverRecheckNotifications(
       }),
     );
   }
-  const evaluation = await studentAttendanceHistoryService.healthForStudent(studentId, offeringId);
   if (evaluation) {
     for (const candidate of evaluation.warningCandidates) {
       work.push(
@@ -158,8 +163,8 @@ async function deliverRecheckNotifications(
           warningKind: candidate.kind,
           count: candidate.count,
           eventSessionId: candidate.eventSessionId,
-          absentCount: evaluation.history.counts.Absent,
-          excusedCount: evaluation.history.counts.Excused,
+          absentCount: evaluation.counts.Absent,
+          excusedCount: evaluation.counts.Excused,
         }),
       );
     }
@@ -173,7 +178,7 @@ export const attendanceRecheckService = {
     date: string,
     input: RecheckAttendanceData,
     actorUserId: string,
-  ): Promise<void> {
+  ): Promise<{ newlyPendingId: string | null }> {
     const studentRows = await students().findByIds([input.studentId]);
     const student = studentRows[0] ?? null;
     if (!student) throw new ReferenceError("Student no longer exists");
@@ -295,7 +300,24 @@ export const attendanceRecheckService = {
       `;
     });
 
-    await deliverRecheckNotifications(offeringId, date, input.studentId, newlyPendingId);
+    // Only the committed academic state determines the save response.
+    return { newlyPendingId };
+  },
+
+  async notifyAfterRecheck(
+    offeringId: string,
+    date: string,
+    studentId: string,
+    newlyPendingId: string | null,
+  ): Promise<void> {
+    const startedAt = performance.now();
+    try {
+      await deliverRecheckNotifications(offeringId, date, studentId, newlyPendingId);
+    } finally {
+      if (process.env.PERF_ATTENDANCE_SAVE_TIMING === "true") {
+        console.warn("[perf] attendance-recheck phase=notifications duration=" + (performance.now() - startedAt).toFixed(1) + "ms");
+      }
+    }
   },
 
   async history(offeringId: string, studentId: string): Promise<AttendanceStudentHistoryView> {

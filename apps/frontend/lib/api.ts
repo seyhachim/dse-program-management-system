@@ -114,9 +114,9 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
 
 export const api = {
   get: <T>(path: string) => runInflightGet(path, () => request<T>(path)),
-  post: <T>(path: string, body: unknown) =>
+  post: <T>(path: string, body: unknown, signal?: AbortSignal) =>
     runConfirmedMutation("POST", path, () =>
-      request<T>(path, { method: "POST", body: JSON.stringify(body) }),
+      request<T>(path, { method: "POST", body: JSON.stringify(body), signal }),
     ),
   patch: <T>(path: string, body: unknown) =>
     runConfirmedMutation("PATCH", path, () =>
