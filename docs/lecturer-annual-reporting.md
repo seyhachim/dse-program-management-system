@@ -92,3 +92,23 @@ CI, QA and API checks are green.
 
 ## Annual submission review
 The annual page defaults to 2025–2026 when that academic year exists. Staff who hold both roles can switch between their own record and coordinator review. Configure an approved reporting period before submission. Lecturers may submit/resubmit an optional note and link their own dated portfolio items. Coordinators review individual teaching, historical staff and evidence, then explicitly verify the annual submission or return it with a reason. Reviews are append-only, self-review is denied, and changed source evidence invalidates the earlier decision. A returned record stays in needs-changes until the lecturer explicitly resubmits, even if edited evidence is independently verified. Approval and release validate and write from a single serializable transaction; concurrent release versions are allocated under a per-year lock with bounded conflict retries. Submitted or returned records must be reviewed before an official release; unreported people remain explicitly unreported. Evidence is linked through the existing private portfolio; direct file uploads are not included. CSV exports escape spreadsheet formula prefixes. Excel remains SpreadsheetML XML.
+
+## Self-describing released exports
+
+The released CSV retains its original staff columns, with appended `Row type`
+and report context columns. Filter `Row type=staff` when importing person-level
+records. Exactly one `report` row carries the release version, DSE scope,
+snapshot time, reporting window, registry denominator, programme headcounts,
+deduplicated publications, CPD activity counts and evidence-gap counts. Never
+sum the report row as a staff record. The report row exists even for an empty
+registry. SpreadsheetML retains the Annual staff sheet and adds Report summary.
+Figures are taken from the saved release, not the live dashboard. Headcounts
+are not FTE; CPD activities are not a participation rate. No evidence URLs or
+private contact fields are added. XML-invalid code points are replaced with
+U+FFFD; Khmer and other valid Unicode text is retained. CSV formula escaping
+remains in place. Existing API response keys and access controls are unchanged.
+
+Automated export regression tests cover empty/nonempty reports, release context,
+row width, Khmer Unicode, XML escaping and formula protection. Actual opening
+in Microsoft Excel (including Khmer display and XML import) remains a manual
+release gate.
