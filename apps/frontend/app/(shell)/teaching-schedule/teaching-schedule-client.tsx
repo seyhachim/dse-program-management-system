@@ -139,6 +139,7 @@ export function TeachingScheduleClient() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <Link href="/teaching-schedule/make-up" className="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent">Schedule make-up class</Link>
               <Link href="/teaching-schedule/available-classes" className="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent">
                 Available classes
               </Link>

@@ -76,6 +76,39 @@ interface CourseAttendanceRow {
 
 function dateOnly(value: Date): string { return value.toISOString().slice(0, 10); }
 function dateValue(value: string): Date { return new Date(`${value}T00:00:00.000Z`); }
+
+/** New registers for timetable-backed offerings require either the recurring
+ * meeting on that date or a programme-approved replacement. Historical
+ * registers and legacy offerings without any timetable remain readable.
+ */
+export async function isNewAttendanceDateEligible(offeringId: string, date: string): Promise<boolean> {
+  const offering = await prisma.offering.findUnique({
+    where: { id: offeringId },
+    select: {
+      startDate: true, endDate: true,
+      academicCalendarPeriod: { select: { teachingStart: true, teachingEnd: true } },
+      meetings: { select: { dayOfWeek: true } },
+    },
+  });
+  if (!offering) throw new ReferenceError("Offering not found");
+  if (offering.meetings.length === 0) return true; // Historical timetable-free records.
+  const first = offering.academicCalendarPeriod?.teachingStart ?? offering.startDate;
+  const last = offering.academicCalendarPeriod?.teachingEnd ?? offering.endDate;
+  const weekday = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][
+    dateValue(date).getUTCDay()
+  ];
+  if (first && last && date >= dateOnly(first) && date <= dateOnly(last) &&
+      offering.meetings.some((meeting) => meeting.dayOfWeek === weekday)) {
+    return true;
+  }
+  const approved = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "pms_attendance"."MakeUpClassRequest"
+    WHERE "offeringId" = ${offeringId}
+      AND "replacementDate" = ${date}::date AND "status" = 'APPROVED'
+    LIMIT 1
+  `;
+  return approved.length > 0;
+}
 function emptyCounts(): Record<AttendanceStatus, number> & { PermissionPending: number } {
   return { Present: 0, Absent: 0, Late: 0, Excused: 0, PermissionPending: 0 };
 }
@@ -310,6 +343,7 @@ async function deliverPostSaveNotifications(
   await Promise.allSettled(work);
 }
 
+export class AttendanceDateNotScheduledError extends Error {}
 export class AttendanceSaveConflictError extends Error {
   constructor() {
     super("Attendance has changed since it was loaded. Reload and review the latest register before saving.");
@@ -370,6 +404,11 @@ export const attendanceService = {
         WHERE "offeringId" = ${offeringId} AND "sessionDate" = ${dateValue(date)} LIMIT 1 FOR UPDATE
       `;
       const existingSession = existing[0] ?? null;
+      if (!existingSession && !(await isNewAttendanceDateEligible(offeringId, date))) {
+        throw new AttendanceDateNotScheduledError(
+          "This date is not on the course timetable. Obtain programme approval for a make-up class before creating attendance.",
+        );
+      }
       // Compare inside the same transaction, after locking the session row.
       // A stale request cannot delete records, alter Check 1 or send alerts.
       if (input.expectedUpdatedAt !== undefined &&

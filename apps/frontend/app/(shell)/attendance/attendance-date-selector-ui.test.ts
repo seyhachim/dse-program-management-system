@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 
 const source = readFileSync(new URL("./attendance-client.tsx", import.meta.url), "utf8");
+const approvedScheduleSource = readFileSync(new URL("./attendance-make-up.ts", import.meta.url), "utf8");
 
 describe("Attendance date-scoped class selector", () => {
   test("filters the assigned offering list by the selected attendance date", () => {
-    expect(source).toContain("offeringsScheduledOnDate(offerings, date)");
+    expect(source).toContain("attendanceOfferingsOnDate(offerings, date, approvedMakeUps)");
+    expect(approvedScheduleSource).toContain("offeringsScheduledOnDate(offerings, date)");
     expect(source).toContain("scheduledOfferings.map((offering)");
     expect(source).not.toContain("{offerings.map((offering) => (");
   });

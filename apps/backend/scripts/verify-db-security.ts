@@ -190,6 +190,7 @@ const EXPECTED_ATTENDANCE_TABLES = [
   "TeachingLeaveRequest",
   "TeachingLeaveRequestOccurrence",
   "TeachingLeaveAuditEvent",
+  "MakeUpClassRequest",
   "OfferingMeetingTeachingRequest",
   "OfferingMeetingTeachingRequestAuditEvent",
 ] as const;

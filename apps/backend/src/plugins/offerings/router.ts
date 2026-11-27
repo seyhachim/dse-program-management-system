@@ -16,7 +16,7 @@ import {
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { hasAnyRoleInProgramme, PROGRAMME_WIDE_ROLES, type Role } from "../../core/auth/token.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
-import { AttendanceSaveConflictError, attendanceService } from "./attendance-service.ts";
+import { AttendanceDateNotScheduledError, AttendanceSaveConflictError, attendanceService } from "./attendance-service.ts";
 import {
   SemesterNoteConflictError, SemesterNoteNotFoundError, SemesterNoteReadOnlyError,
   semesterNoteService,
@@ -196,7 +196,7 @@ export function createOfferingRouter(): Router {
     try {
       res.json(await attendanceService.save(req.params.id!, parsedDate.data, parsedBody.data, req.user!.id));
     } catch (err) {
-      if (err instanceof AttendanceSaveConflictError) {
+      if (err instanceof AttendanceSaveConflictError || err instanceof AttendanceDateNotScheduledError) {
         res.status(409).json({ error: err.message });
         return;
       }
