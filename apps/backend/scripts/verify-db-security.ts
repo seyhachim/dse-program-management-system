@@ -24,6 +24,7 @@ const EXPECTED_PUBLIC_TABLES = [
   "Student",
   "StudentProfile",
   "StudentPortfolioProfile",
+  "StudentCareerProfile",
   "StudentPortfolioEvidence",
   "StudentPortfolioEvidenceLink",
   "StudentPortfolioProfessionalLink",
@@ -195,6 +196,11 @@ const EXPECTED_ATTENDANCE_TABLES = [
 ] as const;
 
 const EXPECTED_TELEGRAM_SECURITY_TABLES = [
+  "StudentRegistrationRequest",
+  "StudentRegistrationBotConsent",
+  "StudentRegistrationReview",
+  "StudentRegistrationEmailSession",
+  "StudentRegistrationEmailChallenge",
   "TelegramInitVerification",
   "TelegramIdentity",
   "TelegramAuditEvent",

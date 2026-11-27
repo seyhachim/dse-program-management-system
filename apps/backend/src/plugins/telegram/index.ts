@@ -7,6 +7,7 @@ import { telegramDestinationService } from "./destination-service.ts";
 import { telegramNotificationService } from "./notification-service.ts";
 import { createEnhancedPublicTelegramRouter } from "./public-bot/ask-dse-enhanced-router.ts";
 import { createTelegramRouter } from "./router.ts";
+import { createStudentRegistrationRouter } from "./student-registration-router.ts";
 import { telegramService } from "./service.ts";
 
 export const telegramBackendService = {
@@ -21,6 +22,7 @@ const telegramRouter = Router();
 telegramRouter.use("/public", createEnhancedPublicTelegramRouter());
 telegramRouter.use(createTelegramDestinationSectionRouter());
 telegramRouter.use(createTelegramDestinationRouter());
+telegramRouter.use(createStudentRegistrationRouter());
 telegramRouter.use(createTelegramRouter());
 
 export const telegramPlugin: BackendPlugin<TelegramBackendService> = {

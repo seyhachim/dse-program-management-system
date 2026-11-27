@@ -8,6 +8,7 @@ import {
 } from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { getPmsTelegramConfig } from "./config.ts";
+import { studentRegistrationBotReply } from "./student-registration-bot.ts";
 import { telegramDestinationDeleteService } from "./destination-delete-service.ts";
 import {
   TelegramDestinationError,
@@ -66,6 +67,14 @@ export function createTelegramDestinationRouter(): Router {
     const supplied = req.header("x-telegram-bot-api-secret-token");
     if (!safeSecretEqual(supplied, config.webhookSecret)) {
       return void res.status(401).json({ error: "Invalid Telegram webhook secret" });
+    }
+
+    try {
+      const registrationReply = await studentRegistrationBotReply(req.body);
+      if (registrationReply) return void res.json(registrationReply);
+    } catch {
+      // Do not log webhook body, contact details or database error parameters.
+      return void res.status(503).json({ error: "Registration temporarily unavailable" });
     }
 
     const update = req.body as TelegramRegistrationUpdate;

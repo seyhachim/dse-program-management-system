@@ -18,6 +18,9 @@ import {
   telegramClassDeliveryService,
 } from "./class-delivery-service.ts";
 import { resolveTelegramDeepLink } from "./deep-link.ts";
+import { getPmsTelegramConfig } from "./config.ts";
+import { studentRegistrationBotUrl } from "./student-registration-bot-contract.ts";
+import { submitTelegramStudentRegistration, TelegramStudentRegistrationError } from "./student-registration-service.ts";
 import { TelegramInitDataError } from "./init-data.ts";
 import { TelegramLinkError, telegramIdentityStore } from "./identity-store.ts";
 import { telegramMiniAppService, telegramMiniErrorStatus } from "./mini-app-service.ts";
@@ -147,6 +150,40 @@ export function createTelegramRouter(service: TelegramService = telegramService)
 
   router.delete("/account", requireAuth, async (req, res) => {
     try { await telegramIdentityStore.revoke(req.user!.id); res.status(204).end(); } catch (error) { sendMiniAppError(res, error); }
+  });
+
+  // Registration does not issue a protected Mini App session. Keep disabled until
+  // staff review, retention policy, abuse controls and staging gates are complete.
+  router.get("/registration/config", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const config = getPmsTelegramConfig();
+    const registrationUrl = process.env.TELEGRAM_STUDENT_REGISTRATION_ENABLED === "true"
+      && config.enabled && config.webhookSecret && config.botToken
+      ? studentRegistrationBotUrl(config.botUsername) : null;
+    res.json({ enabled: Boolean(registrationUrl), registrationUrl });
+  });
+
+  router.post("/registration/requests", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    if (process.env.TELEGRAM_STUDENT_REGISTRATION_ENABLED !== "true") {
+      return void res.status(503).json({ error: "Registration is unavailable" });
+    }
+    try {
+      const config = getPmsTelegramConfig();
+      if (!config.enabled || !config.botToken) {
+        return void res.status(503).json({ error: "Registration is unavailable" });
+      }
+      const receipt = await submitTelegramStudentRegistration(req.body, "dse");
+      res.status(201).json(receipt);
+    } catch (error) {
+      if (error instanceof TelegramStudentRegistrationError) {
+        const status = error.code === "INVALID_VERIFICATION" ? 401
+          : error.code === "IDENTITY_CONFLICT" || error.code === "ALREADY_SUBMITTED" ? 409 : 400;
+        return void res.status(status).json({ error: { code: error.code, message: "Registration could not be submitted" } });
+      }
+      // Never log applicant profile data, verification credentials or database error details.
+      res.status(500).json({ error: "Registration could not be submitted" });
+    }
   });
 
   router.use("/mini", requireTelegramSession);

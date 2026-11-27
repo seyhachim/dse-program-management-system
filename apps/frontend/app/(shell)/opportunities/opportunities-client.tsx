@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Bookmark, CalendarDays, Filter, GraduationCap, Search } from "lucide-react";
-import type { OpportunityKind } from "@dse-pms/shared-types";
+import { matchCareerOpportunity, type OpportunityKind, type StudentCareerProfile } from "@dse-pms/shared-types";
+import { api } from "@/lib/api";
 import { useMe } from "@/lib/auth";
 import { opportunitiesApi } from "@/lib/opportunities";
 import { protectedQueryKey } from "@/lib/query-client";
@@ -25,6 +26,10 @@ export function OpportunitiesClient() {
   const { me, loading } = useMe();
   const [category, setCategory] = useState<OpportunityKind | "all">("all");
   const [search, setSearch] = useState("");
+  const [recommendedOnly, setRecommendedOnly] = useState(false);
+  const student = Boolean(me?.roles.includes("student"));
+  const careerQuery = useQuery({queryKey: protectedQueryKey({userId: me?.id ?? "pending"}, "student-career-profile"), queryFn: ()=>api.get<StudentCareerProfile>("/api/student-portal/career-profile"), enabled: Boolean(me?.id && student), staleTime: 0});
+  const profile = student ? careerQuery.data : undefined;
   const query = useQuery({
     queryKey: protectedQueryKey({ userId: me?.id ?? "pending" }, "opportunities", "published"),
     queryFn: opportunitiesApi.list,
@@ -34,7 +39,8 @@ export function OpportunitiesClient() {
   const rows = useMemo(() => (query.data ?? []).filter((row) =>
     (category === "all" || row.type === category)
     && (row.title + " " + row.organizer + " " + row.summary).toLowerCase().includes(search.trim().toLowerCase())
-  ), [query.data, category, search]);
+    && (!recommendedOnly || !profile || matchCareerOpportunity(profile, row).length > 0)
+  ), [query.data, category, search, recommendedOnly, profile]);
   const staff = me?.roles.some((role) => role === "admin" || role === "program_coordinator");
   const canViewRoster = me?.roles.some((role) => role === "lecturer" || role === "admin" || role === "program_coordinator");
 
@@ -50,6 +56,7 @@ export function OpportunitiesClient() {
           {staff ? <Link href="/opportunities/manage" className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted">Manage opportunities</Link> : null}
         </div>
       </div>
+      {student && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 text-sm"><div><p className="font-medium">Personalized suggestions</p><p className="text-muted-foreground">Based on your private interests; not an eligibility decision.</p><Link href="/portal/portfolio" className="text-primary hover:underline">Edit interests in Portfolio</Link></div>{profile && <label className="flex items-center gap-2"><input type="checkbox" checked={recommendedOnly} onChange={e=>setRecommendedOnly(e.target.checked)} />Recommended only</label>}</div>}
       <div className="rounded-2xl border bg-card p-4">
         <label className="relative block">
           <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" aria-hidden="true" />
@@ -91,6 +98,7 @@ export function OpportunitiesClient() {
                   <p className="mt-1 text-sm text-muted-foreground">{item.organizer}</p>
                 </div>
               </div>
+              {profile && matchCareerOpportunity(profile,item).length>0 && <p className="text-xs text-primary">Matches your interests: {matchCareerOpportunity(profile,item).join(", ")}</p>}
               <p className="line-clamp-3 break-words text-sm leading-6">{item.summary}</p>
               <p className="line-clamp-2 text-sm text-muted-foreground">Eligibility: {item.eligibility}</p>
               <div className="mt-auto flex flex-wrap items-center gap-4 pt-2 text-sm">

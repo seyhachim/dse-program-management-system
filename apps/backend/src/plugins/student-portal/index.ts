@@ -8,6 +8,7 @@ import { createStudentPortfolioCompleteRouter } from "./portfolio-complete-route
 import { createStudentPortfolioEvidenceRouter } from "./portfolio-evidence-router.ts";
 import { createStudentPortfolioPublicRouter } from "./portfolio-public-router.ts";
 import { createStudentPortfolioRouter } from "./portfolio-router.ts";
+import { createStudentCareerProfileRouter } from "./career-profile-router.ts";
 import { createStudentPortalRouter } from "./router.ts";
 import { createDseNewsRouter } from "./dse-news-router.ts";
 import { createStudentScheduleImpactRouter } from "./schedule-impact-router.ts";
@@ -30,6 +31,7 @@ router.use(createCourseAchievementRouter());
 router.use(createStudentAttendanceRouter());
 router.use(createStudentWeeklyNotesRouter());
 router.use("/news", createDseNewsRouter());
+router.use("/career-profile", createStudentCareerProfileRouter());
 router.use(createStudentPortalRouter());
 router.use("/portfolio", createStudentPortfolioRouter());
 router.use("/portfolio/evidence", createStudentPortfolioEvidenceRouter());
