@@ -646,6 +646,7 @@ export function SpecClient({
         policy,
         specDate,
         courseTotalSlt,
+        sltPresentation: review?.status === "approved" ? "historical" : "review",
       }),
     [
       courseInfo,
@@ -665,6 +666,7 @@ export function SpecClient({
       policy,
       specDate,
       courseTotalSlt,
+      review?.status,
     ],
   );
 

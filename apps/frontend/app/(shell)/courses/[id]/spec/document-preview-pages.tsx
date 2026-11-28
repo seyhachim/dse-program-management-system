@@ -6,6 +6,7 @@ import {
   type CourseDocumentModel,
 } from "./course-document-model";
 import { formatCourseDocumentSltHours } from "./course-document-mapping";
+import { documentSltReviewLines, REVIEW_CREDIT_NOTE, REVIEW_MAPPING_NOTE } from "./course-document-slt-review";
 import {
   contiguousRowSpans,
   programmePloCountLabel,
@@ -185,8 +186,8 @@ function learningDomain(level: string) {
   return { cognitive: normalized.startsWith("C") ? normalized : "", affective: normalized.startsWith("A") ? normalized : "", psychomotor: normalized.startsWith("P") ? normalized : "" };
 }
 
-function CloPloMatrix({ mapping, mode }: { mapping: CourseDocumentModel["mapping"]; mode: "percent" | "hours" }) {
-  const heading = mode === "percent"
+function CloPloMatrix({ mapping, mode, linksOnly = false }: { mapping: CourseDocumentModel["mapping"]; mode: "percent" | "hours"; linksOnly?: boolean }) {
+  const heading = linksOnly ? "Programme Learning Outcomes — mapped links only" : mode === "percent"
     ? "Programme Learning Outcomes — Percentages"
     : "Programme Learning Outcomes — Total Hours for Student Learning Time (SLT) including learning and assessment";
   return (
@@ -195,7 +196,7 @@ function CloPloMatrix({ mapping, mode }: { mapping: CourseDocumentModel["mapping
       <thead><tr><TH rowSpan={2}>CLO</TH><TH colSpan={PLOS.length} className="text-center">{heading}</TH></tr><tr>{PLOS.map((plo) => <TH key={plo.id} className="text-center">{plo.id}</TH>)}</tr></thead>
       <tbody>{mapping.map((row) => <tr key={row.cloCode}><TD className="font-medium text-center">{row.cloCode}</TD>{PLOS.map((plo) => {
         if (!row.ploCodes.includes(plo.id)) return <BlankTD key={plo.id} className="text-center" />;
-        return <TD key={plo.id} className="text-center">{mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "—" : formatCourseDocumentSltHours(row.sltHours) || "—"}</TD>;
+        return <TD key={plo.id} className="text-center">{linksOnly ? "Linked" : mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "—" : formatCourseDocumentSltHours(row.sltHours) || "—"}</TD>;
       })}</tr>)}</tbody>
     </Table>
   );
@@ -360,7 +361,7 @@ function Section16ContentTable({
       {showTotals ? (
         <tfoot>
           <tr>
-            <td colSpan={3} className="border border-black px-1 py-[1px] text-right align-middle font-semibold">Total SLT for Course Content</td>
+            <td colSpan={3} className="border border-black px-1 py-[1px] text-right align-middle font-semibold">{document.sltReview ? "Weekly-plan SLT (all scheduled sessions)" : "Total SLT for Course Content"}</td>
             <SltCell value={document.weeklyPlan.reduce((sum, week) => sum + (Number(week.lectureHours) || 0), 0)} className="text-center font-semibold" />
             <SltCell value={document.weeklyPlan.reduce((sum, week) => sum + (Number(week.tutorialHours) || 0), 0)} className="text-center font-semibold" />
             <SltCell value={document.weeklyPlan.reduce((sum, week) => sum + (Number(week.practiceHours) || 0), 0)} className="text-center font-semibold" />
@@ -488,6 +489,12 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
 
       <Page zoom={zoom} pageNumber={5}><div id="mapping" className="h-full px-[54px] py-[42px]"><PartTwoRow>
         <SectionTitle number="15">Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods</SectionTitle>
+        {document.sltReview ? <>
+          <CloPloMatrix mapping={document.mapping} mode="hours" linksOnly />
+          <p className="mt-2 text-[9px]">{REVIEW_MAPPING_NOTE}</p>
+          {document.sltReview.allocationNotes.map((note, index) => <p key={index} className="text-[9px]">{note}</p>)}
+          <p className="mt-2 text-[9px]">{REVIEW_CREDIT_NOTE}</p>
+        </> : <>
         <CloPloMatrix mapping={document.mapping} mode="hours" />
         <p className="mt-2 text-[9px]">1 Credit = 40 Student Learning Time (SLT)</p>
         <div className="mt-4"><CloPloMatrix mapping={document.mapping} mode="percent" /></div>
@@ -497,6 +504,7 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
           <p>• <strong>Moderate (M)</strong> indicates a focus of 31%–50% of the total SLT on this PLO.</p>
           <p>• <strong>Partial (P)</strong> indicates a focus of less than 30% of the total SLT on this PLO.</p>
         </div>
+        </>}
       </PartTwoRow><PageFooter courseCode={info.courseCode} page={5} /></div></Page>
 
       <Page zoom={zoom} pageNumber={6}><div className="h-full px-[54px] py-[42px]"><PartTwoRow>
@@ -522,6 +530,7 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
         <SectionTitle number="16">Distribution of Student Learning Time (SLT) (continued)</SectionTitle>
         <AssessmentSltTable document={document} category="continuous" />
         <AssessmentSltTable document={document} category="final" />
+        {document.sltReview ? <div className="mt-2 text-[8px] leading-tight">{documentSltReviewLines(document).map((line, index) => <p key={index} className="mb-1">{line}</p>)}</div> : null}
       </PartTwoRow><PageFooter courseCode={info.courseCode} page={section16AssessmentPage} /></div></Page>
 
       <Page zoom={zoom} pageNumber={assessmentPlanPage}><div id="assessment-plan" className="h-full px-[54px] py-[42px]"><PartTwoRow><SectionTitle number="17">Course Assessment Plan</SectionTitle><Table><colgroup><col className="w-[7%]" /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[23%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[10%]" /><col className="w-[14%]" /><col className="w-[14%]" /></colgroup><thead><tr><TH>CLOs</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Assessment &amp; Description</TH><TH>G/I</TH><TH>Weight (%)</TH><TH>SLT</TH><TH>Evaluation Definition</TH><TH>Rubric</TH></tr></thead><tbody>{document.assessments.map((assessment) => <tr key={assessment.id}><TD>{joinValues(assessment.cloCodes)}</TD><TD>{joinValues(assessment.mappedPlos)}</TD><TD>{joinValues(assessment.capLevels)}</TD><TD><p className="font-semibold">{displayDocumentValue(assessment.name)}</p>{assessment.description ? <p className="mt-1 text-[9px] text-slate-700">{assessment.description}</p> : null}</TD><TD className="text-center">{assessment.mode === "group" ? "G" : "I"}</TD><TD>{assessment.weight ? `${assessment.weight}%` : "—"}</TD><TD>{assessment.totalSltHours > 0 ? `${assessment.totalSltHours} h` : "—"}</TD><TD>{displayDocumentValue(assessment.evaluationDefinition)}</TD><TD>{assessment.rubricName && assessment.rubricUrl ? <Link href={assessment.rubricUrl} className="font-semibold text-blue-700 underline underline-offset-2">{assessment.rubricName} ↗</Link> : assessment.rubricName ? assessment.rubricName : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={5} className="font-semibold">Total Weightage</TD><TD className="font-semibold">{document.totals.assessmentWeight}%</TD><TD className="font-semibold">{document.totals.assessmentSlt} h</TD><TD colSpan={2}></TD></tr></tfoot></Table></PartTwoRow><PageFooter courseCode={info.courseCode} page={assessmentPlanPage} /></div></Page>
