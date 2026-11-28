@@ -13,6 +13,7 @@ const UNAVAILABLE_TITLES: Record<StudentHandbookSourceKind, string> = {
   CURRICULUM_SUMMARY: "Curriculum unavailable",
   PROGRAMME_PROFILE: "Programme profile unavailable",
   PROGRAMME_CONTACT: "Programme contacts unavailable",
+  ACADEMIC_CALENDAR_LINKS: "Academic Calendar unavailable",
 };
 
 export function getStudentHandbookUnavailableSourceState(

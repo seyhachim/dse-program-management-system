@@ -35,8 +35,11 @@ describe("Student Handbook source preview data", () => {
     expect(studentHandbookSourceValueKind("admissionEmail", "fe.info@rupp.edu.kh")).toBe("email");
     expect(studentHandbookSourceValueKind("phone", "+855 93 222 380")).toBe("phone");
     expect(studentHandbookSourceValueKind("websiteUrl", "https://www.rupp.edu.kh/")).toBe("url");
+    expect(studentHandbookSourceValueKind("Year 2", "/calendar/dse/2026-2027/year-2")).toBe("url");
     expect(studentHandbookSourceValueKind("websiteUrl", "javascript:alert(1)")).toBe("text");
     expect(safeStudentHandbookSourceUrl("https://www.rupp.edu.kh/")).toContain("https://www.rupp.edu.kh/");
+    expect(safeStudentHandbookSourceUrl("/calendar/dse/2026-2027/year-2")).toBe("/calendar/dse/2026-2027/year-2");
+    expect(safeStudentHandbookSourceUrl("/calendar/dse/../../admin/year-2")).toBeNull();
     expect(safeStudentHandbookSourceUrl("javascript:alert(1)")).toBeNull();
   });
 });
