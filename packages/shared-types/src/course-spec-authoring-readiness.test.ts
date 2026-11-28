@@ -3,6 +3,9 @@ import type { SpecSectionStatus, TeachingLearningProfile } from "./course-spec.t
 import {
   COURSE_SPEC_AUTHORING_SECTIONS,
   courseSpecInstructionalWeeks,
+  courseSpecSessionType,
+  courseSpecWeeklyPlanWeekAttention,
+  isCourseSpecWeeklyPlanReady,
   deriveCourseSpecAuthoringReadinessStatus,
   summarizeCourseSpecAuthoringReadiness,
   type CourseSpecReadinessAssessment,
@@ -159,5 +162,32 @@ describe("CourseSpec authoring readiness", () => {
       { ...activeAssessment, status: "inactive" },
     ]);
     expect(status.mapping).toBe("draft");
+  });
+});
+
+describe("session-aware Weekly Plan validation", () => {
+  const teaching: CourseSpecReadinessWeek = { ...readyWeek, sessionType: "teaching", assessmentMethodIds: [], assessment: "" };
+  const assessment: CourseSpecReadinessWeek = { ...teaching, topic: "Midterm Exam", sessionType: "assessment", lloItems: [], activities: [], teachingMethodIds: [], lectureHours: 0, practiceHours: 3, selfStudyHours: 0, assessment: "Midterm Exam" };
+  test("teaching without an assessment is valid, including legacy teaching rows", () => {
+    expect(courseSpecWeeklyPlanWeekAttention(teaching)).toEqual([]);
+    expect(courseSpecWeeklyPlanWeekAttention({ ...teaching, sessionType: undefined })).toEqual([]);
+    expect(derive(clos, [teaching]).slt).toBe("complete");
+  });
+  test("assessment-only sessions do not require LLOs, teaching or activities", () => {
+    expect(courseSpecWeeklyPlanWeekAttention(assessment)).toEqual([]);
+    expect(isCourseSpecWeeklyPlanReady([teaching, assessment])).toBe(true);
+    expect(courseSpecInstructionalWeeks([teaching, assessment])).toEqual([teaching]);
+    expect(courseSpecSessionType({ ...assessment, sessionType: null })).toBe("assessment");
+    expect(courseSpecWeeklyPlanWeekAttention({ ...assessment, assessment: "" })).toEqual(["Assessment"]);
+    expect(isCourseSpecWeeklyPlanReady([teaching, { ...assessment, assessment: "" }])).toBe(false);
+  });
+  test("mixed sessions require both teaching and assessment evidence", () => {
+    expect(courseSpecWeeklyPlanWeekAttention({ ...teaching, sessionType: "teaching_and_assessment" })).toEqual(["Assessment"]);
+    expect(courseSpecWeeklyPlanWeekAttention({ ...teaching, sessionType: "teaching_and_assessment", assessmentMethodIds: ["am"] })).toEqual([]);
+    expect(courseSpecWeeklyPlanWeekAttention({ ...assessment, sessionType: "teaching_and_assessment" })).toEqual(["LLO", "Teaching method", "Learning activity"]);
+  });
+  test("explicit type overrides title inference; CLO and hours still required", () => {
+    expect(courseSpecSessionType({ ...teaching, topic: "Final Exam" })).toBe("teaching");
+    expect(courseSpecWeeklyPlanWeekAttention({ ...assessment, cloCodes: [], lectureHours: 0, tutorialHours: 0, practiceHours: 0, otherHours: 0, selfStudyHours: 0 })).toEqual(["CLO", "Learning time"]);
   });
 });

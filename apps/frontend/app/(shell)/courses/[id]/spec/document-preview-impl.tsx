@@ -214,7 +214,8 @@ export function DocumentPreview({
     !officialThemeReady ||
     gradingScaleLoading ||
     !gradingScaleReady ||
-    themeDirty;
+    themeDirty ||
+    Boolean(resolvedDocument.sltReview?.blocking.length);
 
   const fitWidth = useCallback(() => {
     const viewer = viewerRef.current;
@@ -260,7 +261,7 @@ export function DocumentPreview({
     try {
       setIsExporting(true);
       const printRoot = printRootRef.current;
-      if (printRoot) await exportCourseSpecPdf(printRoot, info.courseCode);
+      if (printRoot) await exportCourseSpecPdf(printRoot, info.courseCode, resolvedDocument.sltReview);
     } catch (error) {
       console.error("Failed to export Course Specification PDF:", error);
     } finally {
@@ -329,8 +330,11 @@ export function DocumentPreview({
               AUN Course Specification Preview
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Official saved preview for the selected Course Specification version.
+              {resolvedDocument.sltReview ? "SLT review copy — provisional accounting; not institutional approval." : "Official saved preview for the selected Course Specification version."}
             </p>
+            {resolvedDocument.sltReview?.blocking.length ? (
+              <p role="alert" className="mt-2 max-w-2xl text-xs text-destructive">Downloads blocked: resolve SLT reconciliation issues ({resolvedDocument.sltReview.blocking.join(", ")}).</p>
+            ) : null}
             {gradingScaleError ? (
               <p className="mt-2 max-w-2xl text-xs text-destructive">
                 {gradingScaleError}

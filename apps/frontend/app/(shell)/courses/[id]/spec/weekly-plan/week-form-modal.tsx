@@ -1,5 +1,5 @@
 "use client";
-import type { Method } from "@dse-pms/shared-types";
+import { courseSpecSessionType, COURSE_SPEC_SESSION_TYPE_LABELS, type Method } from "@dse-pms/shared-types";
 import { Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@dse-pms/ui";
@@ -49,7 +49,8 @@ export function WeekFormModal({ open, onOpenChange, courseId, weekId, weeks, clo
     let cancelled = false;
     const existing = weekId ? (weeks.find((w) => w.id === weekId) ?? null) : null;
     const localDraft = loadWeekDraft(courseId, weekId);
-    const nextDraft = localDraft ?? existing ?? emptyWeek(weeks);
+    const source = localDraft ?? existing ?? emptyWeek(weeks);
+    const nextDraft = { ...source, sessionType: courseSpecSessionType(source) };
     setDraft(nextDraft);
     setLloRequired(!existing || existing.lloItems.length > 0);
     setTouched(false);
@@ -198,12 +199,12 @@ function WeekReview({ draft, teachingMethods, assessmentMethods, projectBasedLea
       ].filter(Boolean).join(" • ")
     : "—";
   return <div className="space-y-5"><div><h3 className="text-base font-semibold text-foreground">Review Week {draft.week}</h3><p className="text-sm text-muted-foreground">Review the constructive alignment before saving this week.</p></div><div className="grid gap-3 sm:grid-cols-2">
-    <ReviewCard label="Topic" value={draft.topic || "—"} /><ReviewCard label="CLOs" value={draft.cloCodes.join(" · ") || "—"} />
+    <ReviewCard label="Session type" value={COURSE_SPEC_SESSION_TYPE_LABELS[courseSpecSessionType(draft)]} /><ReviewCard label="Topic" value={draft.topic || "—"} /><ReviewCard label="CLOs" value={draft.cloCodes.join(" · ") || "—"} />
     <ReviewCard label="Lesson Learning Outcomes" value={draft.lessonLearningOutcomes.map((x) => x.description).filter(Boolean).join(" • ") || "—"} />
     <ReviewCard label="Teaching Methods" value={teaching.join(" • ") || "—"} />
     <ReviewCard label="Student Activities" value={draft.studentLearningActivities.map((x) => x.title).join(" • ") || draft.activities.join(" • ") || "—"} />
     <ReviewCard label="Time Allocation" value={`L ${draft.lectureHours || 0}h · T ${draft.tutorialHours || 0}h · P ${draft.practiceHours || 0}h · O ${draft.otherHours || 0}h · NF2F ${draft.selfStudyHours || 0}h · SLT ${weekSltForm(draft)}h`} />
-    <ReviewCard label="Assessment" value={assessments.join(" • ") || draft.assessment || "—"} />
+    <ReviewCard label="Assessment" value={assessments.join(" • ") || draft.assessment || (courseSpecSessionType(draft) === "teaching" ? "None scheduled" : "Missing")} />
     <ReviewCard label="Teaching Resources" value={draft.teachingResourceTypes.map(teachingResourceLabel).join(" • ") || "None selected"} />
     {projectBasedLearning ? <ReviewCard label="Project Progress" value={projectSummary || "Not planned yet"} /> : null}
   </div></div>;

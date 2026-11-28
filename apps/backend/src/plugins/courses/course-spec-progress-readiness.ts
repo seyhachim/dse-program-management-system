@@ -12,6 +12,8 @@ import { prisma } from "../../core/db/prisma.ts";
 const READINESS_SPEC_SELECT = {
   id: true,
   courseId: true,
+  reviewStatus: true,
+  courseInfo: { select: { totalSltHours: true } },
   sections: { select: { sectionKey: true, status: true } },
   clos: {
     orderBy: { order: "asc" as const },
@@ -20,6 +22,7 @@ const READINESS_SPEC_SELECT = {
       description: true,
       status: true,
       mappedPlos: true,
+      sltHours: true,
       teachingMethods: { select: { teachingMethodId: true } },
     },
   },
@@ -27,6 +30,7 @@ const READINESS_SPEC_SELECT = {
     orderBy: { order: "asc" as const },
     select: {
       topic: true,
+      sessionType: true,
       cloCodes: true,
       lloItems: true,
       lessonLearningOutcomes: true,
@@ -42,7 +46,7 @@ const READINESS_SPEC_SELECT = {
       assessment: true,
     },
   },
-  assessmentItems: { select: { status: true, cloCodes: true } },
+  assessmentItems: { select: { status: true, cloCodes: true, physicalSltHours: true, onlineSltHours: true, independentSltHours: true } },
   teachingLearning: true,
 } satisfies Prisma.CourseSpecSelect;
 
@@ -52,8 +56,13 @@ type ReadinessSpecRow = Prisma.CourseSpecGetPayload<{
 
 export type CourseSpecProgressReadinessSnapshot = Pick<
   ReadinessSpecRow,
-  "sections" | "clos" | "weeks" | "assessmentItems" | "teachingLearning"
->;
+  "sections" | "weeks" | "teachingLearning"
+> & {
+  courseInfo?: ReadinessSpecRow["courseInfo"];
+  reviewStatus?: ReadinessSpecRow["reviewStatus"];
+  clos: (Omit<ReadinessSpecRow["clos"][number], "sltHours"> & Partial<Pick<ReadinessSpecRow["clos"][number], "sltHours">>)[];
+  assessmentItems: (Pick<ReadinessSpecRow["assessmentItems"][number], "status" | "cloCodes"> & Partial<Pick<ReadinessSpecRow["assessmentItems"][number], "physicalSltHours" | "onlineSltHours" | "independentSltHours">>)[];
+};
 
 /**
  * Recompute one already-authorized progress row from the current CourseSpec
@@ -73,6 +82,7 @@ export function applyCurrentCourseSpecReadiness(
     code: `CLO${clo.order + 1}`,
     description: clo.description,
     mappedPlos: clo.mappedPlos,
+    sltHours: clo.sltHours,
     teachingMethodIds: clo.teachingMethods.map(
       (method) => method.teachingMethodId,
     ),
@@ -81,6 +91,7 @@ export function applyCurrentCourseSpecReadiness(
 
   const weeks: CourseSpecReadinessWeek[] = (spec?.weeks ?? []).map((week) => ({
     topic: week.topic,
+    sessionType: week.sessionType,
     cloCodes: week.cloCodes,
     lloItems: week.lloItems,
     lessonLearningOutcomes: week.lessonLearningOutcomes,
@@ -102,6 +113,9 @@ export function applyCurrentCourseSpecReadiness(
         ? ("active" as const)
         : ("inactive" as const),
     cloCodes: assessment.cloCodes,
+    physicalSltHours: assessment.physicalSltHours,
+    onlineSltHours: assessment.onlineSltHours,
+    independentSltHours: assessment.independentSltHours,
   }));
 
   const effectiveStatus = deriveCourseSpecAuthoringReadinessStatus(
@@ -110,6 +124,7 @@ export function applyCurrentCourseSpecReadiness(
     weeks,
     assessments,
     {
+      ...(spec?.courseInfo !== undefined && (spec.reviewStatus == null || spec.reviewStatus === "Draft" || spec.reviewStatus === "ChangesRequested") ? { slt: { declaredHours: spec.courseInfo?.totalSltHours } } : {}),
       teachingLearningProfile:
         (spec?.teachingLearning as TeachingLearningProfile | null | undefined) ??
         null,

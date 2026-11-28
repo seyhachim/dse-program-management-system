@@ -44,6 +44,7 @@ const readySnapshot: CourseSpecProgressReadinessSnapshot = {
   weeks: [
     {
       topic: "Regression modelling",
+      sessionType: null,
       cloCodes: ["CLO1"],
       lloItems: ["Fit and evaluate a regression model"],
       lessonLearningOutcomes: [],

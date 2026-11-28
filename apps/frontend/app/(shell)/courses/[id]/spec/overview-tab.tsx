@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, CircleAlert, Pencil } from "lucide-react";
 import {
   FOCUS_LEVELS,
+  reconcileCourseSpecSlt,
+  courseSpecHasWeekAssessment,
   teachingLearningIsReady,
   courseTypeLabel,
   semesterLabel,
@@ -80,12 +82,14 @@ export function OverviewTab({
     teachingLearningProfile,
     clos,
   );
+  const sltOptions = { declaredHours: courseInfo.totalSltHours === undefined ? courseTotalSlt : courseInfo.totalSltHours };
+  const sltAudit = reconcileCourseSpecSlt(weeklyPlan, clos, assessments, sltOptions);
   const readinessStatus = deriveOverviewReadinessStatus(
     status,
     clos,
-    instructionalPlan,
+    weeklyPlan,
     assessments,
-    { cloReady, teachingLearningReady },
+    { cloReady, teachingLearningReady, ...(readOnly ? {} : { slt: sltOptions }) },
   );
   const fillable = OVERVIEW_REQUIRED_SECTIONS;
   const completed = fillable.filter((s) => readinessStatus[s.id] === "complete").length;
@@ -100,7 +104,7 @@ export function OverviewTab({
     ? sectionDisplayTitle(nextSection.id, nextSection.title)
     : null;
 
-  const deliverables = instructionalPlan.filter((w) => w.assessment.trim());
+  const deliverables = instructionalPlan.filter(courseSpecHasWeekAssessment);
   const planTotals = weeklyPlanFormTotals(instructionalPlan);
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState(courseInfo.description);
@@ -144,6 +148,15 @@ export function OverviewTab({
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="space-y-4 lg:col-span-2">
+        {!readOnly ? <Card><CardHeader title="SLT reconciliation (draft)" />
+          <div className="space-y-1 text-sm">
+            <p>Declared: {sltAudit.declared ?? "Not specified"} h · All weekly sessions: {sltAudit.weeklyTotal} h</p>
+            <p>Instructional: {sltAudit.instructionalTotal} h · Assessment-only sessions: {sltAudit.assessmentOnlyTotal} h</p>
+            <p>Assessment allocations: {sltAudit.assessmentTotal} h · Separate-ledger candidate: {sltAudit.separateTotal} h · CLO allocations: {sltAudit.cloTotal} h</p>
+            <p className="text-muted-foreground">Candidate ledgers are alternatives, not additive totals. Confirm accounting policy and overlap with the academic reviewer.</p>
+            {sltAudit.blocking.length > 0 ? <p role="alert">Resolve: {sltAudit.blocking.join(", ").replaceAll("-", " ")}</p> : null}
+            {sltAudit.warnings.length > 0 ? <p>Review: {sltAudit.warnings.join(", ").replaceAll("-", " ")}</p> : null}
+          </div></Card> : null}
         <Card>
           <CardHeader title="Course Information" />
           {courseInfo.courseCode || courseInfo.courseTitle ? (

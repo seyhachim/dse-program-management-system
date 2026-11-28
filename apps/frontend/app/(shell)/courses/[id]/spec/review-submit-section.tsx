@@ -77,6 +77,7 @@ export function ReviewSubmitSection({
   review,
   cloReady,
   teachingLearningReady,
+  sourceAlignmentReady,
   specificationDate,
   onSubmit,
   onPreview,
@@ -105,6 +106,8 @@ export function ReviewSubmitSection({
   };
   cloReady: boolean;
   teachingLearningReady: boolean;
+  /** Draft editor uses the same canonical instructional alignment as submission. */
+  sourceAlignmentReady?: boolean;
   specificationDate: DateSectionValue;
   /** Kept in the component contract for read-only/spec-client compatibility; date is now system-assigned. */
   onSaveSpecificationDate: (value: DateSectionValue) => Promise<boolean>;
@@ -126,6 +129,11 @@ export function ReviewSubmitSection({
 
   useEffect(() => {
     let cancelled = false;
+    if (sourceAlignmentReady !== undefined) {
+      setConstructiveAlignmentReady(sourceAlignmentReady);
+      setAlignmentLoading(false);
+      return;
+    }
     setAlignmentLoading(true);
 
     void courseSpecApi
@@ -193,7 +201,7 @@ export function ReviewSubmitSection({
     return () => {
       cancelled = true;
     };
-  }, [course.id, status]);
+  }, [course.id, status, sourceAlignmentReady]);
 
   const readinessItems = useMemo<ReviewReadinessItem[]>(
     () =>

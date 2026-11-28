@@ -1,5 +1,6 @@
 import {
   COMPLETABLE_SPEC_SECTIONS,
+  CONSTRUCTIVE_ALIGNMENT_REQUIRED_ERROR,
   teachingLearningIsReady,
   type AssessmentPlanSection,
   type ClosSection,
@@ -31,6 +32,11 @@ import { rubricContentHash } from "../../core/academic/rubric-context.ts";
 import { registry } from "../../core/plugins/registry.ts";
 import { DEFAULT_PROGRAMME_ID } from "../../core/programme.ts";
 import { assertCourseSpecEditable } from "./spec-lock.ts";
+import { courseSpecSubmissionGaps } from "./course-spec-submit-readiness.ts";
+import {
+  MISSING_RESUBMISSION_SPECIFICATION_DATE_ERROR,
+  specificationDateForSubmission,
+} from "./automatic-specification-date.ts";
 import { uniqueActiveCurriculumPlacement } from "./course-spec-progress-placement.ts";
 import {
   buildCourseInfoSnapshot,
@@ -460,73 +466,72 @@ export const courseService = {
     if (!spec)
       throw new ReferenceError("Course specification has not been started");
 
-    const savedComplete = (sectionId: SpecSectionId) =>
-      spec.sections.some(
-        (saved) =>
-          saved.sectionKey === sectionId && saved.status === "Complete",
-      );
-
-    const activeClos = spec.clos.filter((clo) => clo.status === "Active");
-    const readinessGaps: string[] = [];
-
-    if (!savedComplete("courseInfo")) readinessGaps.push("Course Information");
-
-    if (
-      !savedComplete("clos") ||
-      activeClos.length === 0 ||
-      activeClos.some((clo) => clo.mappedPlos.length === 0)
-    ) {
-      readinessGaps.push("Course Learning Outcomes");
-    }
-
-    if (
-      activeClos.length === 0 ||
-      activeClos.some((clo) => clo.teachingMethods.length === 0)
-    ) {
-      readinessGaps.push("Teaching & Learning");
-    }
-
-    if (!savedComplete("assessmentPlan")) readinessGaps.push("Assessment");
-    if (!savedComplete("slt")) readinessGaps.push("Weekly Plan");
-    if (!savedComplete("responsibility"))
-      readinessGaps.push("Student Responsibility");
-
-    if (readinessGaps.length > 0) {
-      throw new ReferenceError(
-        `Complete all required sections before submitting: ${readinessGaps.join(", ")}`,
-      );
-    }
-
     if (!["Draft", "ChangesRequested"].includes(spec.reviewStatus)) {
       throw new ReferenceError(
         "This course specification is not ready for submission",
       );
     }
 
+    // Source-derived readiness; the Review & Submit gates are a subset of
+    // full authoring progress. Never trust stale instructional section flags.
+    const readinessGaps = courseSpecSubmissionGaps(spec);
+    if (readinessGaps.length > 0) {
+      if (readinessGaps.length === 1 && readinessGaps[0] === "CLO Alignment Mapping") {
+        throw new ReferenceError(CONSTRUCTIVE_ALIGNMENT_REQUIRED_ERROR);
+      }
+      throw new ReferenceError(
+        `Complete all required sections before submitting: ${readinessGaps.join(", ")}`,
+      );
+    }
+
+    const submittedAt = new Date();
+    let specificationDate: Date;
+    try {
+      specificationDate = specificationDateForSubmission({
+        reviewStatus: spec.reviewStatus === "ChangesRequested" ? "ChangesRequested" : "Draft",
+        existingDate: spec.specDate,
+        now: submittedAt,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === MISSING_RESUBMISSION_SPECIFICATION_DATE_ERROR) {
+        throw new ReferenceError(error.message);
+      }
+      throw error;
+    }
+
     const nextVersion = spec.submissionVersion + 1;
     const nextStatus =
       spec.reviewStatus === "ChangesRequested" ? "Resubmitted" : "Submitted";
-    const updated = await prisma.courseSpec.update({
-      where: { id: spec.id },
-      data: {
-        reviewStatus: nextStatus,
-        submissionVersion: nextVersion,
-        submittedAt: new Date(),
-        submittedById,
-        submissionNote: note.trim(),
-        reviewActions: {
-          create: {
-            submissionVersion: nextVersion,
-            action: nextStatus === "Resubmitted" ? "Resubmitted" : "Submitted",
-            actorId: submittedById,
-            note: note.trim(),
+    // Preserve the existing atomic date-section and review-action writes.
+    await prisma.$transaction([
+      prisma.courseSpecSection.upsert({
+        where: { courseSpecId_sectionKey: { courseSpecId: spec.id, sectionKey: "date" } },
+        create: { courseSpecId: spec.id, sectionKey: "date", status: "Complete" },
+        update: { status: "Complete" },
+      }),
+      prisma.courseSpec.update({
+        where: { id: spec.id },
+        data: {
+          reviewStatus: nextStatus,
+          specDate: specificationDate,
+          submissionVersion: nextVersion,
+          submittedAt,
+          submittedById,
+          submissionNote: note.trim(),
+          reviewActions: {
+            create: {
+              submissionVersion: nextVersion,
+              action: nextStatus,
+              actorId: submittedById,
+              note: note.trim(),
+            },
           },
         },
-      },
-      include: SPEC_INCLUDE,
-    });
-    const { data, status } = reassembleSpec(updated);
-    return { courseId, data, status, review: reviewEnvelope(updated) };
+      }),
+    ]);
+    const updated = await courseService.getSpec(courseId);
+    if (!updated) throw new ReferenceError("Course specification has not been started");
+    return updated;
   },
 
   async requestSpecChanges(courseId: string, reviewerId: string, note: string) {
@@ -783,6 +788,7 @@ const NORMALIZED_SECTIONS = new Set<SpecSectionId>([
 const SPEC_INCLUDE = {
   sections: true,
   courseInfo: true,
+  teachingLearning: true,
   clos: {
     include: { teachingMethods: true, assessmentMethods: true },
     orderBy: { order: "asc" as const },
@@ -877,6 +883,7 @@ function reassembleSpec(spec: SpecRow | null): {
         id: w.id,
         week: w.week,
         topic: w.topic,
+        ...(w.sessionType != null ? { sessionType: w.sessionType } : {}),
         cloCodes: w.cloCodes,
         lloItems: w.lloItems,
         lessonLearningOutcomes: w.lessonLearningOutcomes ?? [],
@@ -1087,6 +1094,10 @@ async function syncWeeklyPlan(
   courseSpecId: string,
   weeks: WeeklyPlanSection["weeks"],
 ) {
+  // Older clients may omit this new field. Keep explicit classifications on existing rows.
+  const existingTypes = new Map((await tx.courseSpecWeek.findMany({
+    where: { courseSpecId }, select: { id: true, sessionType: true },
+  })).map((row) => [row.id, row.sessionType]));
   await tx.courseSpecWeek.deleteMany({ where: { courseSpecId } });
   if (weeks.length === 0) return;
   await tx.courseSpecWeek.createMany({
@@ -1096,6 +1107,7 @@ async function syncWeeklyPlan(
       order,
       week: w.week,
       topic: w.topic,
+      sessionType: w.sessionType ?? existingTypes.get(w.id) ?? null,
       cloCodes: w.cloCodes,
       lloItems: w.lloItems,
       lessonLearningOutcomes: w.lessonLearningOutcomes,

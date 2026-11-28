@@ -312,6 +312,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
         policy,
         specDate,
         courseTotalSlt,
+        sltPresentation: review?.status === "approved" ? "historical" : "review",
       }),
     [
       courseInfo,
@@ -331,6 +332,7 @@ export function ReadOnlySpecClient({ courseId }: { courseId: string }) {
       policy,
       specDate,
       courseTotalSlt,
+      review?.status,
     ],
   );
 

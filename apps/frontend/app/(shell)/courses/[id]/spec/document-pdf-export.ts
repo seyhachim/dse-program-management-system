@@ -1,7 +1,7 @@
 import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
 
-import { COURSE_DOCUMENT_STYLE } from "./course-document-model";
+import { COURSE_DOCUMENT_STYLE, type CourseDocumentSltReview } from "./course-document-model";
 
 const PAGE_WIDTH = COURSE_DOCUMENT_STYLE.page.preview.width;
 const PAGE_HEIGHT = COURSE_DOCUMENT_STYLE.page.preview.height;
@@ -15,7 +15,9 @@ const PAGE_HEIGHT = COURSE_DOCUMENT_STYLE.page.preview.height;
 export async function exportCourseSpecPdf(
   container: HTMLElement,
   courseCode: string,
+  sltReview?: CourseDocumentSltReview,
 ): Promise<void> {
+  if (sltReview?.blocking.length) throw new Error("Resolve SLT reconciliation before export");
   const pages = Array.from(
     container.querySelectorAll<HTMLElement>("[data-doc-page]"),
   );
@@ -58,5 +60,5 @@ export async function exportCourseSpecPdf(
     pdf.addImage(imageData, "PNG", 0, 0, PAGE_WIDTH, PAGE_HEIGHT, undefined, "FAST");
   }
 
-  pdf.save(`${courseCode || "course"}-course-specification.pdf`);
+  pdf.save(`${courseCode || "course"}-course-specification${sltReview ? "-review" : ""}.pdf`);
 }

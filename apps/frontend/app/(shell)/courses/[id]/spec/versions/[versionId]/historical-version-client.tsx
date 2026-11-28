@@ -71,6 +71,7 @@ export function HistoricalVersionClient({ courseId, versionId }: { courseId: str
       policy: (data.policy as typeof EMPTY_POLICY | undefined) ?? EMPTY_POLICY,
       specDate: (data.date as typeof EMPTY_DATE | undefined) ?? EMPTY_DATE,
       courseTotalSlt: courseInfo.totalSltHours ?? null,
+      sltPresentation: "historical",
     });
   }, [courseId, methods, programme, rubrics, version]);
 

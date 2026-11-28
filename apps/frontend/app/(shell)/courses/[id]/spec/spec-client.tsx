@@ -7,6 +7,7 @@ import {
   type SpecSectionId,
   type SpecSectionStatus,
   teachingLearningIsReady,
+  deriveCourseSpecAuthoringReadinessStatus,
   type DateSection as DateSectionValue,
   type PolicySection as PolicySectionValue,
   type StudentResponsibilitySection as StudentResponsibilityValue,
@@ -211,6 +212,11 @@ export function SpecClient({
     () => teachingLearningIsReady(teachingLearningProfile, clos),
     [teachingLearningProfile, clos],
   );
+
+  const effectiveReadiness = deriveCourseSpecAuthoringReadinessStatus(status, clos, weeklyPlan, assessments, {
+    cloReady, teachingLearningReady,
+    slt: { declaredHours: courseInfo.totalSltHours === undefined ? courseTotalSlt : courseInfo.totalSltHours },
+  });
 
   const setActiveTab = useCallback(
     (id: TabId) => {
@@ -640,6 +646,7 @@ export function SpecClient({
         policy,
         specDate,
         courseTotalSlt,
+        sltPresentation: review?.status === "approved" ? "historical" : "review",
       }),
     [
       courseInfo,
@@ -659,6 +666,7 @@ export function SpecClient({
       policy,
       specDate,
       courseTotalSlt,
+      review?.status,
     ],
   );
 
@@ -770,7 +778,7 @@ export function SpecClient({
             onPersist={persistWeeklyPlan}
             courseId={courseId}
             courseName={`${course.code} - ${course.title}`}
-            ready={status.slt === "complete"}
+            ready={effectiveReadiness.slt === "complete"}
             clos={clos}
             teachingMethods={teachingMethods}
             assessmentMethods={assessmentMethods}
@@ -830,7 +838,8 @@ export function SpecClient({
           {review ? (
             <ReviewSubmitSection
               course={course}
-              status={status}
+              status={effectiveReadiness}
+              sourceAlignmentReady={effectiveReadiness.mapping === "complete"}
               review={review}
               cloReady={cloReady}
               teachingLearningReady={teachingLearningReady}

@@ -30,6 +30,7 @@ import {
   type CourseDocumentModel,
 } from "./course-document-model";
 import { formatCourseDocumentSltHours } from "./course-document-mapping";
+import { documentSltReviewLines, REVIEW_CREDIT_NOTE, REVIEW_MAPPING_NOTE } from "./course-document-slt-review";
 import { resolveCourseSpecWordTheme } from "./document-word-theme";
 import {
   contiguousRowSpans,
@@ -274,12 +275,12 @@ function cloSection(document: CourseDocumentModel): (Paragraph | Table)[] {
 function officialCloPloMatrixTable(document: CourseDocumentModel, mode: "percent" | "hours") {
   const w = colWidths([7, ...PLOS.map(() => 9.3)]);
   const ploWidth = w.slice(1).reduce((sum, width) => sum + width, 0);
-  const matrixTitle = mode === "hours" ? "Programme Learning Outcomes – Total Hours for Student Learning Time (SLT) including learning and assessment" : "Programme Learning Outcomes – Percentages";
+  const matrixTitle = document.sltReview ? "Programme Learning Outcomes – mapped links only" : mode === "hours" ? "Programme Learning Outcomes – Total Hours for Student Learning Time (SLT) including learning and assessment" : "Programme Learning Outcomes – Percentages";
   const rows: TableRow[] = [
     new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noBottomBorder, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text("CLO", false, SMALL)] })] }), new TableCell({ columnSpan: 10, width: { size: ploWidth, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: wordTheme.lineTwips }, children: [text(matrixTitle, false, SMALL)] })] })] }),
     new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: w[0]!, type: WidthType.DXA }, shading: { fill: LABEL }, borders: noTopBorder, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })] }), ...PLOS.map((plo, index) => new TableCell({ width: { size: w[index + 1]!, type: WidthType.DXA }, shading: { fill: LABEL }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [text(plo.id === "PLO9" ? "PLO 9" : plo.id, false, SMALL)] })] }))] }),
   ];
-  for (const row of document.mapping) rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(row.cloCode, w[0]!, AlignmentType.CENTER), ...PLOS.map((plo, index) => { const width = w[index + 1]!; if (!row.ploCodes.includes(plo.id)) return compactWordCell("", width, AlignmentType.CENTER); const value = mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "" : formatCourseDocumentSltHours(row.sltHours); return compactWordCell(value, width, AlignmentType.CENTER); })] }));
+  for (const row of document.mapping) rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(row.cloCode, w[0]!, AlignmentType.CENTER), ...PLOS.map((plo, index) => { const width = w[index + 1]!; if (!row.ploCodes.includes(plo.id)) return compactWordCell("", width, AlignmentType.CENTER); const value = document.sltReview ? "Linked" : mode === "percent" ? row.focusCode && row.focusPercent != null ? `${row.focusCode} (${row.focusPercent}%)` : "" : formatCourseDocumentSltHours(row.sltHours); return compactWordCell(value, width, AlignmentType.CENTER); })] }));
   return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows });
 }
 
@@ -313,7 +314,7 @@ function courseContentSltTable(document: CourseDocumentModel) {
   ];
   for (const week of document.weeklyPlan) rows.push(new TableRow({ cantSplit: true, children: [compactWordCell(week.week, w[0]!, AlignmentType.CENTER), topicSltCell(week.week, week.topic, w[1]!), compactWordCell(week.cloCodes.join(", "), w[2]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.lectureHours), w[3]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.tutorialHours), w[4]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.practiceHours), w[5]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.otherHours), w[6]!, AlignmentType.CENTER), compactWordCell("", w[7]!, AlignmentType.CENTER), compactWordCell("", w[8]!, AlignmentType.CENTER), compactWordCell("", w[9]!, AlignmentType.CENTER), compactWordCell("", w[10]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.selfStudyHours), w[11]!, AlignmentType.CENTER), compactWordCell(cleanSltValue(week.sltHours), w[12]!, AlignmentType.CENTER)] }));
   const labelWidth = w.slice(0, 12).reduce((sum, width) => sum + width, 0);
-  rows.push(new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 12, width: { size: labelWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }, children: [text("Total SLT for Course Content", true, SMALL)] })] }), compactWordCell(String(document.totals.courseContentSlt), w[12]!, AlignmentType.CENTER)] }));
+  rows.push(new TableRow({ cantSplit: true, children: [new TableCell({ columnSpan: 12, width: { size: labelWidth, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: tableCellMargins(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }, children: [text(document.sltReview ? "Weekly-plan SLT (all scheduled sessions)" : "Total SLT for Course Content", true, SMALL)] })] }), compactWordCell(String(document.totals.courseContentSlt), w[12]!, AlignmentType.CENTER)] }));
   return new Table({ width: { size: CONTENT_WIDTH_TWIPS, type: WidthType.DXA }, columnWidths: w, layout: TableLayoutType.FIXED, borders, rows });
 }
 
@@ -393,15 +394,21 @@ function partTwoContinuationRows(document: CourseDocumentModel): TableRow[] {
     partTwoContinuationRow([
       sectionTitle("15", "Mapping of the Course Learning Outcomes to the Programme Learning Outcomes, Teaching Methods and Assessment Methods"),
       officialCloPloMatrixTable(document, "hours"),
+      ...(document.sltReview ? [
+        paragraph(REVIEW_MAPPING_NOTE, false, BODY),
+        ...document.sltReview.allocationNotes.map(note => paragraph(note, false, SMALL)),
+        paragraph(REVIEW_CREDIT_NOTE, false, BODY),
+      ] : [
       paragraph("1 Credit = 40 Student Learning Time (SLT)", false, BODY),
       officialCloPloMatrixTable(document, "percent"),
       paragraph("*", false, BODY),
       paragraph("• Fully (F) indicates a focus of more than 50% of the total SLT on this PLO.", false, BODY),
       paragraph("• Moderate (M) indicates a focus of 31%–50% of the total SLT on this PLO.", false, BODY),
       paragraph("• Partial (P) indicates a focus of less than 30% of the total SLT on this PLO.", false, BODY),
+      ]),
       mappingDetailTable(document),
     ]),
-    partTwoContinuationRow([sectionTitle("16", "Distribution of Student Learning Time (SLT)"), paragraph("* Lecture (L), Tutoring (T), Practice (P), Other (O)", false, BODY), courseContentSltTable(document), new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }), assessmentSltTable(document, "continuous"), new Paragraph({ spacing: { before: 70, after: 0 }, children: [] }), assessmentSltTable(document, "final"), new Paragraph({ spacing: { before: 45, after: 0 }, children: [] }), grandTotalSltTable(document)]),
+    partTwoContinuationRow([sectionTitle("16", "Distribution of Student Learning Time (SLT)"), paragraph("* Lecture (L), Tutoring (T), Practice (P), Other (O)", false, BODY), courseContentSltTable(document), new Paragraph({ spacing: { before: 90, after: 0 }, children: [] }), assessmentSltTable(document, "continuous"), new Paragraph({ spacing: { before: 70, after: 0 }, children: [] }), assessmentSltTable(document, "final"), new Paragraph({ spacing: { before: 45, after: 0 }, children: [] }), ...(document.sltReview ? documentSltReviewLines(document).map(line => paragraph(line, false, SMALL)) : [grandTotalSltTable(document)])]),
     partTwoContinuationRow([sectionTitle("17", "Course Assessment Plan"), assessmentPlanTable(document)]),
     partTwoContinuationRow([sectionTitle("18", "Course Outline/detailed lesson plan"), lessonLearningOutcomesTable(document.weeklyPlan), paragraph("* Active Learning Strategies (ALS)", false, BODY), centered("Detail Course Syllabus", false, wordTheme.heading2HalfPoints), detailCourseSyllabusTable(document, document.weeklyPlan)]),
     partTwoContinuationRow([sectionTitle("19", "Required Resources to Deliver the Course"), ...(document.resources.length === 0 ? [paragraph("No required resources have been confirmed.", false, BODY)] : [resourcesTable(document.resources)])]),
@@ -462,6 +469,7 @@ function documentFooter(courseCode: string) {
 }
 
 async function exportCourseSpecWordInternal(document: CourseDocumentModel, theme: CourseSpecDocumentTheme) {
+  if (document.sltReview?.blocking.length) throw new Error("Resolve SLT reconciliation before export");
   applyWordTheme(theme);
   const children: (Paragraph | Table)[] = []; const info = document.courseInformation;
   children.push(await programmeProfileHeader(document));
@@ -474,7 +482,7 @@ async function exportCourseSpecWordInternal(document: CourseDocumentModel, theme
   const header = documentHeader();
   const footer = documentFooter(info.courseCode);
   const doc = new Document({ sections: [{ properties: { page: { size: { width: COURSE_DOCUMENT_STYLE.page.word.widthTwips, height: COURSE_DOCUMENT_STYLE.page.word.heightTwips }, margin: { top: wordTheme.marginTopTwips, bottom: wordTheme.marginBottomTwips, left: wordTheme.marginLeftTwips, right: wordTheme.marginRightTwips } } }, headers: header ? { default: header } : undefined, footers: footer ? { default: footer } : undefined, children }] });
-  const blob = await Packer.toBlob(doc); const url = URL.createObjectURL(blob); const anchor = window.document.createElement("a"); anchor.href = url; anchor.download = `${info.courseCode || "course"}-course-specification.docx`; window.document.body.appendChild(anchor); anchor.click(); window.document.body.removeChild(anchor); URL.revokeObjectURL(url);
+  const blob = await Packer.toBlob(doc); const url = URL.createObjectURL(blob); const anchor = window.document.createElement("a"); anchor.href = url; anchor.download = `${info.courseCode || "course"}-course-specification${document.sltReview ? "-review" : ""}.docx`; window.document.body.appendChild(anchor); anchor.click(); window.document.body.removeChild(anchor); URL.revokeObjectURL(url);
 }
 
 export function exportCourseSpecWord(

@@ -5,6 +5,9 @@ import {
   cloFocusCode,
   cloFocusPercent,
   rubricScaleSummary,
+  courseSpecPlannedWeeks,
+  courseSpecSessionType,
+  reconcileCourseSpecSlt,
   type DateSection as DateSectionValue,
   type Method,
   type PolicySection as PolicySectionValue,
@@ -27,7 +30,7 @@ import { assessmentSltHours, type AssessmentForm } from "./assessment-model";
 import type { MappingForm } from "./mapping-model";
 import type { ResourcesForm } from "./resources-model";
 import type { ReferencesForm } from "./references-model";
-import { courseDocumentCloSltHours } from "./course-document-mapping";
+import { courseDocumentCloSltHours, courseDocumentCloLearningSltHours, formatCourseDocumentSltHours } from "./course-document-mapping";
 import { normalizeCourseDocumentTopic } from "./course-document-topic";
 
 export type CourseDocumentModel = {
@@ -156,12 +159,14 @@ export type CourseDocumentModel = {
     levels: { label: string; points: number }[];
     criteria: { name: string; descriptors: string[] }[];
   }[];
+  /** Review projection only. Historical exports retain the legacy presentation. */
+  sltReview?: CourseDocumentSltReview;
   totals: {
     courseContentSlt: number;
     continuousAssessmentSlt: number;
     finalAssessmentSlt: number;
     assessmentSlt: number;
-    grandSlt: number;
+    grandSlt: number | null;
     assessmentWeight: number;
   };
 };
@@ -226,6 +231,10 @@ export const COURSE_DOCUMENT_STYLE = {
   courseInfoTitle: "Course Information",
 } as const;
 
+export type CourseDocumentSltReview = ReturnType<typeof reconcileCourseSpecSlt> & {
+  allocationNotes: string[];
+};
+
 type BuildCourseDocumentInput = {
   courseInfo: CourseInfoForm;
   courseId: string;
@@ -245,6 +254,8 @@ type BuildCourseDocumentInput = {
   policy?: PolicySectionValue;
   specDate?: DateSectionValue;
   courseTotalSlt?: number | null;
+  /** Opt-in review projection; never switch approved historical output silently. */
+  sltPresentation?: "historical" | "review";
 };
 
 const EMPTY_POLICY_VALUES: PolicySectionValue = {
@@ -304,6 +315,7 @@ export function buildCourseDocument({
   policy,
   specDate,
   courseTotalSlt = null,
+  sltPresentation = "historical",
 }: BuildCourseDocumentInput): CourseDocumentModel {
   const ploByCode = new Map((programme?.plos ?? []).map((plo) => [plo.code, plo.description]));
   const activeClos = clos.filter((clo) => clo.status === "active");
@@ -319,18 +331,21 @@ export function buildCourseDocument({
     assessmentMethods: methodNames(clo.assessmentMethodIds, assessmentMethods),
   }));
 
-  const documentWeeks = instructionalWeeklyPlan(weeklyPlan).map((week, index) => {
-    const displayWeek = String(index + 1);
+  const reviewProjection = sltPresentation === "review";
+  const sourceWeeks = reviewProjection ? courseSpecPlannedWeeks(weeklyPlan) : instructionalWeeklyPlan(weeklyPlan);
+  const documentWeeks = sourceWeeks.map((week, index) => {
+    const displayWeek = reviewProjection ? week.week : String(index + 1);
     const contact = weekContactHoursForm(week);
     const slt = weekSltForm(week);
     const learningActivities = week.studentLearningActivities.map((activity) =>
       activity.description.trim() ? `${activity.title}: ${activity.description}` : activity.title,
     );
-    const lloItems = week.lessonLearningOutcomes.map((llo) => llo.description.trim()).filter(Boolean);
+    const structuredLlos = week.lessonLearningOutcomes.map((llo) => llo.description.trim()).filter(Boolean);
+    const lloItems = reviewProjection && structuredLlos.length === 0 ? week.lloItems : structuredLlos;
     return {
       id: week.id,
       week: displayWeek,
-      topic: normalizeCourseDocumentTopic(displayWeek, week.topic),
+      topic: normalizeCourseDocumentTopic(displayWeek, week.topic) + (reviewProjection && courseSpecSessionType(week) === "assessment" ? " [Assessment-only session]" : ""),
       cloCodes: week.cloCodes,
       lloItems,
       learningActivities: learningActivities.length > 0 ? learningActivities : week.activities,
@@ -403,23 +418,39 @@ export function buildCourseDocument({
     .reduce((sum, assessment) => sum + assessment.totalSltHours, 0);
   const assessmentSlt = continuousAssessmentSlt + finalAssessmentSlt;
   const courseContentSlt = weeklyPlanSlt;
-  const derivedGrandSlt = courseContentSlt + assessmentSlt;
   const snapshotTotalSlt =
     courseInfo.totalSltHours === undefined ? courseTotalSlt : courseInfo.totalSltHours;
-  const focusDenominator = snapshotTotalSlt && snapshotTotalSlt > 0
-    ? snapshotTotalSlt
-    : derivedGrandSlt > 0
-      ? derivedGrandSlt
-      : null;
+  // For a review projection the snapshot is authoritative; never replace a
+  // missing declaration with a mutable course-catalogue value.
+  const reconciliation = reviewProjection
+    ? reconcileCourseSpecSlt(weeklyPlan, clos, assessments, { declaredHours: courseInfo.totalSltHours })
+    : undefined;
+  const derivedGrandSlt = reconciliation
+    ? reconciliation.blocking.length === 0 && (reconciliation.inclusiveMatches || reconciliation.separateMatches)
+      ? reconciliation.declared
+      : null
+    : courseContentSlt + assessmentSlt;
+  const focusDenominator = reviewProjection
+    ? reconciliation?.declared ?? null
+    : snapshotTotalSlt && snapshotTotalSlt > 0
+      ? snapshotTotalSlt
+      : derivedGrandSlt && derivedGrandSlt > 0
+        ? derivedGrandSlt
+        : null;
+  const allocationNotes = reviewProjection ? activeClos.map(clo => {
+    if (clo.sltHours.trim() !== "") return `${clo.code}: stored ${formatCourseDocumentSltHours(clo.sltHours)} h`;
+    const estimate = courseDocumentCloLearningSltHours(clo.code, documentWeeks);
+    return `${clo.code}: missing stored allocation${estimate > 0 ? ` (weekly-only equal-share estimate ${formatCourseDocumentSltHours(estimate)} h)` : ""}`;
+  }) : [];
 
   const documentMapping = activeClos.map((clo) => {
-    const sltHours = courseDocumentCloSltHours(
+    const sltHours = reviewProjection ? clo.sltHours : courseDocumentCloSltHours(
       clo.code,
       documentWeeks,
       documentAssessments,
       clo.sltHours,
     );
-    const focusPercent = cloFocusPercent(
+    const focusPercent = reviewProjection ? null : cloFocusPercent(
       sltHours ? Number(sltHours) : null,
       focusDenominator,
     );
@@ -525,6 +556,7 @@ export function buildCourseDocument({
     policy: policy ?? EMPTY_POLICY_VALUES,
     assessments: documentAssessments,
     rubrics: documentRubrics,
+    ...(reconciliation ? { sltReview: { ...reconciliation, allocationNotes } } : {}),
     totals: {
       courseContentSlt,
       continuousAssessmentSlt,

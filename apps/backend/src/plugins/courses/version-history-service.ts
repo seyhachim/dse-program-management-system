@@ -121,7 +121,7 @@ function reassemble(spec: SpecRow) {
   }
   if (has("slt")) {
     data.slt = { weeks: spec.weeks.map((w) => ({
-      id: w.id, week: w.week, topic: w.topic, cloCodes: w.cloCodes, lloItems: w.lloItems,
+      id: w.id, week: w.week, topic: w.topic, ...(w.sessionType != null ? { sessionType: w.sessionType } : {}), cloCodes: w.cloCodes, lloItems: w.lloItems,
       lessonLearningOutcomes: w.lessonLearningOutcomes ?? [], activities: w.activities,
       studentLearningActivities: w.studentLearningActivities ?? [], lectureHours: w.lectureHours,
       tutorialHours: w.tutorialHours, practiceHours: w.practiceHours, otherHours: w.otherHours,

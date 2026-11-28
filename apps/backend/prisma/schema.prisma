@@ -2403,7 +2403,14 @@ model CourseSpecCloAssessmentMethod {
 /// reference, same as CourseSpecClo's own `mappedPlos`, left unenforced by a DB FK
 /// since `code` isn't a stored/unique column to FK against (it's derived from
 /// `order`) and the frontend already reconciles orphaned references on save.
+enum CourseSpecSessionType {
+  teaching
+  assessment
+  teaching_and_assessment
+}
+
 model CourseSpecWeek {
+  sessionType               CourseSpecSessionType?
   id                        String     @default(uuid())
   courseSpecId              String
   courseSpec                CourseSpec @relation(fields: [courseSpecId], references: [id], onDelete: Cascade)

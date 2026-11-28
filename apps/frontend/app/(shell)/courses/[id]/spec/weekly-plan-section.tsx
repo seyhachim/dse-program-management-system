@@ -14,7 +14,7 @@ import {
   Target,
   Trash2,
 } from "lucide-react";
-import type { Method } from "@dse-pms/shared-types";
+import { courseSpecSessionType, courseSpecPlannedWeeks, COURSE_SPEC_SESSION_TYPE_LABELS, courseSpecWeeklyPlanWeekAttention, type Method } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import type { CloForm } from "./clos-section";
 import {
@@ -24,7 +24,7 @@ import {
   cloCoverage,
   cloSltAllocation,
   instructionalWeeklyPlan,
-  mergeInstructionalWeeklyPlan,
+  isAssessmentOnlyWeek,
   weekSltForm,
   weeklyPlanFormTotals,
   type WeeklyPlanForm,
@@ -65,9 +65,10 @@ export function WeeklyPlanSectionForm({
   teachingMethods?: Method[];
   assessmentMethods?: Method[];
 }) {
-  const plan = instructionalWeeklyPlan(value);
+  const plan = courseSpecPlannedWeeks(value);
   const preservedCount = Math.max(0, value.length - plan.length);
-  const atLimit = plan.length >= MAX_INSTRUCTIONAL_WEEKS;
+  const teachingCount = value.filter((week) => !isAssessmentOnlyWeek(week)).length;
+  const atLimit = teachingCount >= MAX_INSTRUCTIONAL_WEEKS;
   const cloCodes = clos.map((clo) => clo.code);
   const teachingMethodById = new Map(
     teachingMethods.map((method) => [method.id, method]),
@@ -85,19 +86,20 @@ export function WeeklyPlanSectionForm({
     () => new Set(),
   );
 
-  const displayWeekForId = (weekId: string) => {
-    const index = plan.findIndex((item) => item.id === weekId);
-    return index >= 0 ? String(index + 1) : "";
+  const displayWeekForId = (weekId: string) => value.find((item) => item.id === weekId)?.week ?? "";
+
+  const persistPlan = async (next: WeeklyPlanForm) => {
+    const count = next.filter((week) => !isAssessmentOnlyWeek(week)).length;
+    if (count > MAX_INSTRUCTIONAL_WEEKS && count > teachingCount) {
+      setNotice(`Technical authoring limit: ${MAX_INSTRUCTIONAL_WEEKS} instructional rows.`);
+      return false;
+    }
+    return onPersist(next);
   };
 
-  const persistInstructional = (next: WeeklyPlanForm) =>
-    onPersist(mergeInstructionalWeeklyPlan(value, next));
-
   const openAdd = () => {
-    if (atLimit) {
-      setNotice(
-        `Weekly Plan is limited to ${MAX_INSTRUCTIONAL_WEEKS} instructional weeks. Schedule Midterm and Final assessments in the Assessment tab.`,
-      );
+    if (new Set(value.map((week) => Number(week.week))).size >= 52) {
+      setNotice("No free week number remains.");
       return;
     }
     setModal({ open: true, weekId: null });
@@ -116,18 +118,17 @@ export function WeeklyPlanSectionForm({
   const duplicate = async (id: string) => {
     const source = plan.find((item) => item.id === id);
     if (!source) return;
-    if (atLimit) {
-      setNotice(`Cannot add more than ${MAX_INSTRUCTIONAL_WEEKS} instructional weeks.`);
+    if (atLimit && !isAssessmentOnlyWeek(source)) {
+      setNotice(`Technical authoring limit: ${MAX_INSTRUCTIONAL_WEEKS} instructional rows.`);
       return;
     }
 
     const sourceDisplayWeek = displayWeekForId(id);
-    const next = duplicateWeeklyPlanWeek(plan, id);
+    const next = duplicateWeeklyPlanWeek(value, id);
     const duplicated = next.at(-1);
-    const duplicatedDisplayWeek = duplicated
-      ? String(next.findIndex((item) => item.id === duplicated.id) + 1)
-      : "";
-    const ok = await persistInstructional(next);
+    const duplicatedDisplayWeek = duplicated?.week ?? "";
+    if (!duplicated || Number(duplicated.week) > 52) { setNotice("No valid next week number remains."); return; }
+    const ok = await persistPlan(next);
     setNotice(
       ok
         ? `Week ${duplicatedDisplayWeek} was created from week ${sourceDisplayWeek}.`
@@ -142,7 +143,7 @@ export function WeeklyPlanSectionForm({
       !window.confirm(`Delete week ${displayWeek}? This can't be undone.`)
     ) return;
 
-    const ok = await persistInstructional(plan.filter((item) => item.id !== id));
+    const ok = await persistPlan(value.filter((item) => item.id !== id));
     if (ok) {
       setExpandedWeekIds((current) => {
         const next = new Set(current);
@@ -156,10 +157,10 @@ export function WeeklyPlanSectionForm({
     <CourseSpecAuthoringStack>
       <CourseSpecAuthoringHeader
         title="Weekly Plan"
-        description={`Plan the ${MAX_INSTRUCTIONAL_WEEKS} instructional weeks, learning activities, SLT, and CLO links${courseName ? ` for ${courseName}` : ""}. Midterm and Final assessments are managed in Assessment.`}
+        description={`Plan teaching and assessment sessions${courseName ? ` for ${courseName}` : ""} according to the approved calendar. Reconcile assessment workload without counting it twice.`}
         ready={ready}
         actions={
-          <Button size="sm" onClick={openAdd} disabled={atLimit}>
+          <Button size="sm" onClick={openAdd}>
             <Plus className="mr-1.5 h-4 w-4" />
             Add Week
           </Button>
@@ -168,7 +169,7 @@ export function WeeklyPlanSectionForm({
 
       {preservedCount > 0 ? (
         <CourseSpecNotice>
-          {preservedCount} legacy assessment-only {preservedCount === 1 ? "row is" : "rows are"} preserved for audit history but excluded from the instructional Weekly Plan and official teaching-week SLT. Manage Midterm and Final assessments in the Assessment tab.
+          {preservedCount} empty legacy assessment {preservedCount === 1 ? "placeholder is" : "placeholders are"} preserved for audit history. Assessment-only sessions are excluded from official teaching-week SLT.
         </CourseSpecNotice>
       ) : null}
 
@@ -184,7 +185,7 @@ export function WeeklyPlanSectionForm({
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold text-foreground">
-            Weekly Plan ({plan.length} / {MAX_INSTRUCTIONAL_WEEKS} Weeks)
+            Weekly Plan ({plan.length} sessions · {instructionalWeeklyPlan(plan).length} instructional)
           </h3>
         </div>
 
@@ -192,8 +193,9 @@ export function WeeklyPlanSectionForm({
           <EmptyWeeklyPlan onAdd={openAdd} />
         ) : (
           <div className="space-y-2.5">
-            {plan.map((week, weekIndex) => {
-              const displayWeek = String(weekIndex + 1);
+            {plan.map((week) => {
+              const displayWeek = week.week;
+              const sessionType = courseSpecSessionType(week);
               const llos = weekLessonOutcomes(week);
               const activities = weekActivities(week);
               const teaching = week.teachingMethodIds.map(
@@ -228,6 +230,7 @@ export function WeeklyPlanSectionForm({
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-foreground">{week.topic || "Untitled week"}</p>
                           <div className="mt-1.5 flex flex-wrap gap-1">
+                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">{COURSE_SPEC_SESSION_TYPE_LABELS[sessionType]}</span>
                             {week.cloCodes.length > 0 ? week.cloCodes.map((code) => (
                               <span key={code} className={`inline-flex rounded-md px-1.5 py-0.5 text-[11px] font-medium ${cloChip(code)}`}>{code}</span>
                             )) : <span className="text-xs text-muted-foreground">No CLO linked</span>}
@@ -238,9 +241,9 @@ export function WeeklyPlanSectionForm({
                             ) : null}
                           </div>
                         </div>
-                        <SummaryValue label="Teaching" value={summarizeItems(teaching, "No method")} />
+                        <SummaryValue label="Teaching" value={summarizeItems(teaching, sessionType === "assessment" ? "Not applicable" : "No method")} />
                         <SummaryValue label="SLT" value={`${weekSltForm(week)} h`} strong />
-                        <SummaryValue label="Assessment" value={summarizeItems(assessments, "None")} />
+                        <SummaryValue label="Assessment" value={summarizeItems(assessments, sessionType === "teaching" ? "None scheduled" : "Missing")} />
                         <div><WeekStatus attention={attention} /></div>
                         <ChevronDown className={`hidden h-4 w-4 text-muted-foreground transition-transform sm:block ${expanded ? "rotate-180" : ""}`} />
                       </div>
@@ -272,8 +275,8 @@ export function WeeklyPlanSectionForm({
                             <div className="flex items-center justify-between gap-3 border-t border-border pt-2 font-semibold"><span>Total SLT</span><span>{weekSltForm(week)} h</span></div>
                           </div>
                         </DetailCard>
-                        <DetailCard title="Assessment"><DetailTags items={assessments} empty="No assessment" /></DetailCard>
-                        <DetailCard title="Alignment & Validation"><WeekAlignmentSummary cloCodes={week.cloCodes} llos={llos} teaching={teaching} activities={activities} assessments={assessments} resources={resources} /></DetailCard>
+                        <DetailCard title="Assessment"><DetailTags items={assessments} empty={sessionType === "teaching" ? "No assessment scheduled" : "Assessment missing"} /></DetailCard>
+                        <DetailCard title="Alignment & Validation"><WeekAlignmentSummary week={week} resources={resources} /></DetailCard>
                         <DetailCard title="Needs Attention">
                           {attention.length === 0 ? (
                             <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4" />Planning information is complete.</div>
@@ -296,7 +299,7 @@ export function WeeklyPlanSectionForm({
 
         <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>SLT = Contact Hours (Lecture + Tutorial + Practice + Other) + Independent Learning Hours (NF2F). Assessment SLT is entered separately in the Assessment tab.</span>
+          <span>SLT = Contact Hours (Lecture + Tutorial + Practice + Other) + Independent Learning Hours (NF2F). Assessment-only session hours are excluded from instructional totals. Assessment SLT is entered separately in the Assessment tab.</span>
         </div>
       </div>
 
@@ -305,11 +308,11 @@ export function WeeklyPlanSectionForm({
         courseId={courseId}
         onOpenChange={(open) => setModal((current) => ({ ...current, open }))}
         weekId={modal.weekId}
-        weeks={plan}
+        weeks={value}
         clos={clos}
         teachingMethods={teachingMethods}
         assessmentMethods={assessmentMethods}
-        onSave={persistInstructional}
+        onSave={persistPlan}
       />
     </CourseSpecAuthoringStack>
   );
@@ -357,18 +360,19 @@ function TimeDetail({ label, value }: { label: string; value: string }) {
 }
 
 function WeeklyPlanDashboard({ plan, cloCodes }: { plan: WeeklyPlanForm; cloCodes: string[] }) {
-  const totals = weeklyPlanFormTotals(plan);
-  const coverage = cloCoverage(plan, cloCodes.length ? cloCodes : undefined);
+  const instructional = instructionalWeeklyPlan(plan);
+  const totals = weeklyPlanFormTotals(instructional);
+  const coverage = cloCoverage(instructional, cloCodes.length ? cloCodes : undefined);
   const coveredClos = coverage.filter((item) => item.weeks > 0).length;
   const attentionWeeks = plan.filter((week) => weekAttention(week).length > 0);
   const completeWeeks = Math.max(0, plan.length - attentionWeeks.length);
   return <div className="space-y-3"><div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
-    <MetricCard icon={<CalendarDays className="h-4 w-4" />} label="Total Weeks" value={plan.length} detail={`of ${MAX_INSTRUCTIONAL_WEEKS} instructional weeks`} />
-    <MetricCard icon={<Clock className="h-4 w-4" />} label="Total SLT" value={`${totals.slt} h`} detail={`${totals.selfStudyHours} h independent`} />
+    <MetricCard icon={<CalendarDays className="h-4 w-4" />} label="Total Sessions" value={plan.length} detail={`${instructional.length} instructional weeks`} />
+    <MetricCard icon={<Clock className="h-4 w-4" />} label="Instructional SLT" value={`${totals.slt} h`} detail={`${totals.selfStudyHours} h independent`} />
     <MetricCard icon={<Target className="h-4 w-4" />} label="CLOs Covered" value={coverage.length > 0 ? `${coveredClos} / ${coverage.length}` : "—"} detail={coverage.length > 0 ? `${Math.round((coveredClos / coverage.length) * 100)}% coverage` : "No CLOs available"} />
     <MetricCard icon={<AlertTriangle className="h-4 w-4" />} label="Need Attention" value={attentionWeeks.length} detail={attentionWeeks.length === 1 ? "Week" : "Weeks"} tone="attention" />
     <MetricCard icon={<CheckCircle2 className="h-4 w-4" />} label="Complete" value={completeWeeks} detail={completeWeeks === 1 ? "Week" : "Weeks"} tone="complete" />
-  </div><div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.65fr)_minmax(260px,0.75fr)]"><CloCoverageOverview plan={plan} cloCodes={cloCodes} /><AttentionSummary plan={plan} /></div></div>;
+  </div><div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.65fr)_minmax(260px,0.75fr)]"><CloCoverageOverview plan={instructional} cloCodes={cloCodes} /><AttentionSummary plan={plan} /></div></div>;
 }
 
 function MetricCard({ icon, label, value, detail, tone = "default" }: { icon: React.ReactNode; label: string; value: string | number; detail: string; tone?: "default" | "attention" | "complete" }) {
@@ -382,7 +386,7 @@ function CloCoverageOverview({ plan, cloCodes }: { plan: WeeklyPlanForm; cloCode
   const allocationByCode = new Map(allocations.map((item) => [item.code, item.sltHours]));
   const maxAllocation = Math.max(1, ...allocations.map((item) => item.sltHours));
   const totalSlt = weeklyPlanFormTotals(plan).slt;
-  return <Card><div className="mb-3"><h3 className="text-sm font-semibold text-foreground">CLO Coverage</h3><p className="mt-1 text-[11px] text-muted-foreground">Planned learning time and weekly coverage for each CLO.</p></div>{coverage.length === 0 ? <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center"><p className="text-sm text-muted-foreground">Link CLOs to weeks to see coverage.</p></div> : <><div className="hidden grid-cols-[52px_minmax(0,1fr)_105px_60px] items-center gap-2 border-b border-border pb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid"><span>CLO</span><span>Coverage</span><span>Weeks</span><span className="text-right">SLT</span></div><div>{coverage.map((item) => { const hours = allocationByCode.get(item.code) ?? 0; const width = Math.min(100, (hours / maxAllocation) * 100); const weeks = plan.flatMap((week, index) => week.cloCodes.includes(item.code) ? [index + 1] : []); return <div key={item.code} className="grid gap-2 border-b border-border/60 py-3 last:border-b-0 sm:grid-cols-[52px_minmax(0,1fr)_105px_60px] sm:items-center"><span className={`inline-flex w-fit rounded-md px-1.5 py-0.5 text-xs font-semibold ${cloChip(item.code)}`}>{item.code}</span><div className="min-w-0"><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: cloColor(item.code) }} /></div><p className="mt-1 text-[10px] text-muted-foreground">{item.weeks > 0 ? `${item.weeks} ${item.weeks === 1 ? "week" : "weeks"} linked` : "Not linked"}</p></div><span className="text-[11px] text-muted-foreground">{formatWeekRange(weeks)}</span><span className="text-xs font-semibold text-foreground sm:text-right">{hours.toFixed(1)} h</span></div>; })}</div><div className="mt-2 flex items-center justify-between border-t border-border pt-3"><span className="text-xs font-semibold text-foreground">Total Student Learning Time</span><span className="text-sm font-bold text-foreground">{totalSlt.toFixed(1)} h</span></div></>}</Card>;
+  return <Card><div className="mb-3"><h3 className="text-sm font-semibold text-foreground">CLO Coverage</h3><p className="mt-1 text-[11px] text-muted-foreground">Planned learning time and weekly coverage for each CLO.</p></div>{coverage.length === 0 ? <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center"><p className="text-sm text-muted-foreground">Link CLOs to weeks to see coverage.</p></div> : <><div className="hidden grid-cols-[52px_minmax(0,1fr)_105px_60px] items-center gap-2 border-b border-border pb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid"><span>CLO</span><span>Coverage</span><span>Weeks</span><span className="text-right">SLT</span></div><div>{coverage.map((item) => { const hours = allocationByCode.get(item.code) ?? 0; const width = Math.min(100, (hours / maxAllocation) * 100); const weeks = plan.flatMap((week) => week.cloCodes.includes(item.code) ? [Number(week.week)] : []); return <div key={item.code} className="grid gap-2 border-b border-border/60 py-3 last:border-b-0 sm:grid-cols-[52px_minmax(0,1fr)_105px_60px] sm:items-center"><span className={`inline-flex w-fit rounded-md px-1.5 py-0.5 text-xs font-semibold ${cloChip(item.code)}`}>{item.code}</span><div className="min-w-0"><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: cloColor(item.code) }} /></div><p className="mt-1 text-[10px] text-muted-foreground">{item.weeks > 0 ? `${item.weeks} ${item.weeks === 1 ? "week" : "weeks"} linked` : "Not linked"}</p></div><span className="text-[11px] text-muted-foreground">{formatWeekRange(weeks)}</span><span className="text-xs font-semibold text-foreground sm:text-right">{hours.toFixed(1)} h</span></div>; })}</div><div className="mt-2 flex items-center justify-between border-t border-border pt-3"><span className="text-xs font-semibold text-foreground">Total Student Learning Time</span><span className="text-sm font-bold text-foreground">{totalSlt.toFixed(1)} h</span></div></>}</Card>;
 }
 
 function AttentionSummary({ plan }: { plan: WeeklyPlanForm }) {
@@ -395,16 +399,21 @@ function AttentionSummary({ plan }: { plan: WeeklyPlanForm }) {
 
 function weekLessonOutcomes(week: WeeklyPlanForm[number]): string[] { return week.lessonLearningOutcomes.length > 0 ? week.lessonLearningOutcomes.map((llo) => llo.description).filter(Boolean) : week.lloItems.filter(Boolean); }
 function weekActivities(week: WeeklyPlanForm[number]): string[] { return week.studentLearningActivities.length > 0 ? week.studentLearningActivities.map((activity) => activity.title).filter(Boolean) : week.activities.filter(Boolean); }
-function weekAttention(week: WeeklyPlanForm[number]): string[] { const lloCount = weekLessonOutcomes(week).filter((llo) => llo.trim()).length; const activityCount = weekActivities(week).filter((activity) => activity.trim()).length; const issues: string[] = []; if (!week.topic.trim()) issues.push("Topic"); if (week.cloCodes.length === 0) issues.push("CLO"); if (lloCount === 0) issues.push("LLO"); if (week.teachingMethodIds.length === 0) issues.push("Teaching method"); if (activityCount === 0) issues.push("Learning activity"); if (weekSltForm(week) <= 0) issues.push("Learning time"); if (week.assessmentMethodIds.length === 0 && !week.assessment.trim()) issues.push("Assessment"); return issues; }
+function weekAttention(week: WeeklyPlanForm[number]): string[] { return courseSpecWeeklyPlanWeekAttention(week); }
 function summarizeItems(items: string[], empty: string): string { if (items.length === 0) return empty; if (items.length === 1) return items[0] ?? empty; return `${items[0]} +${items.length - 1}`; }
 function formatWeekRange(weeks: number[]): string { if (weeks.length === 0) return "—"; if (weeks.length === 1) return `Week ${weeks[0]}`; const consecutive = weeks.every((week, index) => index === 0 || week === weeks[index - 1]! + 1); const first = weeks[0]; const last = weeks.at(-1); if (consecutive && first !== undefined && last !== undefined) return `Weeks ${first}–${last}`; return `W${weeks.join(", ")}`; }
 function attentionLabel(issue: string): string { switch (issue) { case "Topic": return "Topic / content missing"; case "CLO": return "CLO not linked"; case "LLO": return "Lesson outcome missing"; case "Teaching method": return "Teaching method missing"; case "Learning activity": return "Learning activity missing"; case "Learning time": return "Learning time missing"; case "Assessment": return "Assessment missing"; default: return issue; } }
 
-function WeekAlignmentSummary({ cloCodes, llos, teaching, activities, assessments, resources }: { cloCodes: string[]; llos: string[]; teaching: string[]; activities: string[]; assessments: string[]; resources: string[] }) {
-  const coreEvidence = [{ label: "CLO", ready: cloCodes.length > 0 }, { label: "LLO", ready: llos.length > 0 }, { label: "Teaching", ready: teaching.length > 0 }, { label: "Activity", ready: activities.length > 0 }, { label: "Assessment", ready: assessments.length > 0 }];
-  const complete = coreEvidence.every((item) => item.ready);
+function WeekAlignmentSummary({ week, resources }: { week: WeeklyPlanForm[number]; resources: string[] }) {
+  const type = courseSpecSessionType(week);
+  const issues = courseSpecWeeklyPlanWeekAttention(week);
+  const coreEvidence = [
+    { label: "CLO", issue: "CLO" },
+    ...(type === "assessment" ? [] : [{ label: "LLO", issue: "LLO" }, { label: "Teaching", issue: "Teaching method" }, { label: "Activity", issue: "Learning activity" }]),
+    ...(type === "teaching" ? [] : [{ label: "Assessment", issue: "Assessment" }]),
+  ].map((item) => ({ label: item.label, ready: !issues.some((issue) => issue === item.issue) }));
   const missing = coreEvidence.filter((item) => !item.ready).map((item) => item.label);
-  return <div className="space-y-2"><div className="flex flex-wrap items-center gap-1">{coreEvidence.map((item, index) => <div key={item.label} className="flex items-center gap-1"><span className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${item.ready ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300" : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"}`}>{item.ready ? "✓" : "○"} {item.label}</span>{index < coreEvidence.length - 1 ? <span className="text-[10px] text-muted-foreground">→</span> : null}</div>)}</div>{complete ? <p className="text-[11px] text-emerald-700 dark:text-emerald-300">Core alignment evidence is present for this week.</p> : <p className="text-[11px] text-amber-700 dark:text-amber-300">Evidence not yet established for: {missing.join(", ")}.</p>}{resources.length > 0 ? <p className="text-[10px] text-muted-foreground">Supporting resources: {resources.join(", ")}</p> : null}</div>;
+  return <div className="space-y-2"><div className="flex flex-wrap items-center gap-1">{coreEvidence.map((item) => <span key={item.label} className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${item.ready ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300" : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"}`}>{item.ready ? "✓" : "○"} {item.label}</span>)}</div>{missing.length === 0 ? <p className="text-[11px] text-emerald-700 dark:text-emerald-300">Required alignment evidence is present for this session.</p> : <p className="text-[11px] text-amber-700 dark:text-amber-300">Evidence not yet established for: {missing.join(", ")}.</p>}{type === "teaching" && !week.assessment.trim() && week.assessmentMethodIds.length === 0 ? <p className="text-[11px] text-muted-foreground">No assessment scheduled. CLO assessment coverage is checked across the course.</p> : null}{resources.length > 0 ? <p className="text-[10px] text-muted-foreground">Supporting resources: {resources.join(", ")}</p> : null}</div>;
 }
 
 function Card({ children }: { children: React.ReactNode }) { return <section className="rounded-xl border border-border bg-card p-4 shadow-sm">{children}</section>; }
