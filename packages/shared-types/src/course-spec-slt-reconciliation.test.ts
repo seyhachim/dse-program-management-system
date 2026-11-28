@@ -70,3 +70,18 @@ describe("Phase 3A.1 synthetic course-shaped reconciliation", () => {
     expect(result.assessmentTotal).toBe(121);
   });
 });
+
+
+test("matching arithmetic cannot hide assessment components outside the weekly ledger", () => {
+  const result = reconcileCourseSpecSlt([teaching(120)], [clo(120)], [assessment(8, 44)], { declaredHours: 120, accountingMode: "inclusive" });
+  expect(result.inclusiveMatches).toBe(false);
+  expect(result.blocking).toContain("total-mismatch");
+  expect(result.warnings).toContain("assessment-components-exceed-weekly-ledger");
+});
+
+test("separate ledger cannot discard scheduled assessment-only hours", () => {
+  const result = reconcileCourseSpecSlt([teaching(90), exam("Final Exam", 40)], [clo(120)], [assessment(2, 28)], { declaredHours: 120, accountingMode: "separate" });
+  expect(result.separateMatches).toBe(false);
+  expect(result.blocking).toContain("weekly-exceeds-declared");
+  expect(result.blocking).toContain("total-mismatch");
+});

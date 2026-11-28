@@ -12,6 +12,7 @@ import { prisma } from "../../core/db/prisma.ts";
 const READINESS_SPEC_SELECT = {
   id: true,
   courseId: true,
+  reviewStatus: true,
   courseInfo: { select: { totalSltHours: true } },
   sections: { select: { sectionKey: true, status: true } },
   clos: {
@@ -58,6 +59,7 @@ export type CourseSpecProgressReadinessSnapshot = Pick<
   "sections" | "weeks" | "teachingLearning"
 > & {
   courseInfo?: ReadinessSpecRow["courseInfo"];
+  reviewStatus?: ReadinessSpecRow["reviewStatus"];
   clos: (Omit<ReadinessSpecRow["clos"][number], "sltHours"> & Partial<Pick<ReadinessSpecRow["clos"][number], "sltHours">>)[];
   assessmentItems: (Pick<ReadinessSpecRow["assessmentItems"][number], "status" | "cloCodes"> & Partial<Pick<ReadinessSpecRow["assessmentItems"][number], "physicalSltHours" | "onlineSltHours" | "independentSltHours">>)[];
 };
@@ -122,7 +124,7 @@ export function applyCurrentCourseSpecReadiness(
     weeks,
     assessments,
     {
-      ...(spec?.courseInfo !== undefined ? { slt: { declaredHours: spec.courseInfo?.totalSltHours } } : {}),
+      ...(spec?.courseInfo !== undefined && (spec.reviewStatus == null || spec.reviewStatus === "Draft" || spec.reviewStatus === "ChangesRequested") ? { slt: { declaredHours: spec.courseInfo?.totalSltHours } } : {}),
       teachingLearningProfile:
         (spec?.teachingLearning as TeachingLearningProfile | null | undefined) ??
         null,

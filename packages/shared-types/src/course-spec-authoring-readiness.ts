@@ -337,12 +337,21 @@ export function reconcileCourseSpecSlt(
   const missingAssessmentAllocations = activeAssessments.filter(item => assessmentHours(item).some(value => !suppliedSltHour(value))).length;
   const declared = suppliedSltHour(options.declaredHours) ? numericHour(options.declaredHours) : null;
   const separateTotal = instructionalTotal + assessmentTotal;
+  const assessmentOnly = planned.filter(isCourseSpecAssessmentOnlyWeek);
+  const supervisedHours = (rows: readonly CourseSpecReadinessWeek[]) => sumHours(rows.flatMap(week => weekHours(week).slice(0, 4)));
+  const independentHours = (rows: readonly CourseSpecReadinessWeek[]) => sumHours(rows.map(week => week.selfStudyHours));
+  const assessmentSupervised = sumHours(activeAssessments.flatMap(item => assessmentHours(item).slice(0, 2)));
+  const assessmentIndependent = sumHours(activeAssessments.map(item => item.independentSltHours));
+  const within = (part: number, total: number) => part < total || sameHours(part, total);
+  const inclusiveFeasible = within(assessmentSupervised, supervisedHours(planned)) && within(assessmentIndependent, independentHours(planned));
+  const separateFeasible = within(supervisedHours(assessmentOnly), assessmentSupervised) && within(independentHours(assessmentOnly), assessmentIndependent);
   const blocking: string[] = [];
   const warnings: string[] = [];
   if ([...weeks.flatMap(weekHours), ...activeAssessments.flatMap(assessmentHours), ...activeClos.map(clo => clo.sltHours)].some(invalidSltHour)) blocking.push("invalid-hours");
   if (declared == null || declared <= 0 || invalidSltHour(options.declaredHours)) blocking.push("missing-or-invalid-declared-hours");
-  const inclusiveMatches = declared != null && sameHours(weeklyTotal, declared);
-  const separateMatches = declared != null && missingAssessmentAllocations === 0 && sameHours(separateTotal, declared);
+  const inclusiveMatches = declared != null && sameHours(weeklyTotal, declared) && inclusiveFeasible;
+  const separateMatches = declared != null && missingAssessmentAllocations === 0 && sameHours(separateTotal, declared) && separateFeasible;
+  if (declared != null && !within(weeklyTotal, declared)) blocking.push("weekly-exceeds-declared");
   if (options.accountingMode === "inclusive" ? !inclusiveMatches : options.accountingMode === "separate" ? !separateMatches : !inclusiveMatches && !separateMatches) blocking.push("total-mismatch");
   if (missingCloAllocations > 0) (options.requireCloAllocation ? blocking : warnings).push("missing-clo-allocation");
   else if (declared != null && activeClos.length > 0 && !sameHours(cloTotal, declared)) blocking.push("clo-total-mismatch");
@@ -351,6 +360,8 @@ export function reconcileCourseSpecSlt(
   // An inclusive ledger can contain assessment as a subset only. Even a
   // matching total cannot establish per-session allocation without evidence.
   if (assessmentTotal > 0 && weeklyTotal > 0) warnings.push("verify-assessment-overlap");
+  if (declared != null && sameHours(weeklyTotal, declared) && !inclusiveFeasible) warnings.push("assessment-components-exceed-weekly-ledger");
+  if (declared != null && sameHours(separateTotal, declared) && !separateFeasible) warnings.push("assessment-only-sessions-exceed-assessment-ledger");
   if (!options.accountingMode) warnings.push("accounting-policy-unconfirmed");
   if (options.minInstructionalWeeks != null && instructional.length < options.minInstructionalWeeks) blocking.push("instructional-weeks-below-policy");
   if (options.maxInstructionalWeeks != null && instructional.length > options.maxInstructionalWeeks) blocking.push("instructional-weeks-above-policy");
