@@ -388,7 +388,7 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
   if (!section16WeeklyPages.length) section16WeeklyPages.push([]);
   const section16StartPage = 7;
   const section16AssessmentPage = section16StartPage + section16WeeklyPages.length;
-  const assessmentPlanPage = section16AssessmentPage + 1;
+  const assessmentPlanPage = section16AssessmentPage + (document.sltReview ? 2 : 1);
 
   const weeklyPages: CourseDocumentModel["weeklyPlan"][] = [];
   for (let i = 0; i < document.weeklyPlan.length; i += SECTION18_WEEK_ROWS_PER_PAGE) {
@@ -530,8 +530,12 @@ export function DocumentPages({ document, zoom }: { document: CourseDocumentMode
         <SectionTitle number="16">Distribution of Student Learning Time (SLT) (continued)</SectionTitle>
         <AssessmentSltTable document={document} category="continuous" />
         <AssessmentSltTable document={document} category="final" />
-        {document.sltReview ? <div className="mt-2 text-[8px] leading-tight">{documentSltReviewLines(document).map((line, index) => <p key={index} className="mb-1">{line}</p>)}</div> : null}
       </PartTwoRow><PageFooter courseCode={info.courseCode} page={section16AssessmentPage} /></div></Page>
+
+      {document.sltReview ? <Page zoom={zoom} pageNumber={section16AssessmentPage + 1}><div className="section16-page h-full px-[54px] py-[42px]"><PartTwoRow>
+        <SectionTitle number="16">SLT reconciliation — review copy</SectionTitle>
+        <div className="space-y-2 text-[10px] leading-relaxed">{documentSltReviewLines(document).map((line, index) => <p key={index}>{line}</p>)}</div>
+      </PartTwoRow><PageFooter courseCode={info.courseCode} page={section16AssessmentPage + 1} /></div></Page> : null}
 
       <Page zoom={zoom} pageNumber={assessmentPlanPage}><div id="assessment-plan" className="h-full px-[54px] py-[42px]"><PartTwoRow><SectionTitle number="17">Course Assessment Plan</SectionTitle><Table><colgroup><col className="w-[7%]" /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[23%]" /><col className="w-[7%]" /><col className="w-[7%]" /><col className="w-[10%]" /><col className="w-[14%]" /><col className="w-[14%]" /></colgroup><thead><tr><TH>CLOs</TH><TH>PLO</TH><TH>C/A/P Level</TH><TH>Assessment &amp; Description</TH><TH>G/I</TH><TH>Weight (%)</TH><TH>SLT</TH><TH>Evaluation Definition</TH><TH>Rubric</TH></tr></thead><tbody>{document.assessments.map((assessment) => <tr key={assessment.id}><TD>{joinValues(assessment.cloCodes)}</TD><TD>{joinValues(assessment.mappedPlos)}</TD><TD>{joinValues(assessment.capLevels)}</TD><TD><p className="font-semibold">{displayDocumentValue(assessment.name)}</p>{assessment.description ? <p className="mt-1 text-[9px] text-slate-700">{assessment.description}</p> : null}</TD><TD className="text-center">{assessment.mode === "group" ? "G" : "I"}</TD><TD>{assessment.weight ? `${assessment.weight}%` : "—"}</TD><TD>{assessment.totalSltHours > 0 ? `${assessment.totalSltHours} h` : "—"}</TD><TD>{displayDocumentValue(assessment.evaluationDefinition)}</TD><TD>{assessment.rubricName && assessment.rubricUrl ? <Link href={assessment.rubricUrl} className="font-semibold text-blue-700 underline underline-offset-2">{assessment.rubricName} ↗</Link> : assessment.rubricName ? assessment.rubricName : "—"}</TD></tr>)}</tbody><tfoot><tr><TD colSpan={5} className="font-semibold">Total Weightage</TD><TD className="font-semibold">{document.totals.assessmentWeight}%</TD><TD className="font-semibold">{document.totals.assessmentSlt} h</TD><TD colSpan={2}></TD></tr></tfoot></Table></PartTwoRow><PageFooter courseCode={info.courseCode} page={assessmentPlanPage} /></div></Page>
 

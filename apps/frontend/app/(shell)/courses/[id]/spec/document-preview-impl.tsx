@@ -261,7 +261,7 @@ export function DocumentPreview({
     try {
       setIsExporting(true);
       const printRoot = printRootRef.current;
-      if (printRoot) await exportCourseSpecPdf(printRoot, info.courseCode);
+      if (printRoot) await exportCourseSpecPdf(printRoot, info.courseCode, resolvedDocument.sltReview);
     } catch (error) {
       console.error("Failed to export Course Specification PDF:", error);
     } finally {

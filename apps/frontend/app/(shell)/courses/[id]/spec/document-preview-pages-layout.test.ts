@@ -16,8 +16,8 @@ describe("Course Specification Part 2 continuation rows", () => {
       '<ValueCell colSpan={4} className="part-two-continuation-cell">',
     );
 
-    expect(source.match(/<PartTwoRow>/g)?.length).toBe(15);
-    expect(source.match(/<\/PartTwoRow>/g)?.length).toBe(15);
+    expect(source.match(/<PartTwoRow>/g)?.length).toBe(16);
+    expect(source.match(/<\/PartTwoRow>/g)?.length).toBe(16);
 
     expect(source).toContain(
       '<span>14.</span><span className="font-bold">Course Learning Outcomes</span>',
@@ -100,6 +100,8 @@ describe("Course Specification Part 2 continuation rows", () => {
     expect(source).toContain("assessment?.weight");
     expect(source).toContain("document.totals.continuousAssessmentSlt");
     expect(source).toContain("document.totals.finalAssessmentSlt");
+    expect(source).toContain("section16AssessmentPage + (document.sltReview ? 2 : 1)");
+    expect(source).toContain("SLT reconciliation — review copy");
     expect(source).not.toContain("Assessment SLT</p>");
   });
 

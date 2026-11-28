@@ -469,6 +469,7 @@ function documentFooter(courseCode: string) {
 }
 
 async function exportCourseSpecWordInternal(document: CourseDocumentModel, theme: CourseSpecDocumentTheme) {
+  if (document.sltReview?.blocking.length) throw new Error("Resolve SLT reconciliation before export");
   applyWordTheme(theme);
   const children: (Paragraph | Table)[] = []; const info = document.courseInformation;
   children.push(await programmeProfileHeader(document));
@@ -481,7 +482,7 @@ async function exportCourseSpecWordInternal(document: CourseDocumentModel, theme
   const header = documentHeader();
   const footer = documentFooter(info.courseCode);
   const doc = new Document({ sections: [{ properties: { page: { size: { width: COURSE_DOCUMENT_STYLE.page.word.widthTwips, height: COURSE_DOCUMENT_STYLE.page.word.heightTwips }, margin: { top: wordTheme.marginTopTwips, bottom: wordTheme.marginBottomTwips, left: wordTheme.marginLeftTwips, right: wordTheme.marginRightTwips } } }, headers: header ? { default: header } : undefined, footers: footer ? { default: footer } : undefined, children }] });
-  const blob = await Packer.toBlob(doc); const url = URL.createObjectURL(blob); const anchor = window.document.createElement("a"); anchor.href = url; anchor.download = `${info.courseCode || "course"}-course-specification.docx`; window.document.body.appendChild(anchor); anchor.click(); window.document.body.removeChild(anchor); URL.revokeObjectURL(url);
+  const blob = await Packer.toBlob(doc); const url = URL.createObjectURL(blob); const anchor = window.document.createElement("a"); anchor.href = url; anchor.download = `${info.courseCode || "course"}-course-specification${document.sltReview ? "-review" : ""}.docx`; window.document.body.appendChild(anchor); anchor.click(); window.document.body.removeChild(anchor); URL.revokeObjectURL(url);
 }
 
 export function exportCourseSpecWord(

@@ -105,6 +105,11 @@ describe("Phase 3A.1B — synthetic export projections", () => {
     expect(preview).toContain("REVIEW_MAPPING_NOTE");
     expect(word).toContain("REVIEW_MAPPING_NOTE");
     expect(pdf).toContain("[data-doc-page]");
+    expect(pdf).toContain("if (sltReview?.blocking.length) throw");
+    expect(word).toContain("if (document.sltReview?.blocking.length) throw");
+    expect(controls).toContain("exportCourseSpecPdf(printRoot, info.courseCode, resolvedDocument.sltReview)");
+    expect(pdf).toContain('sltReview ? "-review" : ""');
+    expect(word).toContain('document.sltReview ? "-review" : ""');
     expect(controls).toContain("Boolean(resolvedDocument.sltReview?.blocking.length)");
     expect(historical).toContain('sltPresentation: "historical"');
     for (const source of [editor, readOnly]) expect(source).toContain('sltPresentation: review?.status === "approved" ? "historical" : "review"');
