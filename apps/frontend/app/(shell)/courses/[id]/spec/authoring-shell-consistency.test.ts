@@ -49,7 +49,10 @@ describe("Course Specification authoring shell", () => {
     expect(source).toContain('ready={status.courseInfo === "complete"}');
     expect(source).toContain("ready={cloReady}");
     expect(source).toContain('ready={status.assessmentPlan === "complete"}');
-    expect(source).toContain('ready={status.slt === "complete"}');
+    expect(source).toContain('ready={effectiveReadiness.slt === "complete"}');
+    expect(source).toContain("deriveCourseSpecAuthoringReadinessStatus(status, clos, weeklyPlan, assessments,");
+    expect(source).toContain("status={effectiveReadiness}");
+    expect(source).toContain('sourceAlignmentReady={effectiveReadiness.mapping === "complete"}');
     expect(source).toContain("teachingLearningIsReady(teachingLearningProfile, clos)");
   });
 

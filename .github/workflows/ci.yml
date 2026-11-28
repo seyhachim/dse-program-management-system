@@ -436,6 +436,8 @@ jobs:
         run: bun run db:migrate:deploy
 
       - name: Seed isolated browser database
+        env:
+          DSE_BROWSER_SMOKE_FIXTURE: "1"
         run: bun run seed
 
       - name: Mint role-scoped dev tokens

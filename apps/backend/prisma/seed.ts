@@ -1094,6 +1094,14 @@ async function main() {
   // Courses
   // ---------------------------------------------------------------------------
 
+  // Create-only SLT declaration for the disposable authenticated browser fixture.
+  // Do not update an existing course or an approved CourseSpec snapshot.
+  const browserSltFixture =
+    process.env.DSE_BROWSER_SMOKE_FIXTURE === "1" &&
+    process.env.CI === "true" && process.env.AUTH_MODE === "dev" &&
+    shouldSeedDemoOffering(process.env.DATABASE_URL, false) &&
+    new URL(process.env.DATABASE_URL!).pathname === "/dse_browser";
+
   for (const c of courses) {
     const lecturer = await prisma.user.findUnique({
       where: {
@@ -1119,6 +1127,7 @@ async function main() {
       create: {
         code: c.code,
         ...courseData,
+        ...(browserSltFixture && c.code === "CS101" ? { totalSltHours: 120 } : {}),
       },
     });
   }

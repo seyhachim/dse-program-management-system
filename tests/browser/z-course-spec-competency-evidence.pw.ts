@@ -282,7 +282,7 @@ test("#1203 CourseSpec programme competency evidence link, clear, mobile, and hi
   ).toBeTruthy();
   const draftSpec = (await draftSpecResponse.json()) as {
     data: {
-      courseInfo?: { prerequisites?: string; description?: string };
+      courseInfo?: { prerequisites?: string; description?: string; totalSltHours?: number | null };
       slt?: { weeks?: DraftWeek[] };
       clos?: {
         items?: Array<{
@@ -353,23 +353,28 @@ test("#1203 CourseSpec programme competency evidence link, clear, mobile, and hi
 
   const weeks = draftSpec.data.slt?.weeks ?? [];
   if (weeks.length === 0) throw new Error("Draft CourseSpec has no weekly plan");
+  // The isolated CI fixture has an explicit 120-hour declaration on creation.
+  // Fifteen eight-hour sessions are synthetic test data, not an academic rule.
+  expect(draftSpec.data.courseInfo?.totalSltHours).toBe(120);
+  const baseWeek = weeks.find(week => week.week === 1);
+  if (!baseWeek) throw new Error("Seeded programming week is missing");
+  const reconciledWeeks = Array.from({ length: 15 }, (_, index): DraftWeek => {
+    const number = index + 1;
+    const existing = weeks.find(week => week.week === number);
+    return {
+      ...(existing ?? { id: crypto.randomUUID(), cloCodes: baseWeek.cloCodes, lloItems: ["Explain a programming solution"], activities: ["Guided programming lab"] }),
+      week: number,
+      topic: existing?.topic ?? `Synthetic programming practice ${number}`,
+      lectureHours: 2, tutorialHours: 0, practiceHours: 2, otherHours: 0, selfStudyHours: 4,
+      teachingMethodIds: [teachingMethod.id],
+      assessment: "Formative programming exercise",
+    };
+  });
   const saveWeeks = await adminApi.put(
     `/api/courses/${course.id}/spec/slt`,
     {
       data: {
-        weeks: weeks.map((week) => {
-          // Keep legacy examination rows unchanged; this fixture's
-          // instructional programming week needs real teaching evidence.
-          if (/^(?:mid[- ]?term|final)\s+(?:exam|quiz|assessment)$/i.test(week.topic.trim())) return week;
-          return {
-            ...week,
-            lectureHours: week.lectureHours || 2,
-            practiceHours: week.practiceHours || 2,
-            selfStudyHours: week.selfStudyHours || 2,
-            teachingMethodIds: week.teachingMethodIds?.length ? week.teachingMethodIds : [teachingMethod.id],
-            assessment: week.assessment || "Formative programming exercise",
-          };
-        }),
+        weeks: reconciledWeeks,
       },
     },
   );
