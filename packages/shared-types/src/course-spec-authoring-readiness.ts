@@ -38,11 +38,15 @@ export type CourseSpecReadinessClo = {
   mappedPlos: readonly string[];
   teachingMethodIds: readonly string[];
   status: "active" | "inactive";
+  sltHours?: number | string | null;
 };
 
 export type CourseSpecReadinessAssessment = {
   status: "active" | "inactive";
   cloCodes: readonly string[];
+  physicalSltHours?: number | string | null;
+  onlineSltHours?: number | string | null;
+  independentSltHours?: number | string | null;
 };
 
 export type CourseSpecReadinessWeek = {
@@ -76,12 +80,14 @@ export type CourseSpecReadinessOptions = {
   cloReady?: boolean;
   teachingLearningReady?: boolean;
   teachingLearningProfile?: TeachingLearningProfile | null;
+  slt?: CourseSpecSltOptions;
 };
 
-export const MAX_COURSE_SPEC_INSTRUCTIONAL_WEEKS = 14;
+/** Storage/calendar authoring bound, not an academic instructional-week rule. */
+export const MAX_COURSE_SPEC_INSTRUCTIONAL_WEEKS = 52;
 
 const ASSESSMENT_ONLY_TOPIC =
-  /^(?:mid[- ]?term(?:\s+(?:exam|quiz|assessment))?|final(?:\s+(?:exam|assessment))?|final\s+exam\s*:\s*.*|exam\s*:\s*.*)$/i;
+  /^(?:(?:mid[- ]?term|final)(?:\s+(?:(?:written|practical|oral)\s+)?(?:exam(?:ination)?|quiz|assessment))?|final\s+exam(?:ination)?\s*:\s*.*|exam(?:ination)?\s*:\s*.*)$/i;
 
 function numericHour(value: number | string | null | undefined): number {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -112,7 +118,7 @@ export const COURSE_SPEC_SESSION_TYPE_LABELS: Record<CourseSpecSessionType, stri
 
 export function courseSpecHasWeekAssessment(week: Pick<CourseSpecReadinessWeek, "assessment" | "assessmentMethodIds">): boolean {
   return (week.assessmentMethodIds ?? []).some((id) => id.trim().length > 0) ||
-    Boolean((week.assessment ?? "").trim());
+    ((week.assessment ?? "").trim().length > 0 && !/^0(?:\.0+)?%?$/.test((week.assessment ?? "").trim()));
 }
 
 /** Explicit choices take precedence. Legacy exam titles and assessment evidence are read-only inference. */
@@ -126,10 +132,9 @@ export function isCourseSpecAssessmentOnlyWeek(week: SessionTypeEvidence): boole
   return courseSpecSessionType(week) === "assessment";
 }
 
-/** Preserve the existing instructional-week cap and exclude assessment-only hours from teaching totals. */
+/** All instructional sessions count; a calendar policy may flag counts but never truncate rows. */
 export function courseSpecInstructionalWeeks<T extends SessionTypeEvidence>(weeks: readonly T[]): T[] {
-  return weeks.filter((week) => !isCourseSpecAssessmentOnlyWeek(week))
-    .slice(0, MAX_COURSE_SPEC_INSTRUCTIONAL_WEEKS);
+  return weeks.filter((week) => !isCourseSpecAssessmentOnlyWeek(week));
 }
 
 /** Preserve old blank exam placeholders for audit; actual assessment sessions participate in readiness. */
@@ -173,7 +178,7 @@ export function courseSpecWeeklyPlanWeekAttention(
     if (!(week.teachingMethodIds ?? []).some((id) => id.trim().length > 0)) issues.push("Teaching method");
     if (!hasActivity) issues.push("Learning activity");
   }
-  if (slt <= 0) issues.push("Learning time");
+  if (slt <= 0 || weekHours(week).some(invalidSltHour)) issues.push("Learning time");
   if (type !== "teaching" && !courseSpecHasWeekAssessment(week)) issues.push("Assessment");
   return issues;
 }
@@ -234,7 +239,8 @@ export function deriveCourseSpecAuthoringReadinessStatus(
       : false);
   effective.teachingLearning = teachingLearningReady ? "complete" : "draft";
 
-  effective.slt = isCourseSpecWeeklyPlanReady(weeks)
+  const reconciliation = options.slt ? reconcileCourseSpecSlt(weeks, clos, assessments, options.slt) : null;
+  effective.slt = isCourseSpecWeeklyPlanReady(weeks) && !reconciliation?.blocking.length
     ? "complete"
     : "draft";
 
@@ -280,3 +286,73 @@ type CourseSpecProgressSummary = {
   total: number;
   incompleteSections: { id: CourseSpecAuthoringSectionId; title: string }[];
 };
+
+type SltHour = number | string | null | undefined;
+export type CourseSpecSltOptions = {
+  declaredHours: SltHour;
+  /** No institutional accounting convention is selected until authorized. */
+  accountingMode?: "inclusive" | "separate";
+  minInstructionalWeeks?: number;
+  maxInstructionalWeeks?: number;
+  requireCloAllocation?: boolean;
+  requireAssessmentAllocation?: boolean;
+};
+
+function suppliedSltHour(value: SltHour): boolean {
+  return value != null && String(value).trim() !== "";
+}
+function invalidSltHour(value: SltHour): boolean {
+  return suppliedSltHour(value) && (!Number.isFinite(Number(value)) || Number(value) < 0);
+}
+function weekHours(week: CourseSpecReadinessWeek): SltHour[] {
+  return [week.lectureHours, week.tutorialHours, week.practiceHours, week.otherHours, week.selfStudyHours];
+}
+function assessmentHours(item: CourseSpecReadinessAssessment): SltHour[] {
+  return [item.physicalSltHours, item.onlineSltHours, item.independentSltHours];
+}
+const sumHours = (values: readonly SltHour[]) => values.reduce<number>((sum, value) => sum + numericHour(value), 0);
+// Technical tolerance only, not an institutional rounding rule.
+const sameHours = (a: number, b: number) => Math.abs(a - b) < 1e-8;
+
+/**
+ * Read-only reconciliation. Weekly-inclusive and instructional-plus-assessment
+ * are alternative candidate ledgers, never added together. A numeric match
+ * does not prove non-overlap or establish an approved institutional policy.
+ */
+export function reconcileCourseSpecSlt(
+  weeks: readonly CourseSpecReadinessWeek[],
+  clos: readonly CourseSpecReadinessClo[],
+  assessments: readonly CourseSpecReadinessAssessment[],
+  options: CourseSpecSltOptions,
+) {
+  const planned = courseSpecPlannedWeeks(weeks);
+  const instructional = courseSpecInstructionalWeeks(planned);
+  const activeClos = clos.filter(clo => clo.status === "active");
+  const activeAssessments = assessments.filter(item => item.status === "active");
+  const weeklyTotal = sumHours(planned.flatMap(weekHours));
+  const instructionalTotal = sumHours(instructional.flatMap(weekHours));
+  const assessmentTotal = sumHours(activeAssessments.flatMap(assessmentHours));
+  const cloTotal = sumHours(activeClos.map(clo => clo.sltHours));
+  const missingCloAllocations = activeClos.filter(clo => !suppliedSltHour(clo.sltHours)).length;
+  const missingAssessmentAllocations = activeAssessments.filter(item => assessmentHours(item).some(value => !suppliedSltHour(value))).length;
+  const declared = suppliedSltHour(options.declaredHours) ? numericHour(options.declaredHours) : null;
+  const separateTotal = instructionalTotal + assessmentTotal;
+  const blocking: string[] = [];
+  const warnings: string[] = [];
+  if ([...weeks.flatMap(weekHours), ...activeAssessments.flatMap(assessmentHours), ...activeClos.map(clo => clo.sltHours)].some(invalidSltHour)) blocking.push("invalid-hours");
+  if (declared == null || declared <= 0 || invalidSltHour(options.declaredHours)) blocking.push("missing-or-invalid-declared-hours");
+  const inclusiveMatches = declared != null && sameHours(weeklyTotal, declared);
+  const separateMatches = declared != null && missingAssessmentAllocations === 0 && sameHours(separateTotal, declared);
+  if (options.accountingMode === "inclusive" ? !inclusiveMatches : options.accountingMode === "separate" ? !separateMatches : !inclusiveMatches && !separateMatches) blocking.push("total-mismatch");
+  if (missingCloAllocations > 0) (options.requireCloAllocation ? blocking : warnings).push("missing-clo-allocation");
+  else if (declared != null && activeClos.length > 0 && !sameHours(cloTotal, declared)) blocking.push("clo-total-mismatch");
+  if (missingAssessmentAllocations > 0) (options.requireAssessmentAllocation ? blocking : warnings).push("missing-assessment-allocation");
+  if (declared != null && assessmentTotal > declared && !sameHours(assessmentTotal, declared)) blocking.push("assessment-exceeds-declared");
+  // An inclusive ledger can contain assessment as a subset only. Even a
+  // matching total cannot establish per-session allocation without evidence.
+  if (assessmentTotal > 0 && weeklyTotal > 0) warnings.push("verify-assessment-overlap");
+  if (!options.accountingMode) warnings.push("accounting-policy-unconfirmed");
+  if (options.minInstructionalWeeks != null && instructional.length < options.minInstructionalWeeks) blocking.push("instructional-weeks-below-policy");
+  if (options.maxInstructionalWeeks != null && instructional.length > options.maxInstructionalWeeks) blocking.push("instructional-weeks-above-policy");
+  return { declared, weeklyTotal, instructionalTotal, assessmentOnlyTotal: weeklyTotal - instructionalTotal, assessmentTotal, separateTotal, cloTotal, missingCloAllocations, missingAssessmentAllocations, instructionalWeeks: instructional.length, inclusiveMatches, separateMatches, blocking, warnings };
+}

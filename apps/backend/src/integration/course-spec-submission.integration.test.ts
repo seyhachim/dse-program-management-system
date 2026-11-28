@@ -91,7 +91,7 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
           order, week: order < 7 ? order + 1 : order + 2,
           topic: "Synthetic guided investigation " + (order + 1), cloCodes: ["CLO1"],
           lloItems: ["Interpret temporal patterns"], activities: ["Guided notebook"],
-          lectureHours: 2, practiceHours: 2, selfStudyHours: 2,
+          lectureHours: 2, practiceHours: 2, selfStudyHours: order === 0 ? 12 : 4,
           teachingMethodIds: [method.id], assessment: "Formative check",
         })),
         // Preserved legacy empty assessment-only row, not an instructional week.
@@ -99,7 +99,7 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
       ]},
       assessmentItems: { create: {
         order: 0, name: "Synthetic individual assessment", type: "Assignment",
-        weight: 100, cloCodes: ["CLO1"], independentSltHours: 36,
+        weight: 100, cloCodes: ["CLO1"], physicalSltHours: 2, onlineSltHours: 0, independentSltHours: 36,
       }},
     }, include: { clos: true } });
     specId = spec.id;
@@ -214,6 +214,11 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
       where: { courseSpecId_id: { courseSpecId: specId, id: mixedWeek.id } },
       data: { assessment: "Formative check" },
     });
+    // Transfer two hours from independent study to the supervised exam, rather than adding hours.
+    await prisma.courseSpecWeek.update({
+      where: { courseSpecId_id: { courseSpecId: specId, id: teachingWeek.id } },
+      data: { selfStudyHours: 10 },
+    });
     const exam = await prisma.courseSpecWeek.create({ data: {
       courseSpecId: specId, order: 15, week: 8,
       topic: "Midterm Exam", sessionType: "assessment",
@@ -227,6 +232,13 @@ isolated("CourseSpec submit/resubmit — authenticated isolated regression #835"
       where: { courseSpecId_id: { courseSpecId: specId, id: exam.id } },
       data: { assessment: "Individual written examination" },
     });
+
+    await prisma.courseSpecWeek.update({ where: { courseSpecId_id: { courseSpecId: specId, id: exam.id } }, data: { otherHours: 3 } });
+    const sltGap = await request("/submit", lecturer);
+    expect(sltGap.status).toBe(400);
+    expect(sltGap.body.error ?? "").toContain("Weekly Plan");
+    expect((await snapshot()).reviewActions).toHaveLength(0);
+    await prisma.courseSpecWeek.update({ where: { courseSpecId_id: { courseSpecId: specId, id: exam.id } }, data: { otherHours: 2 } });
 
     const dateBefore = localDate(new Date());
     const submitted = await request("/submit", lecturer);

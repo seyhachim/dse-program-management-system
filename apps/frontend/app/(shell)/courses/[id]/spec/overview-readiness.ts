@@ -1,6 +1,7 @@
 import {
   deriveCourseSpecAuthoringReadinessStatus,
   type SpecSectionStatus,
+  type CourseSpecSltOptions,
 } from "@dse-pms/shared-types";
 import type { AssessmentForm } from "./assessment-model";
 import type { CloForm } from "./clo-model";
@@ -10,6 +11,7 @@ import type { WeekForm } from "./weekly-plan-model";
 export type OverviewDerivedReadiness = {
   cloReady?: boolean;
   teachingLearningReady?: boolean;
+  slt?: CourseSpecSltOptions;
 };
 
 /**

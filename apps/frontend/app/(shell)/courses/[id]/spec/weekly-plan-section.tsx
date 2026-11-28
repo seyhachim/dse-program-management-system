@@ -91,7 +91,7 @@ export function WeeklyPlanSectionForm({
   const persistPlan = async (next: WeeklyPlanForm) => {
     const count = next.filter((week) => !isAssessmentOnlyWeek(week)).length;
     if (count > MAX_INSTRUCTIONAL_WEEKS && count > teachingCount) {
-      setNotice(`Cannot add more than ${MAX_INSTRUCTIONAL_WEEKS} instructional weeks. Choose Assessment for an assessment-only session.`);
+      setNotice(`Technical authoring limit: ${MAX_INSTRUCTIONAL_WEEKS} instructional rows.`);
       return false;
     }
     return onPersist(next);
@@ -119,7 +119,7 @@ export function WeeklyPlanSectionForm({
     const source = plan.find((item) => item.id === id);
     if (!source) return;
     if (atLimit && !isAssessmentOnlyWeek(source)) {
-      setNotice(`Cannot add more than ${MAX_INSTRUCTIONAL_WEEKS} instructional weeks.`);
+      setNotice(`Technical authoring limit: ${MAX_INSTRUCTIONAL_WEEKS} instructional rows.`);
       return;
     }
 
@@ -157,7 +157,7 @@ export function WeeklyPlanSectionForm({
     <CourseSpecAuthoringStack>
       <CourseSpecAuthoringHeader
         title="Weekly Plan"
-        description={`Plan up to ${MAX_INSTRUCTIONAL_WEEKS} instructional weeks, plus assessment-only sessions${courseName ? ` for ${courseName}` : ""}. Record assessment SLT separately in Assessment.`}
+        description={`Plan teaching and assessment sessions${courseName ? ` for ${courseName}` : ""} according to the approved calendar. Reconcile assessment workload without counting it twice.`}
         ready={ready}
         actions={
           <Button size="sm" onClick={openAdd}>
@@ -185,7 +185,7 @@ export function WeeklyPlanSectionForm({
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold text-foreground">
-            Weekly Plan ({plan.length} sessions · {instructionalWeeklyPlan(plan).length}/{MAX_INSTRUCTIONAL_WEEKS} instructional)
+            Weekly Plan ({plan.length} sessions · {instructionalWeeklyPlan(plan).length} instructional)
           </h3>
         </div>
 
@@ -367,7 +367,7 @@ function WeeklyPlanDashboard({ plan, cloCodes }: { plan: WeeklyPlanForm; cloCode
   const attentionWeeks = plan.filter((week) => weekAttention(week).length > 0);
   const completeWeeks = Math.max(0, plan.length - attentionWeeks.length);
   return <div className="space-y-3"><div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
-    <MetricCard icon={<CalendarDays className="h-4 w-4" />} label="Total Sessions" value={plan.length} detail={`${instructional.length} of ${MAX_INSTRUCTIONAL_WEEKS} instructional weeks`} />
+    <MetricCard icon={<CalendarDays className="h-4 w-4" />} label="Total Sessions" value={plan.length} detail={`${instructional.length} instructional weeks`} />
     <MetricCard icon={<Clock className="h-4 w-4" />} label="Instructional SLT" value={`${totals.slt} h`} detail={`${totals.selfStudyHours} h independent`} />
     <MetricCard icon={<Target className="h-4 w-4" />} label="CLOs Covered" value={coverage.length > 0 ? `${coveredClos} / ${coverage.length}` : "—"} detail={coverage.length > 0 ? `${Math.round((coveredClos / coverage.length) * 100)}% coverage` : "No CLOs available"} />
     <MetricCard icon={<AlertTriangle className="h-4 w-4" />} label="Need Attention" value={attentionWeeks.length} detail={attentionWeeks.length === 1 ? "Week" : "Weeks"} tone="attention" />

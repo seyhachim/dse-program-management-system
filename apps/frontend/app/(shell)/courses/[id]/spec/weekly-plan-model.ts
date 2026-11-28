@@ -1,4 +1,4 @@
-import { courseSpecInstructionalWeeks, isCourseSpecAssessmentOnlyWeek, CourseSpecSessionType } from "@dse-pms/shared-types";
+import { courseSpecInstructionalWeeks, isCourseSpecAssessmentOnlyWeek, courseSpecHasWeekAssessment, MAX_COURSE_SPEC_INSTRUCTIONAL_WEEKS, CourseSpecSessionType } from "@dse-pms/shared-types";
 import type {
   LessonLearningOutcome,
   StudentLearningActivity,
@@ -33,7 +33,8 @@ export type WeekForm = {
 export type WeeklyPlanForm = WeekForm[];
 
 export const EMPTY_WEEKLY_PLAN: WeeklyPlanForm = [];
-export const MAX_INSTRUCTIONAL_WEEKS = 14;
+/** Technical authoring bound only; no institutional week limit is inferred. */
+export const MAX_INSTRUCTIONAL_WEEKS = MAX_COURSE_SPEC_INSTRUCTIONAL_WEEKS;
 
 /** Use the same classification in authoring, readiness, and official teaching SLT. */
 export function isAssessmentOnlyWeek(week: WeekForm): boolean {
@@ -117,7 +118,7 @@ const studentLearningActivityArray = (
     ];
   });
 };
-/** A fresh instructional week, using the first available week number 1–14. */
+/** A fresh instructional week, using the first available week number 1–52. */
 export function emptyWeek(existing: WeeklyPlanForm): WeekForm {
   const used = new Set(
     existing.map((week) => Number(week.week))
@@ -432,7 +433,7 @@ export function weeklyPlanSummary(form: WeeklyPlanForm) {
     totals.tutorialHours +
     totals.practiceHours +
     totals.otherHours;
-  const assessments = form.filter((w) => w.assessment.trim()).length;
+  const assessments = form.filter(courseSpecHasWeekAssessment).length;
   const isProject = (w: WeekForm) =>
     /project/i.test(w.topic) ||
     /project/i.test(w.assessment) ||

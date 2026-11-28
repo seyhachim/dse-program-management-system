@@ -12,18 +12,23 @@ import {
  * be regression-tested without a database or permission bypass.
  */
 export type CourseSpecSubmissionSource = {
+  courseInfo?: { totalSltHours: number | null } | null;
   sections: readonly { sectionKey: string; status: "Complete" | "Draft" }[];
   clos: readonly {
     order: number;
     description: string;
     status: "Active" | "Inactive";
     mappedPlos: readonly string[];
+    sltHours?: number | null;
     teachingMethods: readonly { teachingMethodId: string }[];
   }[];
   weeks: readonly CourseSpecReadinessWeek[];
   assessmentItems: readonly {
     status: "Active" | "Inactive";
     cloCodes: readonly string[];
+    physicalSltHours?: number | null;
+    onlineSltHours?: number | null;
+    independentSltHours?: number | null;
   }[];
   teachingLearning: TeachingLearningProfile | null;
 };
@@ -50,6 +55,7 @@ export function courseSpecSubmissionGaps(
       description: clo.description,
       status: clo.status === "Active" ? ("active" as const) : ("inactive" as const),
       mappedPlos: clo.mappedPlos,
+      sltHours: clo.sltHours,
       teachingMethodIds: clo.teachingMethods.map((method) => method.teachingMethodId),
     })),
     source.weeks,
@@ -59,8 +65,11 @@ export function courseSpecSubmissionGaps(
           ? ("active" as const)
           : ("inactive" as const),
       cloCodes: assessment.cloCodes,
+      physicalSltHours: assessment.physicalSltHours,
+      onlineSltHours: assessment.onlineSltHours,
+      independentSltHours: assessment.independentSltHours,
     })),
-    { teachingLearningProfile: source.teachingLearning },
+    { teachingLearningProfile: source.teachingLearning, ...(source.courseInfo !== undefined ? { slt: { declaredHours: source.courseInfo?.totalSltHours } } : {}) },
   );
 
   // Preserve the existing Review & Submit contract (five authoring gates

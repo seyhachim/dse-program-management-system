@@ -150,3 +150,8 @@ describe("CourseSpec authoritative submission readiness", () => {
     })).toContain("Course Assessment Plan");
   });
 });
+
+
+test("authoritative submit gate rejects a mismatched declared SLT even with saved Complete", () => {
+  expect(courseSpecSubmissionGaps({ ...ready, courseInfo: { totalSltHours: 7 } })).toContain("Weekly Plan");
+});
